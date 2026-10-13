@@ -39,5 +39,13 @@ jobs:
             --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
             --label org.opencontainers.image.revision="$GITHUB_SHA" \
             ci
+      # Forgejo can take longer than docker waits to store a large layer;
+      # pushing again sends only what didn't make it.
       - name: Push
-        run: docker push --all-tags "$IMAGE"
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker push --all-tags "$IMAGE" && exit 0
+            echo "push failed, attempt $attempt" >&2
+            sleep 30
+          done
+          exit 1
