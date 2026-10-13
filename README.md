@@ -1,24 +1,65 @@
-# Wisetalk native client
+# Wisetalk client
 
 Native client of [Wisetalk](https://git.wiseless.net/Wisetalk), an open-source
 voice and video chat for a single community. Built with
 [Flutter](https://flutter.dev): one codebase for Linux, Windows, macOS, Android
-and iOS.
+and iOS. This repository was called `mobile` until 2026-10-12.
 
-**Status:** not started. The browser client
-([webclient](https://git.wiseless.net/Wisetalk/webclient)) comes first; this one
-follows once the MVP has been tried out.
+**Status:** foundation. The Flutter app builds for Linux and opens a window
+that talks to [wisetalk-core](https://git.wiseless.net/Wisetalk/core) through
+the Rust bridge; sign-in, channels and calls come next. The browser client
+([webclient](https://git.wiseless.net/Wisetalk/webclient)) is the one in use.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `lib/` | The Flutter app. `lib/theme.dart` is the design system shared with the web client: Catppuccin colors, Apple's Human Interface Guidelines for the rest. |
+| `lib/src/rust/` | Dart side of the bridge, generated: don't edit, run `flutter_rust_bridge_codegen generate`. |
+| `hook/build.dart` | Native Assets build hook: compiles `rust/` with cargo during `flutter build` and bundles the library. |
+| `android/`, `linux/`, `macos/`, `windows/` | Platform runners. iOS comes later. |
+| `rust/` | `wisetalk_bridge`: Dart bindings for wisetalk-core through [flutter_rust_bridge](https://github.com/fzyzcjy/flutter_rust_bridge) 2.13. Device keys, call and chat encryption, guest proof of work, name checks. Envelopes and sealed messages cross the boundary as gateway JSON, as in the web client's WebAssembly build. |
 
 ## Plan
 
-- Voice, video and screen sharing through the
-  [LiveKit Flutter SDK](https://github.com/livekit/client-sdk-flutter).
-- Protocol types and end-to-end encryption from
-  [wisetalk-core](https://git.wiseless.net/Wisetalk/core), bound to Dart with
-  [flutter_rust_bridge](https://github.com/fzyzcjy/flutter_rust_bridge), so
-  native and browser clients share one implementation.
-- Same feature set as the web client, plus what browsers can't do well:
-  system audio capture during screen sharing and native notifications.
+- Voice, video and screen sharing through
+  [livekit_client](https://pub.dev/packages/livekit_client), end-to-end
+  encrypted and interoperable with the web client. The call key goes to
+  LiveKit with HKDF key derivation (the web client uses
+  `createKeyMaterialFromBuffer`), and the key index is set explicitly after
+  every rotation.
+- All cryptography and protocol types come from wisetalk-core through the
+  bridge; no cryptography is written in Dart.
+- Sign-in through the system browser: the server runs the OpenID Connect flow
+  and hands the app a one-time code that it exchanges for a session token.
+- Beyond the web client: system audio during screen sharing, a tray app that
+  stays connected, native notifications.
+
+## Setting up a machine
+
+- Flutter 3.47 (stable) from the official archive.
+- `cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked`.
+- Linux builds on Fedora: `clang cmake ninja-build pkgconf-pkg-config
+  gtk3-devel libstdc++-devel mesa-libGLU libsecret-devel
+  libayatana-appindicator-gtk3-devel pulseaudio-libs-devel`.
+- `rustup` (Fedora: `dnf install rustup`): flutter_rust_bridge's build hooks
+  need it for the Android and Apple targets. `rust/rust-toolchain.toml` pins
+  the version and targets.
+- Android: Android Studio, SDK API 36, NDK, cmdline-tools. Check with
+  `flutter doctor -v`.
+
+Then:
+
+```sh
+flutter run -d linux        # build hooks compile the Rust bridge too
+flutter test                # widget tests load rust/target/release
+cd rust && cargo test       # the bridge on its own
+flutter_rust_bridge_codegen generate   # after changing rust/src/api
+```
+
+The bridge library is looked up in `rust/target/release` relative to the
+working directory before the bundled copy. A stale build there wins over the
+fresh one in the app; `cargo build --release` in `rust/` fixes that.
 
 ## License
 
