@@ -1,0 +1,43 @@
+name: ci-image
+
+# The build image for this repository, rebuilt when ci/Dockerfile changes.
+# Needs organization secrets REGISTRY_USER and REGISTRY_TOKEN (package write).
+on:
+  push:
+    branches: [master]
+    paths: [ci/Dockerfile]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-20.04
+    container:
+      image: docker.io/library/docker:29-cli
+    defaults:
+      run:
+        shell: sh
+    env:
+      IMAGE: git.wiseless.net/wisetalk/flutter-ci
+    steps:
+      - run: apk add --no-cache git
+      - name: Checkout
+        run: |
+          git init -q .
+          git remote add origin "${{ github.server_url }}/${{ github.repository }}.git"
+          git fetch -q --depth 1 origin "${{ github.sha }}"
+          git checkout -q FETCH_HEAD
+      # The runner's docker-in-docker daemon, reachable through the job
+      # network's gateway on tcp/2375.
+      - name: Docker daemon
+        run: echo "DOCKER_HOST=tcp://$(ip route | awk '/default/ {print $3; exit}'):2375" >> "$GITHUB_ENV"
+      - name: Registry login
+        run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login git.wiseless.net -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+      - name: Build
+        run: |
+          flutter=$(sed -n 's/^ARG FLUTTER_VERSION=//p' ci/Dockerfile)
+          docker build --tag "$IMAGE:$flutter" --tag "$IMAGE:latest" \
+            --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            ci
+      - name: Push
+        run: docker push --all-tags "$IMAGE"

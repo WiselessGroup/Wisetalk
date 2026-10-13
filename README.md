@@ -61,6 +61,25 @@ The bridge library is looked up in `rust/target/release` relative to the
 working directory before the bundled copy. A stale build there wins over the
 fresh one in the app; `cargo build --release` in `rust/` fixes that.
 
+## Releases
+
+A tag `vX.Y.Z` builds the app in CI and publishes it as a release of this
+repository: `Wisetalk-X.Y.Z-x86_64.AppImage` and a universal
+`Wisetalk-X.Y.Z.apk` for now, a Windows installer and a `.dmg` once there
+are runners for them. The notes come from the tag's section in
+`CHANGELOG.md`; a version with a hyphen (`1.0.0-beta.1`) is a prerelease.
+Wisetalk servers offer the latest release on their web client's Download
+button.
+
+CI runs in `git.wiseless.net/wisetalk/flutter-ci:<flutter version>`, built
+from `ci/Dockerfile` whenever it changes. Android releases are signed with
+the key in the repository secrets `ANDROID_KEYSTORE` (the `.jks`, base64),
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`
+(optional, defaults to the keystore password). Without them the APK job
+fails rather than publish an APK signed with a throwaway key, which phones
+would refuse to update later. Keep a copy of the keystore somewhere safe:
+losing it means nobody can update the app without reinstalling.
+
 ## License
 
 [AGPL-3.0](LICENSE). If you run a modified version for others, you have to

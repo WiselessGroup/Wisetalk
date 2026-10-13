@@ -100,9 +100,12 @@ impl ChatKey {
         ciphertext: Vec<u8>,
     ) -> anyhow::Result<Vec<u8>> {
         let image: ChatImage = serde_json::from_str(&image)?;
-        Ok(self
-            .0
-            .open_image(channel_id(&channel)?, author_id(author)?, &image, &ciphertext)?)
+        Ok(self.0.open_image(
+            channel_id(&channel)?,
+            author_id(author)?,
+            &image,
+            &ciphertext,
+        )?)
     }
 
     #[frb(sync)]
