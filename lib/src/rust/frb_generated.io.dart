@@ -3,6 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/auth.dart';
 import 'api/call.dart';
 import 'api/chat.dart';
 import 'api/device.dart';
@@ -106,6 +107,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  PkcePair dco_decode_pkce_pair(dynamic raw);
+
+  @protected
   SealedImage dco_decode_sealed_image(dynamic raw);
 
   @protected
@@ -191,6 +195,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  PkcePair sse_decode_pkce_pair(SseDeserializer deserializer);
 
   @protected
   SealedImage sse_decode_sealed_image(SseDeserializer deserializer);
@@ -299,6 +306,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pkce_pair(PkcePair self, SseSerializer serializer);
 
   @protected
   void sse_encode_sealed_image(SealedImage self, SseSerializer serializer);

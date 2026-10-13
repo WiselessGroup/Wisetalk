@@ -92,6 +92,55 @@ ThemeData themeFor(Brightness brightness) {
     ),
     // No ink splashes: HIG controls highlight, they don't ripple.
     splashFactory: NoSplash.splashFactory,
+    // Capsule buttons: the prominent one tinted, the rest gray, as on the web.
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: palette.accent,
+        foregroundColor: palette.onAccent,
+        disabledBackgroundColor: palette.fill,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        backgroundColor: palette.fill,
+        foregroundColor: palette.text,
+        side: BorderSide.none,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: palette.accent,
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
+    ),
+    // Text fields: a quiet fill and no border; focus shows where you type.
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: palette.fill,
+      hintStyle: TextStyle(color: palette.tertiary),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: palette.accent.withValues(alpha: 0.6),
+          width: 2,
+        ),
+      ),
+    ),
+    dividerColor: palette.separator,
     extensions: [palette],
   );
 }

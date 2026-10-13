@@ -6,6 +6,7 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
+import 'api/auth.dart';
 import 'api/call.dart';
 import 'api/chat.dart';
 import 'api/device.dart';
@@ -108,6 +109,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  PkcePair dco_decode_pkce_pair(dynamic raw);
+
+  @protected
   SealedImage dco_decode_sealed_image(dynamic raw);
 
   @protected
@@ -193,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  PkcePair sse_decode_pkce_pair(SseDeserializer deserializer);
 
   @protected
   SealedImage sse_decode_sealed_image(SseDeserializer deserializer);
@@ -301,6 +308,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_pkce_pair(PkcePair self, SseSerializer serializer);
 
   @protected
   void sse_encode_sealed_image(SealedImage self, SseSerializer serializer);

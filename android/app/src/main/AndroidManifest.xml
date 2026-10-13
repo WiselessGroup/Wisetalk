@@ -1,8 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Talking to Wisetalk servers. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- No auto backup: a restored phone gets the stored secrets but not the
+         Keystore key that unlocks them, and reading them fails. Tokens and
+         device keys are made anew instead (lib/data/secrets.dart). -->
     <application
-        android:label="wisetalk"
+        android:label="Wisetalk"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -40,6 +47,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Opening the browser to sign in. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>
