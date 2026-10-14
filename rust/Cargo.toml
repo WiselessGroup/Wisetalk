@@ -25,6 +25,8 @@ wisetalk-core = { git = "https://git.wiseless.net/Wisetalk/core.git", branch = "
 # Pictures pasted into chats. Phones paste through the keyboard instead.
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 arboard = { version = "3.6.1", default-features = false, features = ["image-data", "wayland-data-control"] }
+# Desktop updates: the app installs, updates and restarts through Velopack.
+velopack = "1.2.161"
 
 [lints.rust]
 # Set by flutter_rust_bridge's code generator while it expands the API.

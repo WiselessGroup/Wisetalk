@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/address.dart';
 import '../data/chat.dart';
@@ -15,6 +16,7 @@ import '../data/notifications.dart';
 import '../data/protocol.dart';
 import '../data/servers.dart';
 import '../data/session.dart';
+import '../data/updates.dart';
 import '../data/voice.dart';
 import '../theme.dart';
 import 'call_stage.dart';
@@ -62,7 +64,12 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   Gateway get _gateway => widget.connection.gateway;
   Voice get _voice => widget.connection.voice;
   Chats get _chats => widget.connection.chats;
-  late final Listenable _changes = Listenable.merge([_gateway, _voice, _chats]);
+  late final Listenable _changes = Listenable.merge([
+    _gateway,
+    _voice,
+    _chats,
+    ref.read(updatesProvider),
+  ]);
   String? _shownError;
 
   /// Whether Wisetalk is the window in front: notifications only when not.
@@ -261,6 +268,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
                     gateway: _gateway,
                     voice: _voice,
                     chats: _chats,
+                    updates: ref.read(updatesProvider),
                     session: widget.session,
                   ),
                 ),
@@ -311,12 +319,14 @@ class _Sidebar extends ConsumerWidget {
     required this.gateway,
     required this.voice,
     required this.chats,
+    required this.updates,
     required this.session,
   });
 
   final Gateway gateway;
   final Voice voice;
   final Chats chats;
+  final Updates updates;
   final Session session;
 
   @override
@@ -407,6 +417,8 @@ class _Sidebar extends ConsumerWidget {
               ],
             ),
           ),
+          if (updates.ready != null || updates.available != null)
+            _UpdateButton(updates: updates),
           Divider(height: 1, color: palette.separator),
           ListTile(
             dense: true,
@@ -432,6 +444,11 @@ class _Sidebar extends ConsumerWidget {
               tooltip: 'More',
               icon: Icon(Icons.more_horiz, color: palette.muted),
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  enabled: false,
+                  child: Text('Wisetalk $versionName'),
+                ),
+                const PopupMenuDivider(),
                 PopupMenuItem(
                   onTap: () async {
                     voice.leave();
@@ -582,6 +599,42 @@ class _ChatButton extends StatelessWidget {
               color: open || unread > 0 ? palette.accent : palette.tertiary,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shows once a new version is waiting: restarts into it on desktop, gets
+/// the APK on Android.
+class _UpdateButton extends StatelessWidget {
+  const _UpdateButton({required this.updates});
+
+  final Updates updates;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = updates.ready;
+    final available = updates.available;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      child: Tooltip(
+        message: ready != null
+            ? 'Wisetalk $ready is downloaded'
+            : 'Wisetalk ${available?.version} is out',
+        child: FilledButton.icon(
+          icon: const Icon(Icons.system_update_alt, size: 18),
+          label: Text(
+            ready != null
+                ? 'Restart to Update'
+                : 'Update to ${available?.version}',
+          ),
+          onPressed: ready != null
+              ? updates.restart
+              : () => launchUrl(
+                  available!.url,
+                  mode: LaunchMode.externalApplication,
+                ),
         ),
       ),
     );

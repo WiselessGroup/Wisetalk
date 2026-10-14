@@ -9,6 +9,7 @@ import 'api/chat.dart';
 import 'api/device.dart';
 import 'api/picture.dart';
 import 'api/text.dart';
+import 'api/update.dart';
 
 import 'dart:async';
 import 'dart:convert';

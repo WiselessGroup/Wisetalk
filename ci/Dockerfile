@@ -1,5 +1,5 @@
 # Build image for the client's CI: Flutter, Rust for the bridge, the Linux
-# desktop toolchain and the Android SDK. Published as
+# desktop toolchain, the Android SDK and Velopack's vpk for releases. Published as
 # git.wiseless.net/wisetalk/flutter-ci:<flutter version> by ci-image.yml.
 #
 # Ubuntu 22.04 on purpose: an AppImage runs on systems with the same or a
@@ -12,8 +12,8 @@ ARG CMDLINE_TOOLS=16111833
 ARG ANDROID_PLATFORM=36
 ARG ANDROID_BUILD_TOOLS=36.0.0
 ARG ANDROID_NDK=28.2.13676358
-ARG APPIMAGETOOL=1.9.1
-ARG APPIMAGETOOL_SHA256=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+# Must match the velopack crate in rust/Cargo.toml.
+ARG VPK_VERSION=1.2.161
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -21,8 +21,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     FLUTTER_ROOT=/opt/flutter \
     RUSTUP_HOME=/opt/rustup \
     CARGO_HOME=/opt/cargo \
-    PUB_CACHE=/opt/pub-cache
-ENV PATH=/opt/flutter/bin:/opt/cargo/bin:/opt/android/cmdline-tools/latest/bin:/opt/android/platform-tools:$PATH
+    PUB_CACHE=/opt/pub-cache \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NOLOGO=1
+ENV PATH=/opt/flutter/bin:/opt/cargo/bin:/opt/android/cmdline-tools/latest/bin:/opt/android/platform-tools:/opt/dotnet-tools:$PATH
 
 RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends \
@@ -60,7 +62,10 @@ RUN git clone -q --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutte
 RUN cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked \
  && rm -rf "$CARGO_HOME/registry"
 
-RUN curl -sSfLo /usr/local/bin/appimagetool \
-      "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL}/appimagetool-x86_64.AppImage" \
- && echo "${APPIMAGETOOL_SHA256}  /usr/local/bin/appimagetool" | sha256sum -c - \
- && chmod +x /usr/local/bin/appimagetool
+# vpk packs the Linux release (an AppImage that updates itself) with
+# squashfs-tools, and makes delta updates with zstd.
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends dotnet-sdk-8.0 squashfs-tools zstd \
+ && rm -rf /var/lib/apt/lists/* \
+ && dotnet tool install --tool-path /opt/dotnet-tools vpk --version "$VPK_VERSION" \
+ && vpk -h >/dev/null

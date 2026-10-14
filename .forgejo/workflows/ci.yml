@@ -50,12 +50,22 @@ jobs:
     steps:
       - name: Checkout
         run: sh -c "$CHECKOUT"
-      - name: Build
+      # Velopack makes an AppImage that updates itself, plus the update
+      # packages and feed the installed apps read from this release.
+      - name: Build and release
         run: |
           version=${GITHUB_REF_NAME#v}
           flutter build linux --release --build-name="${version%%-*}"
-          scripts/appimage.sh "$version"
-      - run: scripts/release-upload.sh dist/*.AppImage
+          # The release before, so updates from it are a small delta.
+          vpk download gitea --repoUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --channel linux -o dist || echo "no release to make a delta from"
+          vpk pack --packId Wisetalk --packVersion "$version" --channel linux \
+            --packDir build/linux/x64/release/bundle --mainExe wisetalk \
+            --packTitle Wisetalk --icon packaging/linux/wisetalk.png \
+            --categories "Network;InstantMessaging;AudioVideo" -o dist
+          mv dist/Wisetalk.AppImage "dist/Wisetalk-$version-x86_64.AppImage"
+          scripts/release-upload.sh "dist/Wisetalk-$version-x86_64.AppImage" \
+            dist/Wisetalk-"$version"-linux-*.nupkg dist/releases.linux.json
 
   android:
     needs: check
@@ -90,7 +100,8 @@ jobs:
           major=${base%%.*}; rest=${base#*.}; minor=${rest%%.*}; patch=${rest#*.}
           # One APK for every phone: arm64, arm and x86_64 in one file.
           flutter build apk --release --build-name="$base" \
-            --build-number=$((major * 1000000 + minor * 1000 + patch))
+            --build-number=$((major * 1000000 + minor * 1000 + patch)) \
+            --dart-define=WISETALK_VERSION="$version"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/Wisetalk-$version.apk"
       - run: scripts/release-upload.sh dist/*.apk

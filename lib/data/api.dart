@@ -105,6 +105,26 @@ class GuestChallenge {
   final int difficulty;
 }
 
+/// The app's latest release, as the server finds it (`GET /api/downloads`).
+class Downloads {
+  const Downloads({required this.version, required this.files});
+
+  factory Downloads.fromJson(Map<String, dynamic> json) => Downloads(
+    version: json['version'] as String?,
+    files: [
+      for (final f in json['files'] as List<dynamic>)
+        (
+          platform: (f as Map<String, dynamic>)['platform'] as String,
+          url: f['url'] as String,
+        ),
+    ],
+  );
+
+  /// `null` while there's no release.
+  final String? version;
+  final List<({String platform, String url})> files;
+}
+
 /// A refusal from the server, with the message it gave for people.
 class ApiException implements Exception {
   const ApiException(this.status, this.message);
@@ -237,6 +257,10 @@ class Api {
   );
 
   Future<void> signOut() => _send('POST', '/auth/logout');
+
+  Future<Downloads> downloads() async => Downloads.fromJson(
+    await _send('GET', '/downloads') as Map<String, dynamic>,
+  );
 
   /// A channel's chat with the keys sealed for [device] (this one's).
   Future<ChatHistory> chatHistory(String channel, String device) async =>
