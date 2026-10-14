@@ -2,8 +2,11 @@
 // the JSON of wisetalk_core::api.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+
+import 'protocol.dart';
 
 /// Who a session belongs to (`GET /api/me`).
 class Me {
@@ -133,8 +136,14 @@ class Api {
     if (token != null) 'authorization': 'Bearer $token',
   };
 
-  Future<dynamic> _send(String method, String path, [Object? body]) async {
-    final request = http.Request(method, _url(path))..headers.addAll(_headers);
+  Future<dynamic> _send(
+    String method,
+    String path, [
+    Object? body,
+    Map<String, String>? query,
+  ]) async {
+    final request = http.Request(method, _url(path, query))
+      ..headers.addAll(_headers);
     if (body != null) request.body = jsonEncode(body);
     final http.Response response;
     try {
@@ -147,24 +156,29 @@ class Api {
         "Can't reach the server. Check the address and your connection.",
       );
     }
-    final text = utf8.decode(response.bodyBytes);
     if (response.statusCode >= 400) {
-      String message = 'The server said no (${response.statusCode}).';
-      try {
-        message =
-            (jsonDecode(text) as Map<String, dynamic>)['message'] as String? ??
-            message;
-      } on FormatException {
-        // Not one of our errors: a proxy's page, say.
-      }
-      throw ApiException(response.statusCode, message);
+      throw ApiException(response.statusCode, _message(response));
     }
+    final text = utf8.decode(response.bodyBytes);
     if (text.isEmpty) return null;
     try {
       return jsonDecode(text);
     } on FormatException {
       throw const ApiException(0, "That doesn't look like a Wisetalk server.");
     }
+  }
+
+  /// What the server said went wrong, for people.
+  String _message(http.Response response) {
+    try {
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      if (json is Map<String, dynamic> && json['message'] is String) {
+        return json['message'] as String;
+      }
+    } on FormatException {
+      // Not one of our errors: a proxy's page, say.
+    }
+    return 'The server said no (${response.statusCode}).';
   }
 
   Future<ServerInfo> server() async {
@@ -223,4 +237,68 @@ class Api {
   );
 
   Future<void> signOut() => _send('POST', '/auth/logout');
+
+  /// A channel's chat with the keys sealed for [device] (this one's).
+  Future<ChatHistory> chatHistory(String channel, String device) async =>
+      ChatHistory.fromJson(
+        await _send('GET', '/channels/$channel/messages', null, {
+          'device': device,
+        }) as Map<String, dynamic>,
+      );
+
+  /// Every device a new chat key has to be sealed for.
+  Future<List<DeviceKey>> chatDevices(String channel) async {
+    final json = await _send(
+      'GET',
+      '/channels/$channel/chat-devices',
+    ) as Map<String, dynamic>;
+    return [
+      for (final d in json['devices'] as List<dynamic>)
+        DeviceKey.fromJson(d as Map<String, dynamic>),
+    ];
+  }
+
+  /// Uploads an encrypted chat picture before the message that carries it.
+  Future<void> uploadChatImage(
+    String channel,
+    String image,
+    Uint8List ciphertext,
+  ) async {
+    final http.Response response;
+    try {
+      response = await _client
+          .put(
+            _url('/channels/$channel/chat-images/$image'),
+            headers: {
+              'content-type': 'application/octet-stream',
+              if (token != null) 'authorization': 'Bearer $token',
+            },
+            body: ciphertext,
+          )
+          .timeout(const Duration(minutes: 2));
+    } on Exception {
+      throw const ApiException(0, "Can't reach the server.");
+    }
+    if (response.statusCode >= 400) {
+      throw ApiException(response.statusCode, _message(response));
+    }
+  }
+
+  Future<Uint8List> downloadChatImage(String channel, String image) async {
+    final http.Response response;
+    try {
+      response = await _client
+          .get(
+            _url('/channels/$channel/chat-images/$image'),
+            headers: {if (token != null) 'authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(minutes: 2));
+    } on Exception {
+      throw const ApiException(0, "Can't reach the server.");
+    }
+    if (response.statusCode >= 400) {
+      throw ApiException(response.statusCode, _message(response));
+    }
+    return response.bodyBytes;
+  }
 }

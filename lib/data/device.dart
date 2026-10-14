@@ -22,7 +22,7 @@ Future<LocalDevice> localDevice(
   Uri origin, {
   required bool guest,
 }) async {
-  if (guest) return LocalDevice(_uuid(), Device.generate());
+  if (guest) return LocalDevice(randomUuid(), Device.generate());
   final stored = await secrets.read(deviceKey(origin));
   if (stored != null) {
     try {
@@ -35,7 +35,7 @@ Future<LocalDevice> localDevice(
       // Unreadable: make a new one, chat keys are asked for again.
     }
   }
-  final device = LocalDevice(_uuid(), Device.generate());
+  final device = LocalDevice(randomUuid(), Device.generate());
   try {
     await secrets.write(
       deviceKey(origin),
@@ -50,8 +50,8 @@ Future<LocalDevice> localDevice(
   return device;
 }
 
-/// A random UUID (version 4) naming the device; not a secret.
-String _uuid() {
+/// A random UUID (version 4): device and picture ids, not secrets.
+String randomUuid() {
   final random = Random.secure();
   final bytes = List<int>.generate(16, (_) => random.nextInt(256));
   bytes[6] = (bytes[6] & 0x0f) | 0x40;

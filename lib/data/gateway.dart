@@ -46,6 +46,12 @@ class Gateway extends ChangeNotifier {
   /// Every event, after the channel list took it in.
   Stream<GatewayEvent> get events => _events.stream;
 
+  /// Where someone's avatar is, if they have one.
+  Uri? avatar(String? account, int? version) =>
+      account == null || version == null
+      ? null
+      : avatarUrl(session.server.origin, account, version);
+
   ChannelView? channel(String id) {
     for (final view in channels) {
       if (view.channel.id == id) return view;

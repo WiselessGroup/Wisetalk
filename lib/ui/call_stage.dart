@@ -209,6 +209,7 @@ class _People extends StatelessWidget {
                 Avatar(
                   name: p.displayName,
                   size: 84,
+                  image: voice.gateway.avatar(p.account, p.avatar),
                   speaking: voice.speaking.contains(p.session),
                 ),
                 const SizedBox(height: 8),
@@ -293,6 +294,7 @@ class _VideoGrid extends StatelessWidget {
                     size: size,
                     child: _PersonTile(
                       participant: p,
+                      image: voice.gateway.avatar(p.account, p.avatar),
                       speaking: voice.speaking.contains(p.session),
                       size: size,
                     ),
@@ -361,11 +363,13 @@ class _VideoTileView extends StatelessWidget {
 class _PersonTile extends StatelessWidget {
   const _PersonTile({
     required this.participant,
+    required this.image,
     required this.speaking,
     required this.size,
   });
 
   final Participant participant;
+  final Uri? image;
   final bool speaking;
   final Size size;
 
@@ -384,6 +388,7 @@ class _PersonTile extends StatelessWidget {
             child: Avatar(
               name: participant.displayName,
               size: (size.width / 4).clamp(40, 112),
+              image: image,
               speaking: speaking,
             ),
           ),

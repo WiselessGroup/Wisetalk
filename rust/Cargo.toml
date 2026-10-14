@@ -17,6 +17,7 @@ anyhow = "1.0.100"
 base64 = "0.23.1"
 # Pinned: the Dart package flutter_rust_bridge must be the very same version.
 flutter_rust_bridge = "=2.13.0"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 serde_json = "1.0.151"
 uuid = "1.26.1"
 wisetalk-core = { git = "https://git.wiseless.net/Wisetalk/core.git", branch = "master", version = "1.6.0" }

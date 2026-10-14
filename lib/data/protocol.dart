@@ -127,3 +127,131 @@ class ChannelView {
   bool can(String permission) =>
       permissions.split('|').any((p) => p.trim() == permission);
 }
+
+/// A device and its public key.
+class DeviceKey {
+  const DeviceKey({required this.device, required this.publicKey});
+
+  factory DeviceKey.fromJson(Map<String, dynamic> json) => DeviceKey(
+    device: json['device'] as String,
+    publicKey: json['public_key'] as String,
+  );
+
+  final String device;
+  final String publicKey;
+}
+
+/// A chat key sealed for this device, and the device that sealed it. The
+/// envelope stays gateway JSON: it goes to Rust as it came.
+class ChatKeyGrant {
+  const ChatKeyGrant({required this.from, required this.envelope});
+
+  factory ChatKeyGrant.fromJson(Map<String, dynamic> json) => ChatKeyGrant(
+    from: DeviceKey.fromJson(json['from'] as Map<String, dynamic>),
+    envelope: json['envelope'] as Map<String, dynamic>,
+  );
+
+  final DeviceKey from;
+  final Map<String, dynamic> envelope;
+
+  String get channel => envelope['channel'] as String;
+  String get key => envelope['key'] as String;
+}
+
+/// A picture in a chat message, encrypted with the same key as its text.
+class ChatImage {
+  const ChatImage(this.json);
+
+  /// As the server sent it: the author bound all of it to the ciphertext.
+  final Map<String, dynamic> json;
+
+  String get id => json['id'] as String;
+  String get type => json['type'] as String;
+  int get width => json['width'] as int;
+  int get height => json['height'] as int;
+}
+
+/// One chat message. [text] is `null` until (or unless) it decrypts.
+class ChatMessage {
+  ChatMessage({
+    required this.id,
+    required this.channel,
+    required this.author,
+    required this.authorName,
+    required this.avatar,
+    required this.sealed,
+    required this.image,
+    required this.sentAt,
+    this.text,
+  });
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+    id: json['id'] as String,
+    channel: json['channel'] as String,
+    author: json['author'] as String?,
+    authorName: json['author_name'] as String,
+    avatar: json['avatar'] as int?,
+    sealed: json['sealed'] as Map<String, dynamic>,
+    image: json['image'] == null
+        ? null
+        : ChatImage(json['image'] as Map<String, dynamic>),
+    sentAt: DateTime.fromMillisecondsSinceEpoch(json['sent_at'] as int),
+  );
+
+  final String id;
+  final String channel;
+
+  /// The author's account; `null` for guests.
+  final String? author;
+  final String authorName;
+  final int? avatar;
+
+  /// The text, encrypted on the author's device; may be empty under a picture.
+  final Map<String, dynamic> sealed;
+  final ChatImage? image;
+  final DateTime sentAt;
+  String? text;
+
+  String get key => sealed['key'] as String;
+}
+
+/// A chat as loaded: its messages and the keys sealed for this device.
+class ChatHistory {
+  const ChatHistory({
+    required this.messages,
+    required this.expiresAt,
+    required this.key,
+    required this.keys,
+  });
+
+  factory ChatHistory.fromJson(Map<String, dynamic> json) => ChatHistory(
+    messages: [
+      for (final m in json['messages'] as List<dynamic>)
+        ChatMessage.fromJson(m as Map<String, dynamic>),
+    ],
+    expiresAt: json['expires_at'] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(json['expires_at'] as int),
+    key: json['key'] as String?,
+    keys: [
+      for (final k in json['keys'] as List<dynamic>)
+        ChatKeyGrant.fromJson(k as Map<String, dynamic>),
+    ],
+  );
+
+  final List<ChatMessage> messages;
+
+  /// `null` while the chat is empty.
+  final DateTime? expiresAt;
+
+  /// The key new messages use; `null` until someone starts one.
+  final String? key;
+  final List<ChatKeyGrant> keys;
+}
+
+/// Where an account's avatar is; [version] changes with every new picture,
+/// so the server lets it be cached forever.
+Uri avatarUrl(Uri origin, String account, int version) => origin.replace(
+  path: '/api/avatars/$account',
+  queryParameters: {'v': '$version'},
+);

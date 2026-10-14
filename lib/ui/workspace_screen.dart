@@ -1,11 +1,12 @@
 // Signed in: the channel list in a floating sidebar, the call beside it.
-// The same layout as the web client, without chat and settings yet.
+// The same layout as the web client, without settings yet.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/address.dart';
+import '../data/chat.dart';
 import '../data/connection.dart';
 import '../data/gateway.dart';
 import '../data/protocol.dart';
@@ -14,6 +15,7 @@ import '../data/session.dart';
 import '../data/voice.dart';
 import '../theme.dart';
 import 'call_stage.dart';
+import 'chat_panel.dart';
 import 'common.dart';
 
 class WorkspaceScreen extends ConsumerWidget {
@@ -56,19 +58,45 @@ class _Workspace extends ConsumerStatefulWidget {
 class _WorkspaceState extends ConsumerState<_Workspace> {
   Gateway get _gateway => widget.connection.gateway;
   Voice get _voice => widget.connection.voice;
-  late final Listenable _changes = Listenable.merge([_gateway, _voice]);
+  Chats get _chats => widget.connection.chats;
+  late final Listenable _changes = Listenable.merge([_gateway, _voice, _chats]);
   String? _shownError;
 
   @override
   void initState() {
     super.initState();
     _voice.addListener(_voiceChanged);
+    _chats.addListener(_chatsChanged);
   }
 
   @override
   void dispose() {
     _voice.removeListener(_voiceChanged);
+    _chats.removeListener(_chatsChanged);
     super.dispose();
+  }
+
+  void _toast(String text) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(text),
+      // Floats above the call controls instead of covering them.
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+    ),
+  );
+
+  void _chatsChanged() {
+    final error = _chats.error;
+    if (error != null && mounted) {
+      _chats.error = null;
+      _toast(error);
+    }
+    // A chat that went out of reach closes itself.
+    final open = _chats.open;
+    if (open != null && _gateway.status == GatewayStatus.ready) {
+      final view = _gateway.channel(open);
+      if (view == null || view.locked) _chats.hide();
+    }
   }
 
   /// Errors show once as a toast; the take-over question as a dialog.
@@ -76,14 +104,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     final error = _voice.error;
     if (error != null && error != _shownError && mounted) {
       _shownError = error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          // Floats above the call controls instead of covering them.
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(24, 0, 24, 100),
-        ),
-      );
+      _toast(error);
     }
     final asked = _voice.elsewhere;
     if (asked != null && mounted) {
@@ -129,23 +150,70 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _changes,
-          builder: (context, _) => Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: _Sidebar(
-                  gateway: _gateway,
-                  voice: _voice,
-                  session: widget.session,
+          builder: (context, _) {
+            final open = _chats.open;
+            final chat = open == null ? null : _gateway.channel(open);
+            final inCall = _voice.channel != null;
+            final panel = chat == null
+                ? null
+                : _Card(
+                    child: ChatPanel(
+                      key: ValueKey(chat.channel.id),
+                      chats: _chats,
+                      gateway: _gateway,
+                      view: chat,
+                      onClose: _chats.hide,
+                    ),
+                  );
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: _Sidebar(
+                    gateway: _gateway,
+                    voice: _voice,
+                    chats: _chats,
+                    session: widget.session,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: CallArea(gateway: _gateway, voice: _voice),
-              ),
-            ],
-          ),
+                // Out of a call the chat takes the whole stage.
+                if (panel != null && !inCall)
+                  Expanded(child: panel)
+                else ...[
+                  Expanded(
+                    child: CallArea(gateway: _gateway, voice: _voice),
+                  ),
+                  if (panel != null) SizedBox(width: 380, child: panel),
+                ],
+              ],
+            );
+          },
         ),
+      ),
+    );
+  }
+}
+
+/// A floating panel like the sidebar, for the chat.
+class _Card extends StatelessWidget {
+  const _Card({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: palette.sidebar,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: palette.separator, width: 0.5),
+        ),
+        child: child,
       ),
     );
   }
@@ -155,11 +223,13 @@ class _Sidebar extends ConsumerWidget {
   const _Sidebar({
     required this.gateway,
     required this.voice,
+    required this.chats,
     required this.session,
   });
 
   final Gateway gateway;
   final Voice voice;
+  final Chats chats;
   final Session session;
 
   @override
@@ -219,7 +289,12 @@ class _Sidebar extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               children: [
                 for (final view in loose)
-                  _ChannelRow(view: view, gateway: gateway, voice: voice),
+                  _ChannelRow(
+                    view: view,
+                    gateway: gateway,
+                    voice: voice,
+                    chats: chats,
+                  ),
                 for (final space in spaces) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
@@ -235,7 +310,12 @@ class _Sidebar extends ConsumerWidget {
                   for (final view in gateway.channels.where(
                     (v) => v.channel.space == space.id,
                   ))
-                    _ChannelRow(view: view, gateway: gateway, voice: voice),
+                    _ChannelRow(
+                      view: view,
+                      gateway: gateway,
+                      voice: voice,
+                      chats: chats,
+                    ),
                 ],
               ],
             ),
@@ -243,7 +323,11 @@ class _Sidebar extends ConsumerWidget {
           Divider(height: 1, color: palette.separator),
           ListTile(
             dense: true,
-            leading: Avatar(name: session.me.displayName, size: 30),
+            leading: Avatar(
+              name: session.me.displayName,
+              size: 30,
+              image: gateway.avatar(session.me.id, session.me.avatar),
+            ),
             title: Text(
               session.me.displayName,
               overflow: TextOverflow.ellipsis,
@@ -293,11 +377,13 @@ class _ChannelRow extends StatelessWidget {
     required this.view,
     required this.gateway,
     required this.voice,
+    required this.chats,
   });
 
   final ChannelView view;
   final Gateway gateway;
   final Voice voice;
+  final Chats chats;
 
   @override
   Widget build(BuildContext context) {
@@ -334,6 +420,14 @@ class _ChannelRow extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (!view.locked)
+                    _ChatButton(
+                      open: chats.open == view.channel.id,
+                      unread: chats.unread[view.channel.id] ?? 0,
+                      onPressed: () => chats.open == view.channel.id
+                          ? chats.hide()
+                          : chats.show(view.channel.id),
+                    ),
                 ],
               ),
             ),
@@ -347,6 +441,7 @@ class _ChannelRow extends StatelessWidget {
                 Avatar(
                   name: p.displayName,
                   size: 20,
+                  image: gateway.avatar(p.account, p.avatar),
                   speaking: voice.speaking.contains(p.session),
                 ),
                 const SizedBox(width: 8),
@@ -363,6 +458,45 @@ class _ChannelRow extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Opens a channel's chat; shows how many messages came in unseen.
+class _ChatButton extends StatelessWidget {
+  const _ChatButton({
+    required this.open,
+    required this.unread,
+    required this.onPressed,
+  });
+
+  final bool open;
+  final int unread;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Tooltip(
+      message: open ? 'Close Chat' : 'Open Chat',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Badge(
+            isLabelVisible: unread > 0,
+            label: Text(unread > 99 ? '99+' : '$unread'),
+            backgroundColor: palette.accent,
+            textColor: palette.onAccent,
+            child: Icon(
+              open ? Icons.chat_bubble : Icons.chat_bubble_outline,
+              size: 17,
+              color: open || unread > 0 ? palette.accent : palette.tertiary,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

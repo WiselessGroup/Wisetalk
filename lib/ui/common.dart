@@ -119,36 +119,55 @@ class ErrorBox extends StatelessWidget {
   }
 }
 
-/// A person's initial in a circle, ringed in green while they talk.
+/// A person's picture, or their initial when they have none, in a circle
+/// ringed in green while they talk.
 class Avatar extends StatelessWidget {
   const Avatar({
     super.key,
     required this.name,
     required this.size,
+    this.image,
     this.speaking = false,
   });
 
   final String name;
   final double size;
+
+  /// Their picture, see [avatarUrl]; the initial shows until it loads.
+  final Uri? image;
   final bool speaking;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final ring = size > 40 ? 3.0 : 1.5;
+    final image = this.image;
+    // Decoded at the size it shows, not the size it was uploaded.
+    final pixels = ((size - ring * 4) * MediaQuery.devicePixelRatioOf(context))
+        .round();
     return Container(
       width: size,
       height: size,
-      padding: EdgeInsets.all(size > 40 ? 3 : 1.5),
+      padding: EdgeInsets.all(ring),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
           color: speaking ? palette.speaking : Colors.transparent,
-          width: size > 40 ? 3 : 1.5,
+          width: ring,
         ),
       ),
       child: CircleAvatar(
         backgroundColor: palette.accent.withValues(alpha: 0.22),
         foregroundColor: palette.accent,
+        foregroundImage: image == null
+            ? null
+            : ResizeImage(
+                NetworkImage(image.toString()),
+                width: pixels,
+                height: pixels,
+                policy: ResizeImagePolicy.fit,
+              ),
+        onForegroundImageError: image == null ? null : (_, _) {},
         child: Text(
           name.characters.isEmpty ? '?' : name.characters.first.toUpperCase(),
           style: TextStyle(fontSize: size * 0.38, fontWeight: FontWeight.w700),

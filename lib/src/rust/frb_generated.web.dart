@@ -10,6 +10,7 @@ import 'api/auth.dart';
 import 'api/call.dart';
 import 'api/chat.dart';
 import 'api/device.dart';
+import 'api/picture.dart';
 import 'api/text.dart';
 
 import 'dart:async';
@@ -109,6 +110,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  Picture dco_decode_picture(dynamic raw);
+
+  @protected
   PkcePair dco_decode_pkce_pair(dynamic raw);
 
   @protected
@@ -197,6 +201,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  Picture sse_decode_picture(SseDeserializer deserializer);
 
   @protected
   PkcePair sse_decode_pkce_pair(SseDeserializer deserializer);
@@ -308,6 +315,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_picture(Picture self, SseSerializer serializer);
 
   @protected
   void sse_encode_pkce_pair(PkcePair self, SseSerializer serializer);
