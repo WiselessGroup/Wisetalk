@@ -1,6 +1,7 @@
 // Where the app picks its server. One server is one community; this list
 // is the servers you've used, to go back to or forget. The first run shows
-// only the address field, with the Wiseless server filled in.
+// only the address field. A server's web page can fill it in too, through
+// a wisetalk: link (see data/links.dart).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,12 +9,11 @@ import 'package:go_router/go_router.dart';
 
 import '../data/address.dart';
 import '../data/api.dart';
+import '../data/links.dart';
 import '../data/servers.dart';
 import '../src/rust/api/text.dart';
 import '../theme.dart';
 import 'common.dart';
-
-const _defaultServer = 'talk.wiseless.net';
 
 class ServersScreen extends ConsumerStatefulWidget {
   const ServersScreen({super.key});
@@ -26,7 +26,6 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
   final _address = TextEditingController();
   String? _error;
   bool _busy = false;
-  bool _filled = false;
 
   @override
   void dispose() {
@@ -109,9 +108,14 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
   Widget build(BuildContext context) {
     final servers = ref.watch(serversProvider).value;
     final saved = servers?.list ?? const <SavedServer>[];
-    if (servers != null && saved.isEmpty && !_filled) {
-      _address.text = _defaultServer;
-      _filled = true;
+    // A link brought a server that didn't work out: show it and why.
+    final pending = ref.watch(pendingAddressProvider);
+    if (pending != null) {
+      _address.text = pending.address;
+      _error = pending.error;
+      Future.microtask(
+        () => ref.read(pendingAddressProvider.notifier).set(null),
+      );
     }
     final palette = context.palette;
 

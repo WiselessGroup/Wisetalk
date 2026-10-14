@@ -52,7 +52,7 @@ void main() {
     expect(secrets.values.containsKey(deviceKey(a)), isFalse);
   });
 
-  testWidgets('a first start asks for a server, with ours filled in', (
+  testWidgets('a first start asks for a server, with nothing filled in', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -63,6 +63,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Which server is your community on?'), findsOneWidget);
-    expect(find.text('talk.wiseless.net'), findsOneWidget);
+    expect(find.text('talk.wiseless.net'), findsNothing);
   });
 }
