@@ -22,6 +22,10 @@ serde_json = "1.0.151"
 uuid = "1.26.1"
 wisetalk-core = { git = "https://git.wiseless.net/Wisetalk/core.git", branch = "master", version = "1.6.0" }
 
+# Pictures pasted into chats. Phones paste through the keyboard instead.
+[target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
+arboard = { version = "3.6.1", default-features = false, features = ["image-data", "wayland-data-control"] }
+
 [lints.rust]
 # Set by flutter_rust_bridge's code generator while it expands the API.
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }

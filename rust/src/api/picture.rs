@@ -8,7 +8,7 @@ use std::io::Cursor;
 use anyhow::{Context, bail};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{ImageFormat, ImageReader};
+use image::{DynamicImage, ImageFormat, ImageReader, RgbaImage};
 use wisetalk_core::protocol::{CHAT_IMAGE_MAX_BYTES, CHAT_IMAGE_MAX_SIDE, CHAT_IMAGE_SCALE_TO};
 
 /// A picture ready to encrypt and send.
@@ -47,7 +47,31 @@ pub fn prepare_picture(bytes: Vec<u8>) -> anyhow::Result<Picture> {
             });
         }
     }
-    let image = reader.decode().context("This picture can't be read.")?;
+    fit(reader.decode().context("This picture can't be read.")?)
+}
+
+/// The picture on the clipboard, prepared like [prepare_picture]; `None`
+/// when the clipboard holds something else.
+pub fn clipboard_picture() -> anyhow::Result<Option<Picture>> {
+    #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+    {
+        let Ok(copied) = arboard::Clipboard::new()?.get_image() else {
+            return Ok(None);
+        };
+        let pixels = RgbaImage::from_raw(
+            copied.width.try_into()?,
+            copied.height.try_into()?,
+            copied.bytes.into_owned(),
+        )
+        .context("This picture can't be read.")?;
+        Ok(Some(fit(DynamicImage::ImageRgba8(pixels))?))
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    Ok(None)
+}
+
+/// Scales a decoded picture down and encodes it to send.
+fn fit(image: DynamicImage) -> anyhow::Result<Picture> {
     let longest = image.width().max(image.height());
     let image = if longest > CHAT_IMAGE_SCALE_TO {
         let scale = f64::from(CHAT_IMAGE_SCALE_TO) / f64::from(longest);
@@ -59,8 +83,11 @@ pub fn prepare_picture(bytes: Vec<u8>) -> anyhow::Result<Picture> {
     };
     let (width, height) = (image.width(), image.height());
     let mut out = Vec::new();
-    // Screenshots with transparency stay PNG; everything else is a photo.
-    let kind = if image.color().has_alpha() {
+    // Pictures with transparency stay PNG; everything else is a photo.
+    // Clipboard pictures always carry an alpha channel, mostly unused.
+    let transparent =
+        image.color().has_alpha() && image.to_rgba8().pixels().any(|pixel| pixel.0[3] < u8::MAX);
+    let kind = if transparent {
         image.write_to(&mut Cursor::new(&mut out), ImageFormat::Png)?;
         "image/png"
     } else {

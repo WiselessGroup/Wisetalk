@@ -7,10 +7,17 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `fit`
+
 /// Reads a picture file and makes it fit to send. Slow on big photos: runs
 /// off the UI thread.
 Future<Picture> preparePicture({required List<int> bytes}) =>
     RustLib.instance.api.crateApiPicturePreparePicture(bytes: bytes);
+
+/// The picture on the clipboard, prepared like [prepare_picture]; `None`
+/// when the clipboard holds something else.
+Future<Picture?> clipboardPicture() =>
+    RustLib.instance.api.crateApiPictureClipboardPicture();
 
 /// A picture ready to encrypt and send.
 class Picture {

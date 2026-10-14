@@ -66,16 +66,35 @@ class _ChatPanelState extends State<ChatPanel> {
     super.dispose();
   }
 
-  /// Enter sends, Shift+Enter starts a new line.
+  /// Enter sends, Shift+Enter starts a new line. Pasting checks for a
+  /// picture too, while any text pastes as usual.
   KeyEventResult _key(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.enter &&
-        !HardwareKeyboard.instance.isShiftPressed) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final keyboard = HardwareKeyboard.instance;
+    if (event.logicalKey == LogicalKeyboardKey.enter &&
+        !keyboard.isShiftPressed) {
       _send();
       return KeyEventResult.handled;
     }
+    if (event.logicalKey == LogicalKeyboardKey.keyV &&
+        (keyboard.isControlPressed || keyboard.isMetaPressed)) {
+      unawaited(_paste());
+    }
     return KeyEventResult.ignored;
   }
+
+  Future<void> _paste() async {
+    try {
+      final picture = await clipboardPicture();
+      if (picture != null && mounted) setState(() => _picture = picture);
+    } catch (e) {
+      _chats.report(_unreadable(e));
+    }
+  }
+
+  static String _unreadable(Object error) => error.toString().contains('large')
+      ? 'This picture is too large.'
+      : "This picture can't be read.";
 
   void _send() {
     final body = _draft.text.trim();
@@ -103,11 +122,7 @@ class _ChatPanelState extends State<ChatPanel> {
       if (mounted) setState(() => _picture = prepared);
       _input.requestFocus();
     } catch (e) {
-      _chats.report(
-        e.toString().contains('too large')
-            ? 'This picture is too large.'
-            : "This picture can't be read.",
-      );
+      _chats.report(_unreadable(e));
     } finally {
       if (mounted) setState(() => _preparing = false);
     }

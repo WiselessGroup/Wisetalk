@@ -1,6 +1,8 @@
 // Signed in: the channel list in a floating sidebar, the call beside it.
 // The same layout as the web client, without settings yet.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../data/address.dart';
 import '../data/chat.dart';
 import '../data/connection.dart';
 import '../data/gateway.dart';
+import '../data/notifications.dart';
 import '../data/protocol.dart';
 import '../data/servers.dart';
 import '../data/session.dart';
@@ -62,18 +65,102 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   late final Listenable _changes = Listenable.merge([_gateway, _voice, _chats]);
   String? _shownError;
 
+  /// Whether Wisetalk is the window in front: notifications only when not.
+  bool _focused = true;
+  late final AppLifecycleListener _lifecycle;
+  final List<StreamSubscription<Object?>> _subscriptions = [];
+
   @override
   void initState() {
     super.initState();
     _voice.addListener(_voiceChanged);
     _chats.addListener(_chatsChanged);
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (state) => _focused = state == AppLifecycleState.resumed,
+    );
+    final notifications = ref.read(notificationsProvider);
+    _subscriptions.addAll([
+      _chats.incoming.listen(_message),
+      _gateway.events.listen(_event),
+      notifications.clicks.listen(_clicked),
+    ]);
   }
 
   @override
   void dispose() {
     _voice.removeListener(_voiceChanged);
     _chats.removeListener(_chatsChanged);
+    _lifecycle.dispose();
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
     super.dispose();
+  }
+
+  String _channelName(String id) =>
+      _gateway.channel(id)?.channel.name ?? 'a channel';
+
+  /// Someone else wrote in a chat we follow (ours, or the call's) while
+  /// Wisetalk is in the background.
+  void _message(ChatMessage message) {
+    final me = widget.session.me;
+    final ours = message.author == null
+        ? me.isGuest && message.authorName == me.displayName
+        : message.author == me.id;
+    final followed =
+        message.channel == _voice.channel ||
+        _chats.opened.contains(message.channel);
+    if (ours || !followed || _focused) return;
+    final text = message.text;
+    unawaited(
+      ref
+          .read(notificationsProvider)
+          .show(
+            title: '${message.authorName} in ${_channelName(message.channel)}',
+            body: text == null
+                ? 'Wrote an encrypted message.'
+                : text.isNotEmpty
+                ? text
+                : 'Sent a picture.',
+            target: ChatTarget(message.channel),
+          ),
+    );
+  }
+
+  void _event(GatewayEvent event) {
+    if (event.type != 'summoned' || !mounted) return;
+    final data = event.data as Map<String, dynamic>;
+    final channel = data['channel'] as String;
+    final from = data['from'] as String;
+    final text = '$from summons you to ${_channelName(channel)}.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: 'Join',
+          onPressed: () => _voice.join(channel),
+        ),
+      ),
+    );
+    if (!_focused) {
+      unawaited(
+        ref
+            .read(notificationsProvider)
+            .show(title: 'Summoned', body: text, target: SummonTarget(channel)),
+      );
+    }
+  }
+
+  void _clicked(NotificationTarget target) {
+    switch (target) {
+      case ChatTarget(:final channel):
+        unawaited(_chats.show(channel));
+      case SummonTarget(:final channel):
+        _voice.join(channel);
+    }
   }
 
   void _toast(String text) => ScaffoldMessenger.of(context).showSnackBar(

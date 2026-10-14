@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -39279489;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -242251696;
 
 // Section: executor
 
@@ -987,6 +987,40 @@ fn wire__crate__api__device__Device_secret_bytes_impl(
         },
     )
 }
+fn wire__crate__api__picture__clipboard_picture_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "clipboard_picture",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::picture::clipboard_picture()?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__text__fingerprint_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1349,6 +1383,17 @@ impl SseDecode for Option<String> {
     }
 }
 
+impl SseDecode for Option<crate::api::picture::Picture> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::picture::Picture>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for crate::api::picture::Picture {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1446,8 +1491,9 @@ fn pde_ffi_dispatcher_primary_impl(
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
         12 => wire__crate__api__chat__ChatKey_open_image_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__picture__clipboard_picture_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1478,12 +1524,12 @@ fn pde_ffi_dispatcher_sync_impl(
         17 => wire__crate__api__device__Device_generate_impl(ptr, rust_vec_len, data_len),
         18 => wire__crate__api__device__Device_public_key_impl(ptr, rust_vec_len, data_len),
         19 => wire__crate__api__device__Device_secret_bytes_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__text__fingerprint_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__text__normalize_channel_name_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__text__normalize_chat_body_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__text__normalize_display_name_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__auth__pkce_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__text__fingerprint_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__text__normalize_channel_name_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__text__normalize_chat_body_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__text__normalize_display_name_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__auth__pkce_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1668,6 +1714,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::picture::Picture> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::picture::Picture>::sse_encode(value, serializer);
         }
     }
 }

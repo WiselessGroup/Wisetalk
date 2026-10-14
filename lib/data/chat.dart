@@ -56,6 +56,9 @@ class Chats extends ChangeNotifier {
 
   /// The chat on screen, if any.
   String? open;
+
+  /// Every chat opened since signing in: the ones we follow.
+  final Set<String> opened = {};
   final Map<String, ChatRoom> _rooms = {};
   final Map<String, int> unread = {};
 
@@ -70,6 +73,7 @@ class Chats extends ChangeNotifier {
   final Map<String, Uint8List?> pictures = {};
 
   late final StreamSubscription<GatewayEvent> _subscription;
+  final _incoming = StreamController<ChatMessage>.broadcast();
   final Map<String, Map<String, ChatKey>> _keys = {};
 
   /// Messages written before the key was there, sent once it is.
@@ -90,6 +94,9 @@ class Chats extends ChangeNotifier {
 
   ChatRoom room(String channel) => _rooms[channel] ?? ChatRoom();
 
+  /// Every message as it arrives, already decrypted if it can be, ours too.
+  Stream<ChatMessage> get incoming => _incoming.stream;
+
   @override
   void notifyListeners() {
     if (!_disposed) super.notifyListeners();
@@ -99,6 +106,7 @@ class Chats extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _subscription.cancel();
+    _incoming.close();
     _timer?.cancel();
     for (final ring in _keys.values) {
       for (final key in ring.values) {
@@ -111,6 +119,7 @@ class Chats extends ChangeNotifier {
 
   Future<void> show(String channel) async {
     open = channel;
+    opened.add(channel);
     unread[channel] = 0;
     notifyListeners();
     if (!(_rooms[channel]?.loaded ?? false)) await _load(channel);
@@ -429,6 +438,7 @@ class Chats extends ChangeNotifier {
         if (open != message.channel) {
           unread[message.channel] = (unread[message.channel] ?? 0) + 1;
         }
+        _incoming.add(message);
       case 'chat_deleted':
         final deleted = data as Map<String, dynamic>;
         final room = _rooms[deleted['channel']];
