@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'data/android_logs.dart';
 import 'data/desktop_entry.dart';
 import 'data/links.dart';
 import 'data/updates.dart';
@@ -13,6 +14,8 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Before anything can set a call key.
+  quietAndroidLogs();
   await RustLib.init();
   // First: while installing or updating, Velopack may end the process here.
   startUpdates();

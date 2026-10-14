@@ -28,7 +28,9 @@ android {
 
     defaultConfig {
         applicationId = "net.wiseless.wisetalk"
-        minSdk = flutter.minSdkVersion
+        // Android 11: the first that lets the app keep call keys out of
+        // the system log (lib/data/android_logs.dart).
+        minSdk = 30
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
