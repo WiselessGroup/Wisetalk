@@ -111,6 +111,8 @@ container=wisetalk-release-$$
 work=$(mktemp -d)
 cleanup() {
     stty echo 2>/dev/null || true
+    # What the build wrote belongs to root; hand it back so it can be removed.
+    docker exec "$container" chown -R "$(id -u):$(id -g)" /src >/dev/null 2>&1 || true
     docker rm -f "$container" >/dev/null 2>&1 || true
     rm -rf "$work"
 }
@@ -140,11 +142,15 @@ cp "$keystore" "$work/android/release.jks"
 (umask 077; printf '%s\n%s\n' "$store_pass" "${key_pass:-$store_pass}" > "$work/android/passwords")
 
 # One container for every step, so caches and the build stay between them.
+# The build's own directories outlive it too: .dart_tool holds the compiled
+# Rust, so the next release rebuilds only what changed.
 docker run -d --name "$container" \
     -v "$work:/src" -v "$PWD/dist:/out" -w /src \
     -v wisetalk-pub-cache:/opt/pub-cache \
     -v wisetalk-cargo-registry:/opt/cargo/registry \
     -v wisetalk-gradle:/root/.gradle \
+    -v wisetalk-dart-tool:/src/.dart_tool \
+    -v wisetalk-build:/src/build \
     -e VERSION="$version" -e BASE="$base" -e REPO="$repo" \
     "$image" sleep infinity >/dev/null
 inside() { docker exec "$container" sh -euc "$1"; }

@@ -69,3 +69,11 @@ RUN apt-get update -qq \
  && rm -rf /var/lib/apt/lists/* \
  && dotnet tool install --tool-path /opt/dotnet-tools vpk --version "$VPK_VERSION" \
  && vpk -h >/dev/null
+
+# Flutter runs the Rust build hook with only HOME, PATH and a few other
+# variables, so RUSTUP_HOME and CARGO_HOME don't reach it: without these
+# links rustup downloads the whole toolchain again and cargo every crate.
+RUN ln -s "$RUSTUP_HOME" /root/.rustup && ln -s "$CARGO_HOME" /root/.cargo
+
+# jni compiles against android-35; without it Gradle downloads it every run.
+RUN sdkmanager --install "platforms;android-35" >/dev/null
