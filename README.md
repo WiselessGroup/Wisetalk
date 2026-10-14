@@ -88,11 +88,12 @@ Download button.
 The builds run in a Docker image made from `ci/Dockerfile` (Ubuntu 22.04,
 so the AppImage runs on older systems than the one building it), built
 locally the first time. The script needs a Forgejo token that can write
-releases in `~/.config/wisetalk/forgejo-token`, and the Android release key:
-`android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
-`keyPassword`) with the keystore it names beside it, both ignored by git.
-Without them it refuses to build rather than sign with a throwaway key,
-which phones would refuse to update later. Keep a copy of the keystore
+releases in `~/.config/wisetalk/forgejo-token`, and the Android release
+keystore at `$WISETALK_KEYSTORE` or at the path in
+`~/.config/wisetalk/keystore-path`. It asks for the keystore's password in
+the terminal and keeps it in no file but a temporary one inside the build
+directory. Without the keystore it refuses to build rather than sign with a
+throwaway key, which phones would refuse to update later. Keep a copy of the keystore
 somewhere safe: losing it means nobody can update the app without
 reinstalling.
 

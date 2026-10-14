@@ -5,10 +5,12 @@
 # in the image from ci/Dockerfile, Ubuntu 22.04, so the AppImage also runs
 # on systems older than this one.
 #
-# Usage: scripts/release.sh vX.Y.Z
-# Needs the tag checked out and pushed, android/key.properties with the
-# release keystore beside it, and a Forgejo token that can write releases in
-# ~/.config/wisetalk/forgejo-token.
+# Usage: scripts/release.sh vX.Y.Z, in a terminal: it asks for the
+# keystore's password, which no file keeps (only a temporary one inside the
+# build directory, deleted with it).
+# Needs the tag checked out and pushed, a Forgejo token that can write
+# releases in ~/.config/wisetalk/forgejo-token, and the release keystore at
+# $WISETALK_KEYSTORE or at the path in ~/.config/wisetalk/keystore-path.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -25,9 +27,18 @@ git diff --quiet && git diff --cached --quiet || fail "commit or stash your chan
 git ls-remote --exit-code --tags origin "$tag" >/dev/null || fail "push $tag first"
 [ -s "$token_file" ] || fail "put a Forgejo token in $token_file"
 # Never an APK signed with a throwaway key: phones would refuse its updates.
-[ -f android/key.properties ] || fail "android/key.properties is missing"
-store=$(sed -n 's/^storeFile=//p' android/key.properties)
-[ -f "android/$store" ] || fail "android/$store (the keystore) is missing"
+keystore=${WISETALK_KEYSTORE:-$(cat "$HOME/.config/wisetalk/keystore-path" 2>/dev/null || true)}
+[ -f "$keystore" ] || fail "no keystore: set WISETALK_KEYSTORE or ~/.config/wisetalk/keystore-path"
+[ -t 0 ] || fail "run this in a terminal: it asks for the keystore's password"
+printf 'Password of %s: ' "$(basename "$keystore")" >&2
+stty -echo
+read -r store_pass
+stty echo
+printf '\nKey password (Enter if the same): ' >&2
+stty -echo
+read -r key_pass
+stty echo
+echo >&2
 
 image=wisetalk-client-build:$(sed -n 's/^ARG FLUTTER_VERSION=//p' ci/Dockerfile)
 docker image inspect "$image" >/dev/null 2>&1 || docker build -t "$image" ci
@@ -35,8 +46,10 @@ docker image inspect "$image" >/dev/null 2>&1 || docker build -t "$image" ci
 # The tag's files only, with the signing key beside them.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
+chmod 700 "$work"
 git archive "$tag" | tar -x -C "$work"
-cp android/key.properties "android/$store" "$work/android/"
+cp "$keystore" "$work/android/release.jks"
+(umask 077; printf '%s\n%s\n' "$store_pass" "${key_pass:-$store_pass}" > "$work/android/passwords")
 rm -rf dist
 mkdir -p dist
 
@@ -49,6 +62,16 @@ docker run --rm \
     -e HOST_USER="$(id -u):$(id -g)" \
     "$image" sh -euc '
         base=${VERSION%%-*}
+        # The signing key: its alias read from the keystore itself.
+        cd android
+        store_pass=$(sed -n 1p passwords)
+        key_pass=$(sed -n 2p passwords)
+        alias=$(keytool -list -keystore release.jks -storepass:file passwords 2>/dev/null \
+            | sed -n "s/^\([^,]*\), .*PrivateKeyEntry.*/\1/p" | head -n 1)
+        [ -n "$alias" ] || { echo "release: wrong password, or no key in the keystore" >&2; exit 1; }
+        (umask 077; printf "storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+            "$store_pass" "$alias" "$key_pass" > key.properties)
+        cd ..
         flutter pub get --enforce-lockfile
 
         flutter build linux --release --build-name="$base"
