@@ -13,8 +13,8 @@ final secretsProvider = Provider<Secrets>((ref) => SystemSecrets());
 
 String tokenKey(Uri origin) => 'token:$origin';
 String deviceKey(Uri origin) => 'device:$origin';
-const _listKey = 'servers';
-const _currentKey = 'current-server';
+const serversKey = 'servers';
+const currentServerKey = 'current-server';
 
 class SavedServer {
   const SavedServer({required this.origin, required this.name, this.user});
@@ -71,7 +71,7 @@ class ServersNotifier extends AsyncNotifier<Servers> {
   Future<Servers> build() async {
     final list = <SavedServer>[];
     try {
-      final raw = await _secrets.read(_listKey);
+      final raw = await _secrets.read(serversKey);
       if (raw != null) {
         for (final entry in jsonDecode(raw) as List<dynamic>) {
           list.add(SavedServer.fromJson(entry as Map<String, dynamic>));
@@ -80,7 +80,7 @@ class ServersNotifier extends AsyncNotifier<Servers> {
     } on FormatException {
       // Unreadable: start over with an empty list.
     }
-    final current = await _secrets.read(_currentKey);
+    final current = await _secrets.read(currentServerKey);
     final origin = current == null ? null : Uri.tryParse(current);
     return Servers(list, list.any((s) => s.origin == origin) ? origin : null);
   }
@@ -88,13 +88,13 @@ class ServersNotifier extends AsyncNotifier<Servers> {
   Future<void> _save(Servers servers) async {
     state = AsyncData(servers);
     await _secrets.write(
-      _listKey,
+      serversKey,
       jsonEncode(servers.list.map((s) => s.toJson()).toList()),
     );
     if (servers.current == null) {
-      await _secrets.delete(_currentKey);
+      await _secrets.delete(currentServerKey);
     } else {
-      await _secrets.write(_currentKey, servers.current.toString());
+      await _secrets.write(currentServerKey, servers.current.toString());
     }
   }
 

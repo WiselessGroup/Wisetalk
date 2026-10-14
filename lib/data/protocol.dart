@@ -122,4 +122,8 @@ class ChannelView {
   final bool locked;
   final String permissions;
   final List<Participant> participants;
+
+  /// Whether we may do [permission] here, a name like `VIDEO`.
+  bool can(String permission) =>
+      permissions.split('|').any((p) => p.trim() == permission);
 }

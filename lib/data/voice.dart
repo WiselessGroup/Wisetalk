@@ -66,6 +66,44 @@ class _CallKeyProvider extends lk.BaseKeyProvider {
 
 enum VoiceState { idle, joining, waitingForKey, connected }
 
+/// A camera or screen share on screen.
+class VideoTile {
+  const VideoTile({
+    required this.id,
+    required this.session,
+    required this.name,
+    required this.screen,
+    required this.local,
+    required this.track,
+  });
+
+  /// Track sid, stable while the track lives.
+  final String id;
+
+  /// Session id of the participant, the LiveKit identity.
+  final String session;
+  final String name;
+  final bool screen;
+  final bool local;
+  final lk.VideoTrack track;
+}
+
+/// What a screen share is tuned for. Text needs sharp frames but few of
+/// them; motion needs many, and costs both ends more.
+enum ScreenQuality {
+  text(
+    lk.VideoParameters(
+      dimensions: lk.VideoDimensionsPresets.h1080_169,
+      encoding: lk.VideoEncoding(maxBitrate: 1500 * 1000, maxFramerate: 5),
+    ),
+  ),
+  motion(lk.VideoParametersPresets.screenShareH1080FPS30);
+
+  const ScreenQuality(this.parameters);
+
+  final lk.VideoParameters parameters;
+}
+
 class Voice extends ChangeNotifier {
   Voice(this.gateway) {
     _subscription = gateway.events.listen(_onEvent);
@@ -88,6 +126,12 @@ class Voice extends ChangeNotifier {
 
   /// Our account is in a call on another device: (channel here, channel there).
   (String, String)? elsewhere;
+
+  bool camera = false;
+  bool screen = false;
+
+  /// Cameras and screen shares, in the order they appeared.
+  List<VideoTile> tiles = const [];
 
   lk.Room? _room;
   lk.EventsListener<lk.RoomEvent>? _roomEvents;
@@ -138,6 +182,64 @@ class Voice extends ChangeNotifier {
     _refreshMicStates();
   }
 
+  Future<void> toggleCamera() async {
+    final local = _room?.localParticipant;
+    if (local == null) return;
+    try {
+      await local.setCameraEnabled(
+        !camera,
+        // 720p: plenty for a face, and light on the machine sending it.
+        cameraCaptureOptions: const lk.CameraCaptureOptions(
+          params: lk.VideoParametersPresets.h720_169,
+        ),
+      );
+    } catch (e) {
+      debugPrint('camera unavailable: $e');
+      error = 'Camera unavailable.';
+    }
+    // Read the state back: unpublish events fire while the call above runs.
+    camera = _room?.localParticipant?.isCameraEnabled() ?? false;
+    notifyListeners();
+  }
+
+  /// Shares a screen or a window: [source] from the desktop source list,
+  /// or `null` for whatever the system lets the person pick (Wayland asks
+  /// through its own dialog).
+  Future<void> startScreen({
+    String? source,
+    ScreenQuality quality = ScreenQuality.text,
+  }) async {
+    final local = _room?.localParticipant;
+    if (local == null) return;
+    try {
+      await local.setScreenShareEnabled(
+        true,
+        screenShareCaptureOptions: lk.ScreenShareCaptureOptions(
+          sourceId: source,
+          maxFrameRate: quality.parameters.encoding!.maxFramerate.toDouble(),
+          params: quality.parameters,
+        ),
+      );
+    } catch (e) {
+      // Cancelling the system's share dialog lands here too.
+      debugPrint('screen share stopped or refused: $e');
+    }
+    screen = _room?.localParticipant?.isScreenShareEnabled() ?? false;
+    notifyListeners();
+  }
+
+  Future<void> stopScreen() async {
+    final local = _room?.localParticipant;
+    if (local == null) return;
+    try {
+      await local.setScreenShareEnabled(false);
+    } catch (e) {
+      debugPrint('cannot stop screen share: $e');
+    }
+    screen = _room?.localParticipant?.isScreenShareEnabled() ?? false;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     leave();
@@ -172,6 +274,44 @@ class Voice extends ChangeNotifier {
     micOff = {};
     muted = false;
     serverMuted = false;
+    camera = false;
+    screen = false;
+    tiles = const [];
+    notifyListeners();
+  }
+
+  void _addTile(
+    lk.TrackPublication publication,
+    lk.Participant participant,
+    lk.VideoTrack track, {
+    required bool local,
+  }) {
+    final tile = VideoTile(
+      id: publication.sid,
+      session: participant.identity,
+      name: local
+          ? 'You'
+          : (participant.name.isEmpty
+                ? participant.identity
+                : participant.name),
+      screen: publication.source == lk.TrackSource.screenShareVideo,
+      local: local,
+      track: track,
+    );
+    tiles = [
+      for (final t in tiles)
+        if (t.id != tile.id) t,
+      tile,
+    ];
+    notifyListeners();
+  }
+
+  void _removeTile(String id) {
+    if (!tiles.any((t) => t.id == id)) return;
+    tiles = [
+      for (final t in tiles)
+        if (t.id != id) t,
+    ];
     notifyListeners();
   }
 
@@ -275,6 +415,11 @@ class Voice extends ChangeNotifier {
         return;
       }
       _keys = keys;
+      // The key may have come in while the provider was being made, with
+      // nowhere to go: hand it over now.
+      final early = _key;
+      if (early != null) await keys.use(early);
+      if (attempt != _attempt) return;
       // The channel's audio quality, as the web client publishes it: low
       // bitrates may pause in silence (DTX), RED repeats packets against loss.
       final audio =
@@ -303,8 +448,49 @@ class Voice extends ChangeNotifier {
         })
         ..on<lk.TrackPublishedEvent>((_) => _refreshMicStates())
         ..on<lk.TrackUnpublishedEvent>((_) => _refreshMicStates())
-        ..on<lk.TrackMutedEvent>((_) => _refreshMicStates())
-        ..on<lk.TrackUnmutedEvent>((_) => _refreshMicStates())
+        ..on<lk.TrackSubscribedEvent>((e) {
+          final track = e.track;
+          if (track is lk.VideoTrack && !e.publication.muted) {
+            _addTile(e.publication, e.participant, track, local: false);
+          }
+        })
+        ..on<lk.TrackUnsubscribedEvent>((e) => _removeTile(e.publication.sid))
+        ..on<lk.LocalTrackPublishedEvent>((e) {
+          final track = e.publication.track;
+          if (track is lk.LocalVideoTrack) {
+            _addTile(e.publication, e.participant, track, local: true);
+          }
+          _refreshMicStates();
+        })
+        ..on<lk.LocalTrackUnpublishedEvent>((e) {
+          _removeTile(e.publication.sid);
+          // The system's own "stop sharing" ends up here.
+          if (e.publication.source == lk.TrackSource.screenShareVideo) {
+            screen = false;
+          }
+          if (e.publication.source == lk.TrackSource.camera) camera = false;
+          _refreshMicStates();
+        })
+        // A camera turned off is muted, not unpublished: drop its tile so
+        // the person shows up with their avatar instead of a black frame.
+        ..on<lk.TrackMutedEvent>((e) {
+          if (e.publication.kind == lk.TrackType.VIDEO) {
+            _removeTile(e.publication.sid);
+          }
+          _refreshMicStates();
+        })
+        ..on<lk.TrackUnmutedEvent>((e) {
+          final track = e.publication.track;
+          if (track is lk.VideoTrack) {
+            _addTile(
+              e.publication,
+              e.participant,
+              track,
+              local: e.participant is lk.LocalParticipant,
+            );
+          }
+          _refreshMicStates();
+        })
         ..on<lk.ParticipantConnectedEvent>((_) => _refreshMicStates())
         ..on<lk.ParticipantDisconnectedEvent>((_) => _refreshMicStates())
         ..on<lk.RoomDisconnectedEvent>((_) {

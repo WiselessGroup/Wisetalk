@@ -1,5 +1,5 @@
-// Pieces the signed-out screens share: the centered card the web client's
-// sign-in page uses, and the way errors are shown.
+// Pieces the screens share: the centered card the web client's sign-in
+// page uses, the way errors are shown, and people's avatars.
 
 import 'package:flutter/material.dart';
 
@@ -113,6 +113,45 @@ class ErrorBox extends StatelessWidget {
         child: Text(
           message,
           style: TextStyle(color: palette.error, fontSize: 14),
+        ),
+      ),
+    );
+  }
+}
+
+/// A person's initial in a circle, ringed in green while they talk.
+class Avatar extends StatelessWidget {
+  const Avatar({
+    super.key,
+    required this.name,
+    required this.size,
+    this.speaking = false,
+  });
+
+  final String name;
+  final double size;
+  final bool speaking;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(size > 40 ? 3 : 1.5),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: speaking ? palette.speaking : Colors.transparent,
+          width: size > 40 ? 3 : 1.5,
+        ),
+      ),
+      child: CircleAvatar(
+        backgroundColor: palette.accent.withValues(alpha: 0.22),
+        foregroundColor: palette.accent,
+        child: Text(
+          name.characters.isEmpty ? '?' : name.characters.first.toUpperCase(),
+          style: TextStyle(fontSize: size * 0.38, fontWeight: FontWeight.w700),
         ),
       ),
     );

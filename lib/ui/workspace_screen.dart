@@ -1,5 +1,5 @@
 // Signed in: the channel list in a floating sidebar, the call beside it.
-// The same layout as the web client, without video, chat and settings yet.
+// The same layout as the web client, without chat and settings yet.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +13,8 @@ import '../data/servers.dart';
 import '../data/session.dart';
 import '../data/voice.dart';
 import '../theme.dart';
+import 'call_stage.dart';
+import 'common.dart';
 
 class WorkspaceScreen extends ConsumerWidget {
   const WorkspaceScreen({super.key});
@@ -74,8 +76,14 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     final error = _voice.error;
     if (error != null && error != _shownError && mounted) {
       _shownError = error;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          // Floats above the call controls instead of covering them.
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+        ),
+      );
     }
     final asked = _voice.elsewhere;
     if (asked != null && mounted) {
@@ -133,7 +141,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
                 ),
               ),
               Expanded(
-                child: _CallArea(gateway: _gateway, voice: _voice),
+                child: CallArea(gateway: _gateway, voice: _voice),
               ),
             ],
           ),
@@ -235,7 +243,7 @@ class _Sidebar extends ConsumerWidget {
           Divider(height: 1, color: palette.separator),
           ListTile(
             dense: true,
-            leading: _Avatar(name: session.me.displayName, size: 30),
+            leading: Avatar(name: session.me.displayName, size: 30),
             title: Text(
               session.me.displayName,
               overflow: TextOverflow.ellipsis,
@@ -336,7 +344,7 @@ class _ChannelRow extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(34, 3, 8, 3),
             child: Row(
               children: [
-                _Avatar(
+                Avatar(
                   name: p.displayName,
                   size: 20,
                   speaking: voice.speaking.contains(p.session),
@@ -355,220 +363,6 @@ class _ChannelRow extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _CallArea extends StatelessWidget {
-  const _CallArea({required this.gateway, required this.voice});
-
-  final Gateway gateway;
-  final Voice voice;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final id = voice.channel;
-    final view = id == null ? null : gateway.channel(id);
-    if (view == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.headphones, size: 40, color: palette.accent),
-            const SizedBox(height: 12),
-            Text(
-              'Pick a Voice Channel',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: palette.text,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Click a channel to join.',
-              style: TextStyle(color: palette.muted),
-            ),
-          ],
-        ),
-      );
-    }
-    final status = switch (voice.state) {
-      VoiceState.joining => 'Joining…',
-      VoiceState.waitingForKey => 'Waiting for the call key…',
-      _ => 'End-to-end encrypted',
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-          child: Row(
-            children: [
-              Text(
-                view.channel.name,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: palette.text,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(Icons.lock_outline, size: 13, color: palette.muted),
-              const SizedBox(width: 4),
-              Text(
-                status,
-                style: TextStyle(fontSize: 12, color: palette.muted),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Center(
-            child: Wrap(
-              spacing: 28,
-              runSpacing: 24,
-              alignment: WrapAlignment.center,
-              children: [
-                for (final p in view.participants)
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _Avatar(
-                        name: p.displayName,
-                        size: 84,
-                        speaking: voice.speaking.contains(p.session),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (p.serverMuted ||
-                              voice.micOff.contains(p.session)) ...[
-                            Icon(
-                              Icons.mic_off,
-                              size: 14,
-                              color: palette.tertiary,
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Text(
-                            p.displayName,
-                            style: TextStyle(color: palette.text),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _RoundButton(
-                icon: voice.muted ? Icons.mic_off : Icons.mic,
-                label: voice.muted ? 'Unmute' : 'Mute',
-                background: voice.muted
-                    ? palette.error.withValues(alpha: 0.25)
-                    : palette.fill,
-                foreground: voice.muted ? palette.error : palette.text,
-                onPressed: voice.state == VoiceState.connected
-                    ? voice.toggleMute
-                    : null,
-              ),
-              const SizedBox(width: 16),
-              _RoundButton(
-                icon: Icons.call_end,
-                label: 'Leave',
-                background: palette.error,
-                foreground: palette.onAccent,
-                onPressed: voice.leave,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({
-    required this.icon,
-    required this.label,
-    required this.background,
-    required this.foreground,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color background;
-  final Color foreground;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-    message: label,
-    child: Semantics(
-      button: true,
-      label: label,
-      child: Material(
-        color: background,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox(
-            width: 56,
-            height: 56,
-            child: Icon(icon, color: foreground),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-/// A person's initial in a circle, ringed in green while they talk.
-class _Avatar extends StatelessWidget {
-  const _Avatar({
-    required this.name,
-    required this.size,
-    this.speaking = false,
-  });
-
-  final String name;
-  final double size;
-  final bool speaking;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Container(
-      width: size,
-      height: size,
-      padding: EdgeInsets.all(size > 40 ? 3 : 1.5),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: speaking ? palette.speaking : Colors.transparent,
-          width: size > 40 ? 3 : 1.5,
-        ),
-      ),
-      child: CircleAvatar(
-        backgroundColor: palette.accent.withValues(alpha: 0.22),
-        foregroundColor: palette.accent,
-        child: Text(
-          name.characters.isEmpty ? '?' : name.characters.first.toUpperCase(),
-          style: TextStyle(fontSize: size * 0.38, fontWeight: FontWeight.w700),
-        ),
-      ),
     );
   }
 }

@@ -7,8 +7,9 @@ and iOS. This repository was called `mobile` until 2026-10-12.
 
 **Status:** early. On Linux the app signs in to any Wisetalk server (with
 an account through the browser, or as a guest), lists its channels and
-joins end-to-end encrypted voice calls. Video, screen sharing, chat and
-settings come next. The browser client
+joins end-to-end encrypted calls with cameras and screen sharing. On
+Wayland the system picks what to share, whole screens only, without
+sound. Chat and settings come next. The browser client
 ([webclient](https://git.wiseless.net/Wisetalk/webclient)) is the one in use.
 
 ## Layout
@@ -58,6 +59,8 @@ flutter test                # widget tests load rust/target/release
 # the desktop runner can't start the app twice in one run.
 flutter test integration_test/sign_in_test.dart -d linux
 flutter test integration_test/voice_test.dart -d linux
+# Needs an account's session (see the file) and a camera:
+WISETALK_TEST_TOKEN=... flutter test integration_test/video_test.dart -d linux
 cd rust && cargo test       # the bridge on its own
 flutter_rust_bridge_codegen generate   # after changing rust/src/api
 ```
