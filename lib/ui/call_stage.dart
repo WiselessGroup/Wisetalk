@@ -39,8 +39,14 @@ class _CallAreaState extends State<CallArea> {
       context: context,
       builder: (context) => const ScreenShareDialog(),
     );
-    if (choice == null) return;
-    await _voice.startScreen(source: choice.source, quality: choice.quality);
+    if (choice == null || !mounted) return;
+    if (!systemPicksScreen) {
+      return _voice.startScreen(source: choice.source, quality: choice.quality);
+    }
+    final source = await askSystemForScreen(context);
+    if (source != null) {
+      await _voice.startScreen(source: source, quality: choice.quality);
+    }
   }
 
   @override
