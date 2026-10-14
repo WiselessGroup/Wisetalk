@@ -6,6 +6,7 @@ import 'src/rust/frb_generated.dart';
 import 'theme.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
   runApp(const ProviderScope(child: WisetalkApp()));
 }

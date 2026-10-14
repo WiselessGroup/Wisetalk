@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'data/servers.dart';
 import 'data/session.dart';
 import 'theme.dart';
-import 'ui/home_screen.dart';
+import 'ui/workspace_screen.dart';
 import 'ui/servers_screen.dart';
 import 'ui/sign_in_screen.dart';
 
@@ -51,7 +51,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/sign-in',
         builder: (context, state) => const SignInScreen(),
       ),
-      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const WorkspaceScreen(),
+      ),
     ],
   );
 });

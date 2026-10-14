@@ -5,9 +5,10 @@ voice and video chat for a single community. Built with
 [Flutter](https://flutter.dev): one codebase for Linux, Windows, macOS, Android
 and iOS. This repository was called `mobile` until 2026-10-12.
 
-**Status:** foundation. The Flutter app builds for Linux and opens a window
-that talks to [wisetalk-core](https://git.wiseless.net/Wisetalk/core) through
-the Rust bridge; sign-in, channels and calls come next. The browser client
+**Status:** early. On Linux the app signs in to any Wisetalk server (with
+an account through the browser, or as a guest), lists its channels and
+joins end-to-end encrypted voice calls. Video, screen sharing, chat and
+settings come next. The browser client
 ([webclient](https://git.wiseless.net/Wisetalk/webclient)) is the one in use.
 
 ## Layout
@@ -53,6 +54,10 @@ Then:
 ```sh
 flutter run -d linux        # build hooks compile the Rust bridge too
 flutter test                # widget tests load rust/target/release
+# Against a local server (server/README) on Linux, one file at a time:
+# the desktop runner can't start the app twice in one run.
+flutter test integration_test/sign_in_test.dart -d linux
+flutter test integration_test/voice_test.dart -d linux
 cd rust && cargo test       # the bridge on its own
 flutter_rust_bridge_codegen generate   # after changing rust/src/api
 ```

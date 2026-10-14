@@ -46,12 +46,15 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
     }
     await tester.pumpAndSettle();
-    expect(find.text('App Owl'), findsOneWidget);
+    expect(find.text('App Owl'), findsWidgets);
     expect(
       secrets.values.keys.where((k) => k.startsWith('token:')),
       hasLength(1),
     );
 
+    // Signing out lives in the menu under your name in the sidebar.
+    await tester.tap(find.byIcon(Icons.more_horiz));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sign Out'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(find.text('Join as a guest'), findsOneWidget);
