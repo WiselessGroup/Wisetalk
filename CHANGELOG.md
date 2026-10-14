@@ -15,6 +15,9 @@ The first Wisetalk app, for Linux and Android.
   with Ctrl+V.
 - Summons and new messages show up as notifications while the app is in
   the background.
+- On Android, calls keep going in the background with an ongoing
+  notification, and you can share the entire screen or one app. Phones get
+  a one-column layout: the channel list folds into a row during a call.
 - On Linux the app updates itself: it downloads the new version in the
   background, then "Restart to Update" switches to it. On Android it tells
   you when a new version is out.

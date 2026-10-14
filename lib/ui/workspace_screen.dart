@@ -72,6 +72,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   ]);
   String? _shownError;
 
+  /// Phones in a call: the channel list, folded into one row until opened.
+  bool _listOpen = false;
+  String? _lastChannel;
+  String? _lastChat;
+
   /// Whether Wisetalk is the window in front: notifications only when not.
   bool _focused = true;
   late final AppLifecycleListener _lifecycle;
@@ -86,6 +91,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
       onStateChange: (state) => _focused = state == AppLifecycleState.resumed,
     );
     final notifications = ref.read(notificationsProvider);
+    unawaited(notifications.prepare());
     _subscriptions.addAll([
       _chats.incoming.listen(_message),
       _gateway.events.listen(_event),
@@ -180,6 +186,13 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   );
 
   void _chatsChanged() {
+    // A chat opened from the list takes its place.
+    if (_chats.open != _lastChat) {
+      _lastChat = _chats.open;
+      if (_lastChat != null && _listOpen && mounted) {
+        setState(() => _listOpen = false);
+      }
+    }
     final error = _chats.error;
     if (error != null && mounted) {
       _chats.error = null;
@@ -195,6 +208,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
 
   /// Errors show once as a toast; the take-over question as a dialog.
   void _voiceChanged() {
+    // Joining a channel from the list shows its stage.
+    if (_voice.channel != _lastChannel) {
+      _lastChannel = _voice.channel;
+      if (_listOpen && mounted) setState(() => _listOpen = false);
+    }
     final error = _voice.error;
     if (error != null && error != _shownError && mounted) {
       _shownError = error;
@@ -242,48 +260,169 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     return Scaffold(
       backgroundColor: palette.window,
       body: SafeArea(
-        child: ListenableBuilder(
-          listenable: _changes,
-          builder: (context, _) {
-            final open = _chats.open;
-            final chat = open == null ? null : _gateway.channel(open);
-            final inCall = _voice.channel != null;
-            final panel = chat == null
-                ? null
-                : _Card(
-                    child: ChatPanel(
-                      key: ValueKey(chat.channel.id),
-                      chats: _chats,
-                      gateway: _gateway,
-                      view: chat,
-                      onClose: _chats.hide,
-                    ),
-                  );
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: LayoutBuilder(
+          builder: (context, constraints) => ListenableBuilder(
+            listenable: _changes,
+            builder: (context, _) =>
+                constraints.maxWidth < _phoneWidth ? _phone() : _desktop(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  ChatPanel? _chatPanel() {
+    final open = _chats.open;
+    final chat = open == null ? null : _gateway.channel(open);
+    if (chat == null) return null;
+    return ChatPanel(
+      key: ValueKey(chat.channel.id),
+      chats: _chats,
+      gateway: _gateway,
+      view: chat,
+      onClose: _chats.hide,
+    );
+  }
+
+  _Sidebar _sidebar({bool flat = false}) => _Sidebar(
+    gateway: _gateway,
+    voice: _voice,
+    chats: _chats,
+    updates: ref.read(updatesProvider),
+    session: widget.session,
+    flat: flat,
+  );
+
+  /// One column, as the web client on a phone. Out of a call it's the
+  /// channel list; in a call the list folds into one row above the stage.
+  /// A chat takes the whole room. Back closes the chat or the list first.
+  Widget _phone() {
+    final chat = _chatPanel();
+    final id = _voice.channel;
+    final call = id == null ? null : _gateway.channel(id);
+    final Widget body;
+    if (call == null) {
+      body = chat ?? _sidebar(flat: true);
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _NowRow(
+            view: call,
+            open: _listOpen,
+            onPressed: () => setState(() => _listOpen = !_listOpen),
+          ),
+          Divider(height: 1, color: context.palette.separator),
+          if (_listOpen) ...[
+            Expanded(child: _sidebar(flat: true)),
+            CallControls(gateway: _gateway, voice: _voice),
+          ] else
+            Expanded(
+              child:
+                  chat ??
+                  CallArea(gateway: _gateway, voice: _voice, showName: false),
+            ),
+        ],
+      );
+    }
+    final folded = chat != null || (call != null && _listOpen);
+    return PopScope(
+      canPop: !folded,
+      onPopInvokedWithResult: (popped, _) {
+        if (popped) return;
+        if (_listOpen) {
+          setState(() => _listOpen = false);
+        } else {
+          _chats.hide();
+        }
+      },
+      child: body,
+    );
+  }
+
+  /// A floating sidebar, the stage beside it and the chat on the right.
+  Widget _desktop() {
+    final chat = _chatPanel();
+    final inCall = _voice.channel != null;
+    final panel = chat == null ? null : _Card(child: chat);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(padding: const EdgeInsets.all(8), child: _sidebar()),
+        // Out of a call the chat takes the whole stage.
+        if (panel != null && !inCall)
+          Expanded(child: panel)
+        else ...[
+          Expanded(
+            child: CallArea(gateway: _gateway, voice: _voice),
+          ),
+          if (panel != null) SizedBox(width: 380, child: panel),
+        ],
+      ],
+    );
+  }
+}
+
+/// Narrower than this, the window is laid out as a phone (56rem on the web).
+const _phoneWidth = 896.0;
+
+/// Phones in a call: the channel and how many are in it, opening the list.
+class _NowRow extends StatelessWidget {
+  const _NowRow({
+    required this.view,
+    required this.open,
+    required this.onPressed,
+  });
+
+  final ChannelView view;
+  final bool open;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Semantics(
+      button: true,
+      expanded: open,
+      label: open ? 'Hide channels' : 'Show channels',
+      child: InkWell(
+        onTap: onPressed,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: _Sidebar(
-                    gateway: _gateway,
-                    voice: _voice,
-                    chats: _chats,
-                    updates: ref.read(updatesProvider),
-                    session: widget.session,
+                Icon(Icons.volume_up_outlined, size: 20, color: palette.accent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        view.channel.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.text,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${view.participants.length} in voice',
+                        style: TextStyle(color: palette.muted, fontSize: 13),
+                      ),
+                    ],
                   ),
                 ),
-                // Out of a call the chat takes the whole stage.
-                if (panel != null && !inCall)
-                  Expanded(child: panel)
-                else ...[
-                  Expanded(
-                    child: CallArea(gateway: _gateway, voice: _voice),
-                  ),
-                  if (panel != null) SizedBox(width: 380, child: panel),
-                ],
+                AnimatedRotation(
+                  turns: open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(Icons.expand_more, color: palette.muted),
+                ),
               ],
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -321,6 +460,7 @@ class _Sidebar extends ConsumerWidget {
     required this.chats,
     required this.updates,
     required this.session,
+    this.flat = false,
   });
 
   final Gateway gateway;
@@ -328,6 +468,9 @@ class _Sidebar extends ConsumerWidget {
   final Chats chats;
   final Updates updates;
   final Session session;
+
+  /// Phones: the whole width, without the floating card.
+  final bool flat;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -338,12 +481,14 @@ class _Sidebar extends ConsumerWidget {
     final spaces = [...gateway.spaces]
       ..sort((a, b) => a.position.compareTo(b.position));
     return Container(
-      width: 260,
-      decoration: BoxDecoration(
-        color: palette.sidebar,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: palette.separator, width: 0.5),
-      ),
+      width: flat ? null : 260,
+      decoration: flat
+          ? null
+          : BoxDecoration(
+              color: palette.sidebar,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: palette.separator, width: 0.5),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -16,11 +16,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import '../src/rust/api/call.dart';
+import 'call_service.dart';
 import 'gateway.dart';
 import 'protocol.dart';
 
@@ -110,6 +113,7 @@ class Voice extends ChangeNotifier {
   }
 
   final Gateway gateway;
+  final _service = CallService();
   late final StreamSubscription<GatewayEvent> _subscription;
 
   String? channel;
@@ -171,7 +175,7 @@ class Voice extends ChangeNotifier {
     final room = _room;
     if (room == null) return;
     if (!muted) {
-      await room.localParticipant?.setMicrophoneEnabled(false);
+      await _unpublish(lk.TrackSource.microphone);
       muted = true;
     } else if (serverMuted) {
       error = 'A moderator muted you; only they can lift it.';
@@ -186,13 +190,17 @@ class Voice extends ChangeNotifier {
     final local = _room?.localParticipant;
     if (local == null) return;
     try {
-      await local.setCameraEnabled(
-        !camera,
-        // 720p: plenty for a face, and light on the machine sending it.
-        cameraCaptureOptions: const lk.CameraCaptureOptions(
-          params: lk.VideoParametersPresets.h720_169,
-        ),
-      );
+      if (camera) {
+        await _unpublish(lk.TrackSource.camera);
+      } else {
+        await local.setCameraEnabled(
+          true,
+          // 720p: plenty for a face, and light on the machine sending it.
+          cameraCaptureOptions: const lk.CameraCaptureOptions(
+            params: lk.VideoParametersPresets.h720_169,
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('camera unavailable: $e');
       error = 'Camera unavailable.';
@@ -200,6 +208,18 @@ class Voice extends ChangeNotifier {
     // Read the state back: unpublish events fire while the call above runs.
     camera = _room?.localParticipant?.isCameraEnabled() ?? false;
     notifyListeners();
+  }
+
+  /// Turns the microphone or camera off by unpublishing it. LiveKit's own
+  /// "off" mutes the track and stops its capture, and after a full
+  /// reconnect it publishes that dead track again and throws ("track is
+  /// null"). The others see a missing track as off, the same as a muted one.
+  Future<void> _unpublish(lk.TrackSource source) async {
+    final local = _room?.localParticipant;
+    final publication = local?.getTrackPublicationBySource(source);
+    if (local != null && publication != null) {
+      await local.removePublishedTrack(publication.sid);
+    }
   }
 
   /// Shares a screen or a window: [source] from the desktop source list,
@@ -211,6 +231,17 @@ class Voice extends ChangeNotifier {
   }) async {
     final local = _room?.localParticipant;
     if (local == null) return;
+    // Android asks first (whole screen or one app), then wants the
+    // foreground service running before capture starts.
+    if (Platform.isAndroid) {
+      if (!await rtc.Helper.requestCapturePermission()) return;
+      final name = gateway.channel(channel ?? '')?.channel.name ?? 'Wisetalk';
+      if (!await _service.update(channel: name, sharing: true)) {
+        error = 'Screen sharing unavailable.';
+        notifyListeners();
+        return;
+      }
+    }
     try {
       await local.setScreenShareEnabled(
         true,
@@ -225,6 +256,7 @@ class Voice extends ChangeNotifier {
       debugPrint('screen share stopped or refused: $e');
     }
     screen = _room?.localParticipant?.isScreenShareEnabled() ?? false;
+    unawaited(_syncService());
     notifyListeners();
   }
 
@@ -237,6 +269,7 @@ class Voice extends ChangeNotifier {
       debugPrint('cannot stop screen share: $e');
     }
     screen = _room?.localParticipant?.isScreenShareEnabled() ?? false;
+    unawaited(_syncService());
     notifyListeners();
   }
 
@@ -277,7 +310,19 @@ class Voice extends ChangeNotifier {
     camera = false;
     screen = false;
     tiles = const [];
+    unawaited(_service.update(channel: null));
     notifyListeners();
+  }
+
+  /// Android: the call's foreground service follows the call.
+  Future<bool> _syncService() {
+    final id = channel;
+    return _service.update(
+      channel: id == null || state != VoiceState.connected
+          ? null
+          : gateway.channel(id)?.channel.name ?? 'Wisetalk',
+      sharing: screen,
+    );
   }
 
   void _addTile(
@@ -467,12 +512,13 @@ class Voice extends ChangeNotifier {
           // The system's own "stop sharing" ends up here.
           if (e.publication.source == lk.TrackSource.screenShareVideo) {
             screen = false;
+            unawaited(_syncService());
           }
           if (e.publication.source == lk.TrackSource.camera) camera = false;
           _refreshMicStates();
         })
-        // A camera turned off is muted, not unpublished: drop its tile so
-        // the person shows up with their avatar instead of a black frame.
+        // Other clients mute a camera instead of unpublishing it: drop its
+        // tile so the person shows up with their avatar, not a black frame.
         ..on<lk.TrackMutedEvent>((e) {
           if (e.publication.kind == lk.TrackType.VIDEO) {
             _removeTile(e.publication.sid);
@@ -536,6 +582,7 @@ class Voice extends ChangeNotifier {
     state = VoiceState.connected;
     if (serverMuted) {
       muted = true;
+      unawaited(_syncService());
       notifyListeners();
       return;
     }
@@ -547,6 +594,8 @@ class Voice extends ChangeNotifier {
       muted = true;
       error = 'Microphone unavailable: you can listen, but not speak.';
     }
+    // After the microphone permission: the service needs it.
+    unawaited(_syncService());
     _refreshMicStates();
   }
 

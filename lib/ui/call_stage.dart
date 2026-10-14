@@ -18,10 +18,18 @@ const _gap = 8.0;
 const _stagePadding = 16.0;
 
 class CallArea extends StatefulWidget {
-  const CallArea({super.key, required this.gateway, required this.voice});
+  const CallArea({
+    super.key,
+    required this.gateway,
+    required this.voice,
+    this.showName = true,
+  });
 
   final Gateway gateway;
   final Voice voice;
+
+  /// Off on phones, where the row above the stage names the channel.
+  final bool showName;
 
   @override
   State<CallArea> createState() => _CallAreaState();
@@ -32,22 +40,6 @@ class _CallAreaState extends State<CallArea> {
   String? _focused;
 
   Voice get _voice => widget.voice;
-
-  Future<void> _toggleScreen() async {
-    if (_voice.screen) return _voice.stopScreen();
-    final choice = await showDialog<ScreenShareChoice>(
-      context: context,
-      builder: (context) => const ScreenShareDialog(),
-    );
-    if (choice == null || !mounted) return;
-    if (!systemPicksScreen) {
-      return _voice.startScreen(source: choice.source, quality: choice.quality);
-    }
-    final source = await askSystemForScreen(context);
-    if (source != null) {
-      await _voice.startScreen(source: source, quality: choice.quality);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,12 +75,6 @@ class _CallAreaState extends State<CallArea> {
       VoiceState.waitingForKey => 'Waiting for the call key…',
       _ => 'End-to-end encrypted',
     };
-    final connected = _voice.state == VoiceState.connected;
-    final canStream = connected && view.can('VIDEO');
-    // Phones need a foreground service to share their screen; not yet.
-    final canShareScreen =
-        canStream &&
-        (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
     if (_focused != null && !_voice.tiles.any((t) => t.id == _focused)) {
       _focused = null;
     }
@@ -100,15 +86,17 @@ class _CallAreaState extends State<CallArea> {
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
           child: Row(
             children: [
-              Text(
-                view.channel.name,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: palette.text,
+              if (widget.showName) ...[
+                Text(
+                  view.channel.name,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: palette.text,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
+                const SizedBox(width: 10),
+              ],
               Icon(Icons.lock_outline, size: 13, color: palette.muted),
               const SizedBox(width: 4),
               Text(
@@ -130,58 +118,92 @@ class _CallAreaState extends State<CallArea> {
                   ),
                 ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _RoundButton(
-                icon: _voice.muted ? Icons.mic_off : Icons.mic,
-                label: _voice.muted ? 'Unmute' : 'Mute',
-                background: _voice.muted
-                    ? palette.error.withValues(alpha: 0.25)
-                    : palette.fill,
-                foreground: _voice.muted ? palette.error : palette.text,
-                onPressed: connected ? _voice.toggleMute : null,
-              ),
-              if (canStream) ...[
-                const SizedBox(width: 16),
-                _RoundButton(
-                  icon: _voice.camera ? Icons.videocam : Icons.videocam_off,
-                  label: _voice.camera ? 'Turn Camera Off' : 'Turn Camera On',
-                  background: _voice.camera
-                      ? palette.accent.withValues(alpha: 0.25)
-                      : palette.fill,
-                  foreground: _voice.camera ? palette.accent : palette.text,
-                  onPressed: _voice.toggleCamera,
-                ),
-              ],
-              if (canShareScreen) ...[
-                const SizedBox(width: 16),
-                _RoundButton(
-                  icon: _voice.screen
-                      ? Icons.stop_screen_share
-                      : Icons.screen_share,
-                  label: _voice.screen ? 'Stop Sharing' : 'Share Screen',
-                  background: _voice.screen
-                      ? palette.accent.withValues(alpha: 0.25)
-                      : palette.fill,
-                  foreground: _voice.screen ? palette.accent : palette.text,
-                  onPressed: _toggleScreen,
-                ),
-              ],
-              const SizedBox(width: 16),
-              _RoundButton(
-                icon: Icons.call_end,
-                label: 'Leave',
-                background: palette.error,
-                foreground: palette.onAccent,
-                onPressed: _voice.leave,
-              ),
-            ],
-          ),
-        ),
+        CallControls(gateway: widget.gateway, voice: _voice),
       ],
+    );
+  }
+}
+
+/// Mute, camera, screen and leave, under the stage.
+class CallControls extends StatelessWidget {
+  const CallControls({super.key, required this.gateway, required this.voice});
+
+  final Gateway gateway;
+  final Voice voice;
+
+  Future<void> _toggleScreen(BuildContext context) async {
+    if (voice.screen) return voice.stopScreen();
+    final choice = await showDialog<ScreenShareChoice>(
+      context: context,
+      builder: (context) => const ScreenShareDialog(),
+    );
+    if (choice == null || !context.mounted) return;
+    if (!systemPicksScreen) {
+      return voice.startScreen(source: choice.source, quality: choice.quality);
+    }
+    final source = await askSystemForScreen(context);
+    if (source != null) {
+      await voice.startScreen(source: source, quality: choice.quality);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final id = voice.channel;
+    final view = id == null ? null : gateway.channel(id);
+    final connected = voice.state == VoiceState.connected;
+    final canStream = connected && (view?.can('VIDEO') ?? false);
+    // iOS needs a broadcast extension to share its screen; not yet.
+    final canShareScreen = canStream && !Platform.isIOS;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _RoundButton(
+            icon: voice.muted ? Icons.mic_off : Icons.mic,
+            label: voice.muted ? 'Unmute' : 'Mute',
+            background: voice.muted
+                ? palette.error.withValues(alpha: 0.25)
+                : palette.fill,
+            foreground: voice.muted ? palette.error : palette.text,
+            onPressed: connected ? voice.toggleMute : null,
+          ),
+          if (canStream) ...[
+            const SizedBox(width: 16),
+            _RoundButton(
+              icon: voice.camera ? Icons.videocam : Icons.videocam_off,
+              label: voice.camera ? 'Turn Camera Off' : 'Turn Camera On',
+              background: voice.camera
+                  ? palette.accent.withValues(alpha: 0.25)
+                  : palette.fill,
+              foreground: voice.camera ? palette.accent : palette.text,
+              onPressed: voice.toggleCamera,
+            ),
+          ],
+          if (canShareScreen) ...[
+            const SizedBox(width: 16),
+            _RoundButton(
+              icon: voice.screen ? Icons.stop_screen_share : Icons.screen_share,
+              label: voice.screen ? 'Stop Sharing' : 'Share Screen',
+              background: voice.screen
+                  ? palette.accent.withValues(alpha: 0.25)
+                  : palette.fill,
+              foreground: voice.screen ? palette.accent : palette.text,
+              onPressed: () => _toggleScreen(context),
+            ),
+          ],
+          const SizedBox(width: 16),
+          _RoundButton(
+            icon: Icons.call_end,
+            label: 'Leave',
+            background: palette.error,
+            foreground: palette.onAccent,
+            onPressed: voice.leave,
+          ),
+        ],
+      ),
     );
   }
 }

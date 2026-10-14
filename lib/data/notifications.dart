@@ -56,6 +56,10 @@ class Notifications {
   /// Where clicked notifications lead.
   Stream<NotificationTarget> get clicks => _clicks.stream;
 
+  /// Sets notifications up, and asks for the permission where the system
+  /// wants that (Android), up front instead of at the first message.
+  Future<bool> prepare() => _ready ??= _start();
+
   Future<bool> _start() async {
     try {
       final ok = await _plugin.initialize(
@@ -94,7 +98,7 @@ class Notifications {
     required String body,
     required NotificationTarget target,
   }) async {
-    if (!await (_ready ??= _start())) return;
+    if (!await prepare()) return;
     try {
       await _plugin.show(
         id: _next++,

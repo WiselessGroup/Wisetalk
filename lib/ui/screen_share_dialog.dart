@@ -1,5 +1,5 @@
 // Before sharing: what it's for (text or motion), and which screen or
-// window. On Wayland the system asks which screen itself.
+// window. On Wayland and Android the system asks what to share itself.
 
 import 'dart:async';
 import 'dart:io';
@@ -19,6 +19,10 @@ typedef ScreenShareChoice = ({String? source, ScreenQuality quality});
 bool get systemPicksScreen =>
     Platform.isLinux && Platform.environment['XDG_SESSION_TYPE'] == 'wayland';
 
+/// Whether the app lists nothing and the system asks instead: Wayland's
+/// portal, or Android's own "entire screen or one app" question.
+bool get _systemAsks => systemPicksScreen || Platform.isAndroid;
+
 class ScreenShareDialog extends StatefulWidget {
   const ScreenShareDialog({super.key});
 
@@ -28,8 +32,7 @@ class ScreenShareDialog extends StatefulWidget {
 
 class _ScreenShareDialogState extends State<ScreenShareDialog> {
   var _quality = ScreenQuality.text;
-  late final Future<List<rtc.DesktopCapturerSource>> _sources =
-      systemPicksScreen
+  late final Future<List<rtc.DesktopCapturerSource>> _sources = _systemAsks
       ? Future.value(const [])
       : rtc.desktopCapturer.getSources(
           types: [rtc.SourceType.Screen, rtc.SourceType.Window],
@@ -40,7 +43,7 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final ready = systemPicksScreen || _source != null;
+    final ready = _systemAsks || _source != null;
     return AlertDialog(
       title: const Text('Share Your Screen'),
       content: SizedBox(
@@ -73,7 +76,13 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
               style: TextStyle(fontSize: 13, color: palette.muted),
             ),
             const SizedBox(height: 16),
-            if (systemPicksScreen)
+            if (Platform.isAndroid)
+              Text(
+                'Android asks next whether to share the entire screen or '
+                'one app. Without sound, for now.',
+                style: TextStyle(fontSize: 13, color: palette.muted),
+              )
+            else if (systemPicksScreen)
               Text(
                 'The first time, your system asks which screen to share. '
                 'Later shares reuse that screen until Wisetalk restarts. '
