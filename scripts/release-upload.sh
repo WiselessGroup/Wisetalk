@@ -10,8 +10,14 @@ tag=$1
 shift
 version=${tag#v}
 
+# Fails on an HTTP error, saying what Forgejo answered ("token does not
+# have at least one of required scope(s)", say).
 call() {
-    curl -sSf -H "Authorization: token $TOKEN" "$@"
+    curl -sS --fail-with-body -H "Authorization: token $TOKEN" "$@" || {
+        status=$?
+        echo >&2
+        return $status
+    }
 }
 
 release_id() {
@@ -27,11 +33,18 @@ if [ -z "$id" ] || [ "$id" = null ]; then
     case $version in *-*) pre=true ;; *) pre=false ;; esac
     body=$(jq -n --arg tag "$tag" --arg name "Wisetalk $version" --arg notes "$notes" \
         --argjson pre "$pre" '{tag_name: $tag, name: $name, body: $notes, prerelease: $pre}')
-    id=$(call -H "Content-Type: application/json" -d "$body" "$api/releases" | jq -r .id)
+    answer=$(call -H "Content-Type: application/json" -d "$body" "$api/releases") || {
+        echo "cannot create the release: $answer" >&2
+        exit 1
+    }
+    id=$(echo "$answer" | jq -r .id)
 fi
 
 for file in "$@"; do
     name=$(basename "$file")
-    call -F "attachment=@$file" "$api/releases/$id/assets?name=$name" >/dev/null
+    answer=$(call -F "attachment=@$file" "$api/releases/$id/assets?name=$name") || {
+        echo "cannot attach $name: $answer" >&2
+        exit 1
+    }
     echo "attached $name to $tag"
 done
