@@ -74,6 +74,15 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Ship a libwebrtc that keeps call keys out of the logs; see the file.
+if(FLUTTER_TARGET_PLATFORM MATCHES "arm64")
+  set(WISETALK_LIBWEBRTC_ARCH "arm64")
+else()
+  set(WISETALK_LIBWEBRTC_ARCH "x64")
+endif()
+set(WISETALK_LIBWEBRTC_OS "linux")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/libwebrtc.cmake")
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build

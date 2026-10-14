@@ -57,6 +57,15 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Ship a libwebrtc that keeps call keys out of the logs; see the file.
+if(CMAKE_GENERATOR_PLATFORM MATCHES "^[Aa][Rr][Mm]64$")
+  set(WISETALK_LIBWEBRTC_ARCH "arm64")
+else()
+  set(WISETALK_LIBWEBRTC_ARCH "x64")
+endif()
+set(WISETALK_LIBWEBRTC_OS "win")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/libwebrtc.cmake")
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
