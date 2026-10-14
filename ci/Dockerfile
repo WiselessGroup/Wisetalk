@@ -1,6 +1,6 @@
-# Build image for the client's CI: Flutter, Rust for the bridge, the Linux
-# desktop toolchain, the Android SDK and Velopack's vpk for releases. Published as
-# git.wiseless.net/wisetalk/flutter-ci:<flutter version> by ci-image.yml.
+# Build image for the client's releases: Flutter, Rust for the bridge, the
+# Linux desktop toolchain, the Android SDK and Velopack's vpk. Built and run
+# on a developer's machine by scripts/release.sh, never on the server.
 #
 # Ubuntu 22.04 on purpose: an AppImage runs on systems with the same or a
 # newer glibc than the one it was built with (2.35 here).

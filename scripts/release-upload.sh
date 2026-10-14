@@ -1,13 +1,13 @@
 #!/bin/sh
-# Attaches files to the Forgejo release of the current tag, creating the
-# release first if no other job has yet. Notes come from the tag's section
-# in CHANGELOG.md; versions with a hyphen (1.0.0-beta.1) are prereleases.
-# Usage: scripts/release-upload.sh <file>...   (needs TOKEN and the
-# GITHUB_* variables Forgejo Actions sets)
+# Attaches files to the Forgejo release of a tag, creating the release
+# first if there is none yet. Notes come from the tag's section in
+# CHANGELOG.md; versions with a hyphen (1.0.0-beta.1) are prereleases.
+# Usage: TOKEN=... scripts/release-upload.sh vX.Y.Z <file>...
 set -eu
 
-api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
-tag=$GITHUB_REF_NAME
+api=https://git.wiseless.net/api/v1/repos/Wisetalk/client
+tag=$1
+shift
 version=${tag#v}
 
 call() {
@@ -27,9 +27,7 @@ if [ -z "$id" ] || [ "$id" = null ]; then
     case $version in *-*) pre=true ;; *) pre=false ;; esac
     body=$(jq -n --arg tag "$tag" --arg name "Wisetalk $version" --arg notes "$notes" \
         --argjson pre "$pre" '{tag_name: $tag, name: $name, body: $notes, prerelease: $pre}')
-    # Another job may create it at the same moment; then take theirs.
-    id=$(call -H "Content-Type: application/json" -d "$body" "$api/releases" | jq -r .id) \
-        || id=$(release_id)
+    id=$(call -H "Content-Type: application/json" -d "$body" "$api/releases" | jq -r .id)
 fi
 
 for file in "$@"; do

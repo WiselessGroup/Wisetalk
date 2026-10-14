@@ -73,22 +73,28 @@ fresh one in the app; `cargo build --release` in `rust/` fixes that.
 
 ## Releases
 
-A tag `vX.Y.Z` builds the app in CI and publishes it as a release of this
-repository: `Wisetalk-X.Y.Z-x86_64.AppImage` and a universal
-`Wisetalk-X.Y.Z.apk` for now, a Windows installer and a `.dmg` once there
-are runners for them. The notes come from the tag's section in
-`CHANGELOG.md`; a version with a hyphen (`1.0.0-beta.1`) is a prerelease.
-Wisetalk servers offer the latest release on their web client's Download
-button.
+Everything is built on a developer's machine; the server only hosts the
+results. Before pushing, `scripts/check.sh` runs what has to pass (the
+Rust bridge, bindings, formatting, analyzer, tests).
 
-CI runs in `git.wiseless.net/wisetalk/flutter-ci:<flutter version>`, built
-from `ci/Dockerfile` whenever it changes. Android releases are signed with
-the key in the repository secrets `ANDROID_KEYSTORE` (the `.jks`, base64),
-`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`
-(optional, defaults to the keystore password). Without them the APK job
-fails rather than publish an APK signed with a throwaway key, which phones
-would refuse to update later. Keep a copy of the keystore somewhere safe:
-losing it means nobody can update the app without reinstalling.
+`scripts/release.sh vX.Y.Z` builds a tagged release and publishes it as a
+release of this repository: `Wisetalk-X.Y.Z-x86_64.AppImage` with
+Velopack's update packages and feed, and a universal `Wisetalk-X.Y.Z.apk`.
+Installed apps update from these releases. The notes come from the tag's
+section in `CHANGELOG.md`; a version with a hyphen (`1.0.0-beta.1`) is a
+prerelease. Wisetalk servers offer the latest release on their web client's
+Download button.
+
+The builds run in a Docker image made from `ci/Dockerfile` (Ubuntu 22.04,
+so the AppImage runs on older systems than the one building it), built
+locally the first time. The script needs a Forgejo token that can write
+releases in `~/.config/wisetalk/forgejo-token`, and the Android release key:
+`android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
+`keyPassword`) with the keystore it names beside it, both ignored by git.
+Without them it refuses to build rather than sign with a throwaway key,
+which phones would refuse to update later. Keep a copy of the keystore
+somewhere safe: losing it means nobody can update the app without
+reinstalling.
 
 ## License
 
