@@ -77,6 +77,11 @@ Everything is built on a developer's machine; the server only hosts the
 results. Before pushing, `scripts/check.sh` runs what has to pass (the
 Rust bridge, bindings, formatting, analyzer, tests).
 
+Before a release, see what the app costs (ADR-0019): `scripts/measure.sh
+[seconds] [pid]` prints CPU, wakeups and memory of a running release build.
+Take the window idle, minimized, in a voice call and with video, and compare
+with the numbers of the release before (kept in issue WLK-24).
+
 `scripts/release.sh vX.Y.Z` builds a tagged release and publishes it as a
 release of this repository: `Wisetalk-X.Y.Z-x86_64.AppImage` with
 Velopack's update packages and feed, and a universal `Wisetalk-X.Y.Z.apk`.
