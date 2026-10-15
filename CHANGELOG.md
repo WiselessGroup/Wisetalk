@@ -3,6 +3,13 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
+## 0.3.2
+
+- Linux: installed with Gear Lever or AppImageLauncher, Wisetalk shows up
+  as one app with one icon, running or not, and the manager's entry opens
+  links from a server's page. After updating, use Gear Lever's Reload
+  Metadata once.
+
 ## 0.3.1
 
 - Crash reports, off until you turn them on in Settings › Privacy. They
