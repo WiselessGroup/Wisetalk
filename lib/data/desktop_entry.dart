@@ -2,8 +2,10 @@
 // tells the system it opens wisetalk: links. Wisetalk does both itself,
 // once per start (the file may have moved), so a server's web page can hand
 // the app its address. When an AppImage manager (Gear Lever,
-// AppImageLauncher) already made a menu entry, Wisetalk's own stays out of
-// the menu and only opens the links.
+// AppImageLauncher) already made a menu entry, Wisetalk leaves the menu to
+// it: from the entry inside the AppImage (packaging/linux), that entry also
+// opens the links. An older AppImage's entry doesn't, so Wisetalk's own
+// stays for the links, out of the menu.
 
 import 'dart:io';
 
@@ -26,7 +28,22 @@ Future<void> registerDesktopEntry() async {
     }
 
     final entry = File('$data/applications/$_id.desktop');
-    final hidden = _integrated(image, Directory('$data/applications'), entry);
+    final others = _entriesFor(image, Directory('$data/applications'), entry);
+    final handler = others
+        .where(
+          (f) => f.readAsLinesSync().any(
+            (l) => l.startsWith('MimeType=') && l.contains(_scheme),
+          ),
+        )
+        .firstOrNull;
+    if (handler != null) {
+      if (entry.existsSync()) await entry.delete();
+      await _handleLinksWith(handler);
+      return;
+    }
+    final hidden =
+        others.isNotEmpty ||
+        (Platform.environment['DESKTOPINTEGRATION'] ?? '').isNotEmpty;
     final text =
         '''[Desktop Entry]
 Type=Application
@@ -34,48 +51,55 @@ Name=Wisetalk
 Comment=Voice and video chat for one community
 Exec=${_quote(image)} %u
 Icon=$_id
-Categories=Network;InstantMessaging;AudioVideo;
+Categories=Network;InstantMessaging;
 Terminal=false
 StartupWMClass=$_id
 MimeType=x-scheme-handler/wisetalk;
 ${hidden ? 'NoDisplay=true\n' : ''}''';
     if (entry.existsSync() && entry.readAsStringSync() == text) return;
     await entry.parent.create(recursive: true);
-    await entry.writeAsString(text);
-    await Process.run('xdg-mime', [
-      'default',
-      '$_id.desktop',
-      'x-scheme-handler/wisetalk',
-    ]);
-    await Process.run('update-desktop-database', [entry.parent.path]);
+    // Whole or not at all: a half-written entry would leave the menu broken.
+    final draft = File('${entry.path}.new');
+    await draft.writeAsString(text, flush: true);
+    await draft.rename(entry.path);
+    await _handleLinksWith(entry);
   } catch (e) {
     // A read-only home, no xdg-utils: links just won't open the app.
     debugPrint('cannot register the desktop entry: $e');
   }
 }
 
-/// Whether something else put this AppImage in the app menu: managers
-/// start it with DESKTOPINTEGRATION set, and their entries name its path.
-bool _integrated(String image, Directory folder, File ours) {
-  if ((Platform.environment['DESKTOPINTEGRATION'] ?? '').isNotEmpty) {
-    return true;
-  }
+const _scheme = 'x-scheme-handler/wisetalk';
+
+/// Makes [entry] the one that opens wisetalk: links.
+Future<void> _handleLinksWith(File entry) async {
+  await Process.run('xdg-mime', [
+    'default',
+    entry.uri.pathSegments.last,
+    _scheme,
+  ]);
+  await Process.run('update-desktop-database', [entry.parent.path]);
+}
+
+/// Entries other than ours that start this AppImage, as AppImage managers
+/// make them.
+List<File> _entriesFor(String image, Directory folder, File ours) {
   try {
-    for (final file in folder.listSync().whereType<File>()) {
-      if (!file.path.endsWith('.desktop') || file.path == ours.path) continue;
-      final lines = file.readAsLinesSync();
-      if (lines.any(
-        (l) =>
-            (l.startsWith('Exec=') || l.startsWith('TryExec=')) &&
-            l.contains(image),
-      )) {
-        return true;
-      }
-    }
+    return [
+      for (final file in folder.listSync().whereType<File>())
+        if (file.path.endsWith('.desktop') &&
+            file.path != ours.path &&
+            file.readAsLinesSync().any(
+              (l) =>
+                  (l.startsWith('Exec=') || l.startsWith('TryExec=')) &&
+                  l.contains(image),
+            ))
+          file,
+    ];
   } on FileSystemException {
-    // Unreadable: assume nobody else did it.
+    // Unreadable: assume nobody else made one.
+    return const [];
   }
-  return false;
 }
 
 /// A path as the desktop entry spec wants it in Exec.

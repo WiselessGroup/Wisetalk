@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Wisetalk
+Comment=Voice and video chat for one community
+Exec=wisetalk %u
+Icon=net.wiseless.wisetalk
+Categories=Network;InstantMessaging;
+Keywords=voice;video;chat;call;
+Terminal=false
+StartupNotify=true
+StartupWMClass=net.wiseless.wisetalk
+MimeType=x-scheme-handler/wisetalk;
+X-AppImage-Version=@VERSION@

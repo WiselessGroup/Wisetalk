@@ -124,13 +124,30 @@ step linux "Building for Linux" inside '
 '
 
 step appimage "Packing the AppImage and updates" inside '
+    # Our own AppDir, which vpk takes as it is and adds its updater to: its
+    # desktop entry names the window the app opens and the wisetalk: links
+    # it handles, so AppImage managers (Gear Lever) make one working entry.
+    app=build/Wisetalk.AppDir
+    rm -rf "$app"
+    mkdir -p "$app/usr/bin" "$app/usr/share/metainfo" \
+        "$app/usr/share/icons/hicolor/512x512/apps"
+    cp -a build/linux/x64/release/bundle/. "$app/usr/bin/"
+    cp packaging/linux/AppRun "$app/AppRun"
+    sed "s/@VERSION@/$VERSION/" packaging/linux/net.wiseless.wisetalk.desktop \
+        > "$app/net.wiseless.wisetalk.desktop"
+    sed "s/@VERSION@/$VERSION/; s/@DATE@/$(date -u +%F)/" \
+        packaging/linux/net.wiseless.wisetalk.metainfo.xml \
+        > "$app/usr/share/metainfo/net.wiseless.wisetalk.metainfo.xml"
+    for icon in net.wiseless.wisetalk.png .DirIcon \
+        usr/share/icons/hicolor/512x512/apps/net.wiseless.wisetalk.png; do
+        cp packaging/linux/wisetalk.png "$app/$icon"
+    done
+
     # The release before, so updates from it are a small delta.
     vpk download gitea --repoUrl "$REPO" --channel linux -o /out \
         || echo "no release to make a delta from"
     vpk pack --packId Wisetalk --packVersion "$VERSION" --channel linux \
-        --packDir build/linux/x64/release/bundle --mainExe wisetalk \
-        --packTitle Wisetalk --icon packaging/linux/wisetalk.png \
-        --categories "Network;InstantMessaging;AudioVideo" -o /out
+        --packDir "$app" --mainExe wisetalk --packTitle Wisetalk -o /out
     mv /out/Wisetalk.AppImage "/out/Wisetalk-$VERSION-x86_64.AppImage"
 '
 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.wiseless.wisetalk</id>
+  <name>Wisetalk</name>
+  <summary>Voice and video chat for one community</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <developer id="net.wiseless">
+    <name>Wiseless</name>
+  </developer>
+  <description>
+    <p>
+      Voice channels, cameras and screen sharing, end-to-end encrypted, on
+      your community's own Wisetalk server.
+    </p>
+  </description>
+  <url type="homepage">https://git.wiseless.net/Wisetalk/client</url>
+  <url type="vcs-browser">https://git.wiseless.net/Wisetalk/client</url>
+  <url type="bugtracker">https://git.wiseless.net/Wisetalk/client/issues</url>
+  <launchable type="desktop-id">net.wiseless.wisetalk.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>
