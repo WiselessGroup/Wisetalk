@@ -1,6 +1,7 @@
 #!/bin/sh
 # Attaches files to the Forgejo release of a tag, creating the release
-# first if there is none yet. Notes come from the tag's section in
+# first if there is none yet, and replacing files of the same name. Each
+# platform's release script sends its own files to the same release. Notes come from the tag's section in
 # CHANGELOG.md; versions with a hyphen (1.0.0-beta.1) are prereleases.
 # Usage: TOKEN=... scripts/release-upload.sh vX.Y.Z <file>...
 set -eu
@@ -40,8 +41,15 @@ if [ -z "$id" ] || [ "$id" = null ]; then
     id=$(echo "$answer" | jq -r .id)
 fi
 
+# A file sent again (a build redone) replaces the one already there.
+assets=$(call "$api/releases/$id" | jq -c '.assets[] | {id, name}')
+
 for file in "$@"; do
     name=$(basename "$file")
+    old=$(echo "$assets" | jq -r --arg name "$name" 'select(.name == $name) | .id')
+    for asset in $old; do
+        call -X DELETE "$api/releases/$id/assets/$asset" >/dev/null
+    done
     answer=$(call -F "attachment=@$file" "$api/releases/$id/assets?name=$name") || {
         echo "cannot attach $name: $answer" >&2
         exit 1

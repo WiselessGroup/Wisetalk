@@ -3,6 +3,22 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
+## 0.2.0
+
+Wisetalk for Windows and for Macs with Apple silicon.
+
+- Windows gets an installer that keeps the app up to date, like the Linux
+  one. Links from a server's web page (Add to Client, Open in Client) open
+  the app, and a second start brings the open window forward.
+- macOS gets a disk image: drag Wisetalk to Applications. It asks for the
+  microphone and camera when a call needs them.
+- New owl icons on Windows and macOS.
+
+Known limits: neither is signed by a paid certificate yet. The first time,
+Windows SmartScreen asks for "More info", then "Run anyway", and macOS
+opens the app only from System Settings › Privacy & Security › Open
+Anyway.
+
 ## 0.1.0
 
 The first Wisetalk app, for Linux and Android.

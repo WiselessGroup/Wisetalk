@@ -13,7 +13,7 @@
 # $WISETALK_KEYSTORE or at the path in ~/.config/wisetalk/keystore-path.
 #
 # Each step shows one line with a running clock and how long it took last
-# time; what it prints goes to dist/logs/ and only shows when it fails.
+# time (scripts/lib/steps.sh); what it prints goes to dist/logs/.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -45,64 +45,8 @@ read -r key_pass
 stty echo
 echo >&2
 
-# --- How the steps look ---------------------------------------------------
-
 times=$HOME/.cache/wisetalk/release-times
-mkdir -p "$(dirname "$times")"
-touch "$times"
 steps=6
-n=0
-started=$(date +%s)
-tty=false
-[ -t 1 ] && tty=true
-
-clock() { printf '%d:%02d' $(($1 / 60)) $(($1 % 60)); }
-spinner() {
-    case $(($1 % 10)) in
-        0) printf '⠋' ;; 1) printf '⠙' ;; 2) printf '⠹' ;; 3) printf '⠸' ;; 4) printf '⠼' ;;
-        5) printf '⠴' ;; 6) printf '⠦' ;; 7) printf '⠧' ;; 8) printf '⠇' ;; *) printf '⠏' ;;
-    esac
-}
-last_time() { sed -n "s/^$1 //p" "$times" | tail -n 1; }
-
-# step <name> <title> <command...>: runs the command with its output in
-# dist/logs/<name>.log, a spinner and a clock meanwhile, and remembers how
-# long it took for next time's estimate.
-step() {
-    name=$1 title=$2
-    shift 2
-    n=$((n + 1))
-    log=dist/logs/$name.log
-    was=$(last_time "$name")
-    begin=$(date +%s)
-    "$@" >"$log" 2>&1 &
-    pid=$!
-    i=0
-    while kill -0 "$pid" 2>/dev/null; do
-        if $tty; then
-            took=$(($(date +%s) - begin))
-            hint=
-            [ -n "$was" ] && hint=" of ~$(clock "$was")"
-            printf '\r\033[K%s [%d/%d] %s  %s%s' "$(spinner "$i")" "$n" "$steps" "$title" "$(clock "$took")" "$hint"
-            i=$((i + 1))
-        fi
-        sleep 0.2
-    done
-    status=0
-    wait "$pid" || status=$?
-    took=$(($(date +%s) - begin))
-    if [ "$status" -ne 0 ]; then
-        $tty && printf '\r\033[K'
-        printf '✗ [%d/%d] %s  failed after %s\n\n' "$n" "$steps" "$title" "$(clock "$took")"
-        tail -n 30 "$log"
-        printf '\nThe whole log: %s\n' "$log"
-        exit 1
-    fi
-    { grep -v "^$name " "$times" || true; echo "$name $took"; } >"$times.new"
-    mv "$times.new" "$times"
-    $tty && printf '\r\033[K'
-    printf '✓ [%d/%d] %s  %s\n' "$n" "$steps" "$title" "$(clock "$took")"
-}
 
 # --- The build ------------------------------------------------------------
 
@@ -120,8 +64,9 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 rm -rf dist
-mkdir -p dist/logs
-total=$(awk '{ sum += $2 } END { print sum + 0 }' "$times")
+# shellcheck source=scripts/lib/steps.sh
+. scripts/lib/steps.sh
+total=$(estimate)
 if [ "$total" -gt 0 ]; then
     echo "Wisetalk $version, about $(clock "$total") going by the last release"
 else
@@ -129,8 +74,7 @@ else
 fi
 
 if docker image inspect "$image" >/dev/null 2>&1; then
-    n=1
-    printf '✓ [1/%d] Build image  ready\n' "$steps"
+    skip_step "Build image" ready
 else
     step image "Build image (first time only)" docker build -t "$image" ci
 fi
@@ -198,9 +142,5 @@ files="dist/Wisetalk-$version-x86_64.AppImage $(echo dist/Wisetalk-"$version"-li
 step upload "Uploading to Forgejo" env TOKEN="$(cat "$token_file")" \
     scripts/release-upload.sh "$tag" $files
 
-echo
-echo "Released in $(clock $(($(date +%s) - started))):"
-for file in $files; do
-    printf '  %-44s %s\n' "$(basename "$file")" "$(du -h "$file" | cut -f1)"
-done
-echo "$repo/releases/tag/$tag"
+# shellcheck disable=SC2086
+summary "$repo/releases/tag/$tag" $files

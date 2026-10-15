@@ -97,6 +97,29 @@ throwaway key, which phones would refuse to update later. Keep a copy of the key
 somewhere safe: losing it means nobody can update the app without
 reinstalling.
 
+### macOS and Windows
+
+Flutter builds desktop apps only on their own system, so each release
+gets its Mac and Windows files from people who have those machines, after
+`scripts/release.sh` made the release. Each script builds from the tag,
+checks the tools it needs and says how to get the missing ones, then adds
+its files to the same release (sending a file again replaces it):
+
+- On a Mac with Apple silicon, `scripts/release-macos.sh vX.Y.Z` makes
+  `Wisetalk-X.Y.Z-arm64.dmg` with the update package and feed. It needs
+  Xcode, Flutter, rustup, the .NET SDK with `vpk` and `jq`, and the token
+  in `~/.config/wisetalk/forgejo-token`.
+- On Windows, `.\scripts\release-windows.ps1 vX.Y.Z` in PowerShell makes
+  `Wisetalk-X.Y.Z-x64-Setup.exe` with the update package and feed. It needs
+  Visual Studio 2022 with "Desktop development with C++", Flutter, rustup,
+  the .NET SDK with `vpk`, and the token in `%APPDATA%\wisetalk\forgejo-token`
+  or `$env:WISETALK_FORGEJO_TOKEN`.
+
+A Forgejo token for releases needs the "repository: Read and Write" scope.
+Neither file is signed by a paid certificate yet. The first time, macOS
+opens the app only from System Settings › Privacy & Security › Open Anyway,
+and Windows SmartScreen asks for "More info", then "Run anyway".
+
 ## License
 
 [AGPL-3.0](LICENSE). If you run a modified version for others, you have to
