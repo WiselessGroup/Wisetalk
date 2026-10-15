@@ -3,6 +3,15 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
+## 0.3.1
+
+- Crash reports, off until you turn them on in Settings › Privacy. They
+  say what broke and where in the code, never your messages, names, keys
+  or servers.
+- Linux: installed with Gear Lever or AppImageLauncher, Wisetalk no longer
+  adds a second icon to the app menu; links from a server's page still
+  open it.
+
 ## 0.3.0
 
 The app catches up with the web client.
