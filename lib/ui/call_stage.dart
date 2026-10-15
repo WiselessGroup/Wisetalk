@@ -143,11 +143,15 @@ class CallControls extends StatelessWidget {
     if (voice.screen) return voice.stopScreen();
     final choice = await showDialog<ScreenShareChoice>(
       context: context,
-      builder: (context) => const ScreenShareDialog(),
+      builder: (context) => ScreenShareDialog(preferences: voice.preferences),
     );
     if (choice == null || !context.mounted) return;
     if (!systemPicksScreen) {
-      return voice.startScreen(source: choice.source, quality: choice.quality);
+      return voice.startScreen(
+        source: choice.source,
+        quality: choice.quality,
+        sound: choice.sound,
+      );
     }
     final source = await askSystemForScreen(context);
     if (source != null) {

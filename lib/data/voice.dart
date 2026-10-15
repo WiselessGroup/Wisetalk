@@ -109,6 +109,22 @@ enum ScreenQuality {
   final lk.VideoParameters parameters;
 }
 
+/// Whether a screen share can carry its sound: Windows only for now. There
+/// libwebrtc records just the shared window's app, or for a whole screen
+/// everything but Wisetalk, so the call's voices stay out. On Linux it would
+/// record the speakers, the call included (everyone would hear themselves);
+/// on macOS and Android it records nothing (WLK-3).
+bool get screenSoundAvailable => Platform.isWindows;
+
+/// Screen sound is music and films more than speech: no pauses in the quiet
+/// parts (DTX), a music bitrate. Mono: LiveKit's Flutter SDK publishes no
+/// stereo, and the Windows capture mixes down to one channel anyway.
+const _screenSound = lk.AudioPublishOptions(
+  name: 'screen_audio',
+  encoding: lk.AudioEncoding.presetMusicHighQuality,
+  dtx: false,
+);
+
 class Voice extends ChangeNotifier {
   Voice(this.gateway, this.preferences) {
     _subscription = gateway.events.listen(_onEvent);
@@ -332,10 +348,11 @@ class Voice extends ChangeNotifier {
 
   /// Shares a screen or a window: [source] from the desktop source list,
   /// or `null` for whatever the system lets the person pick (Wayland asks
-  /// through its own dialog).
+  /// through its own dialog). With [sound] where [screenSoundAvailable].
   Future<void> startScreen({
     String? source,
     ScreenQuality quality = ScreenQuality.text,
+    bool sound = false,
   }) async {
     final local = _room?.localParticipant;
     if (local == null) return;
@@ -350,15 +367,20 @@ class Voice extends ChangeNotifier {
         return;
       }
     }
+    final options = lk.ScreenShareCaptureOptions(
+      sourceId: source,
+      maxFrameRate: quality.parameters.encoding!.maxFramerate.toDouble(),
+      params: quality.parameters,
+    );
     try {
-      await local.setScreenShareEnabled(
-        true,
-        screenShareCaptureOptions: lk.ScreenShareCaptureOptions(
-          sourceId: source,
-          maxFrameRate: quality.parameters.encoding!.maxFramerate.toDouble(),
-          params: quality.parameters,
-        ),
-      );
+      if (sound && screenSoundAvailable) {
+        await _shareWithSound(local, options);
+      } else {
+        await local.setScreenShareEnabled(
+          true,
+          screenShareCaptureOptions: options,
+        );
+      }
     } catch (e) {
       // Cancelling the system's share dialog lands here too.
       debugPrint('screen share stopped or refused: $e');
@@ -368,10 +390,41 @@ class Voice extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// What setScreenShareEnabled does with captureScreenAudio, but with the
+  /// sound's own publish options: it would publish it as a microphone (the
+  /// room's speech settings, named "microphone"). Without sound from the
+  /// system (Windows before 10 2004), the picture alone.
+  Future<void> _shareWithSound(
+    lk.LocalParticipant local,
+    lk.ScreenShareCaptureOptions options,
+  ) async {
+    final tracks = await lk.LocalVideoTrack.createScreenShareTracksWithAudio(
+      options,
+    );
+    final video = tracks.whereType<lk.LocalVideoTrack>().first;
+    final audio = tracks.whereType<lk.LocalAudioTrack>().firstOrNull;
+    try {
+      await local.publishVideoTrack(video);
+    } catch (_) {
+      for (final track in tracks) {
+        await track.stop();
+      }
+      rethrow;
+    }
+    if (audio == null) return;
+    try {
+      await local.publishAudioTrack(audio, publishOptions: _screenSound);
+    } catch (e) {
+      debugPrint('sharing without sound: $e');
+      await audio.stop();
+    }
+  }
+
   Future<void> stopScreen() async {
     final local = _room?.localParticipant;
     if (local == null) return;
     try {
+      // Takes the screen's sound down with it.
       await local.setScreenShareEnabled(false);
     } catch (e) {
       debugPrint('cannot stop screen share: $e');
@@ -620,9 +673,12 @@ class Voice extends ChangeNotifier {
         })
         ..on<lk.LocalTrackUnpublishedEvent>((e) {
           _removeTile(e.publication.sid);
-          // The system's own "stop sharing" ends up here.
+          // The system's own "stop sharing" ends up here, or the shared
+          // window closing: only the picture ends, the sound stays
+          // published, silent.
           if (e.publication.source == lk.TrackSource.screenShareVideo) {
             screen = false;
+            unawaited(_unpublish(lk.TrackSource.screenShareAudio));
             unawaited(_syncService());
           }
           if (e.publication.source == lk.TrackSource.camera) camera = false;

@@ -1,5 +1,6 @@
-// Before sharing: what it's for (text or motion), and which screen or
-// window. On Wayland and Android the system asks what to share itself.
+// Before sharing: what it's for (text or motion), which screen or window,
+// and on Windows whether its sound goes too. On Wayland and Android the
+// system asks what to share itself.
 
 import 'dart:async';
 import 'dart:io';
@@ -8,10 +9,15 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 
+import '../data/preferences.dart';
 import '../data/voice.dart';
 import '../theme.dart';
 
-typedef ScreenShareChoice = ({String? source, ScreenQuality quality});
+typedef ScreenShareChoice = ({
+  String? source,
+  ScreenQuality quality,
+  bool sound,
+});
 
 /// On Wayland apps can't list screens or windows: a system dialog picks.
 /// This libwebrtc offers whole screens only there, and its window capture
@@ -24,7 +30,10 @@ bool get systemPicksScreen =>
 bool get _systemAsks => systemPicksScreen || Platform.isAndroid;
 
 class ScreenShareDialog extends StatefulWidget {
-  const ScreenShareDialog({super.key});
+  const ScreenShareDialog({super.key, required this.preferences});
+
+  /// Remembers the sound switch.
+  final Preferences preferences;
 
   @override
   State<ScreenShareDialog> createState() => _ScreenShareDialogState();
@@ -38,7 +47,22 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
           types: [rtc.SourceType.Screen, rtc.SourceType.Window],
           thumbnailSize: rtc.ThumbnailSize(320, 180),
         );
-  String? _source;
+  rtc.DesktopCapturerSource? _source;
+  late bool _sound = widget.preferences.screenSound;
+
+  void _share() {
+    final sound = screenSoundAvailable && _sound;
+    if (screenSoundAvailable && widget.preferences.screenSound != _sound) {
+      widget.preferences
+        ..screenSound = _sound
+        ..changed();
+    }
+    Navigator.pop<ScreenShareChoice>(context, (
+      source: _source?.id,
+      quality: _quality,
+      sound: sound,
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +116,26 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
             else
               _SourcePicker(
                 sources: _sources,
-                selected: _source,
-                onSelect: (id) => setState(() => _source = id),
+                selected: _source?.id,
+                onSelect: (source) => setState(() => _source = source),
+              ),
+            if (screenSoundAvailable)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'Share Sound',
+                  style: TextStyle(color: palette.text),
+                ),
+                subtitle: Text(switch (_source?.type) {
+                  rtc.SourceType.Window => "Only this window's app.",
+                  rtc.SourceType.Screen =>
+                    'Everything you hear, without the call.',
+                  null =>
+                    "A window's app, or for a screen everything you hear, "
+                        'without the call.',
+                }, style: TextStyle(color: palette.muted, fontSize: 13)),
+                value: _sound,
+                onChanged: (on) => setState(() => _sound = on),
               ),
           ],
         ),
@@ -104,12 +146,7 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: ready
-              ? () => Navigator.pop<ScreenShareChoice>(context, (
-                  source: _source,
-                  quality: _quality,
-                ))
-              : null,
+          onPressed: ready ? _share : null,
           child: const Text('Share'),
         ),
       ],
@@ -126,7 +163,7 @@ class _SourcePicker extends StatelessWidget {
 
   final Future<List<rtc.DesktopCapturerSource>> sources;
   final String? selected;
-  final void Function(String) onSelect;
+  final void Function(rtc.DesktopCapturerSource) onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +199,7 @@ class _SourcePicker extends StatelessWidget {
                 _SourceTile(
                   source: source,
                   selected: source.id == selected,
-                  onTap: () => onSelect(source.id),
+                  onTap: () => onSelect(source),
                 ),
             ],
           ),
