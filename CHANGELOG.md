@@ -3,6 +3,27 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
+## 0.3.0
+
+The app catches up with the web client.
+
+- Settings, behind the gear: your picture, which microphone, camera and
+  speakers to use, voice processing, join and leave sounds, whether others
+  may summon you, and which notifications this device shows.
+- An owl hoots when someone comes into or leaves your call.
+- Right-click a person, a channel or a space (or long-press on a phone):
+  how loud someone is for you, Mute for Me, invite links, chat, and for
+  moderators and admins muting, kicking, bans, owners, channel and space
+  settings.
+- Summon friends and copy invite links from the call's title row.
+- Admins create channels and spaces with the + button, and reorder them by
+  dragging the handle or with Move Up and Move Down.
+- Spaces fold, and channels inside a space sit a step in.
+- Check for Updates in the ⋯ menu.
+
+Whitelists, permissions per role and channel icons are still set in the
+web client.
+
 ## 0.2.0
 
 Wisetalk for Windows and for Macs with Apple silicon.
