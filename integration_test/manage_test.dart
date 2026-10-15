@@ -18,6 +18,7 @@ import 'package:wisetalk/data/secrets.dart';
 import 'package:wisetalk/data/servers.dart';
 import 'package:wisetalk/main.dart';
 import 'package:wisetalk/src/rust/frb_generated.dart';
+import 'package:wisetalk/ui/settings_sheet.dart';
 
 Future<void> waitFor(WidgetTester tester, Finder finder) async {
   for (var i = 0; i < 100 && finder.evaluate().isEmpty; i++) {
@@ -69,7 +70,7 @@ void main() {
       await tester.tap(find.byTooltip('Settings'));
       await waitFor(tester, find.text('Audio and Video'));
       expect(find.text('Voice Processing'), findsOneWidget);
-      expect(find.text('Others May Summon Me'), findsOneWidget);
+      await waitFor(tester, find.text('Others May Summon Me'));
       await shot(tester, '2-settings');
       await tester.tap(find.text('Done'));
       await tester.pump(const Duration(milliseconds: 400));
@@ -105,6 +106,8 @@ void main() {
       await waitFor(tester, find.text('New Channel'));
       await shot(tester, '7-create');
       await tester.enterText(find.byType(TextField), 'Test Room');
+      // Create works once there's a name, a frame later.
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Create'));
       await waitFor(tester, find.text('Test Room'));
       // The dialog fades out first.
@@ -127,6 +130,8 @@ void main() {
       await waitFor(tester, find.text('Accounts Only'));
       await tester.ensureVisible(find.text('Accounts Only'));
       await tester.tap(find.text('Accounts Only'));
+      // Save works once something changed, a frame later.
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Save'));
       await tester.pump(const Duration(seconds: 1));
       await shot(tester, '9-moved');
@@ -152,12 +157,22 @@ void main() {
       await tester.tap(find.text('Test Room'), buttons: kSecondaryButton);
       await waitFor(tester, find.text('Channel Settings…'));
       await tester.tap(find.text('Channel Settings…'));
-      await waitFor(tester, find.text('Delete Channel…'));
-      final accountsOnly = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Accounts Only'),
+      await waitFor(tester, find.text('Accounts Only'));
+      final accountsOnly = tester.widget<SwitchRow>(
+        find.widgetWithText(SwitchRow, 'Accounts Only'),
       );
       expect(accountsOnly.value, isTrue);
-      await tester.ensureVisible(find.text('Delete Channel…'));
+      // The sheet's list builds its rows as they scroll into view.
+      await tester.scrollUntilVisible(
+        find.text('Delete Channel…'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(SettingsSheet),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.tap(find.text('Delete Channel…'));
       await waitFor(tester, find.widgetWithText(FilledButton, 'Delete'));
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));

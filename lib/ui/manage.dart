@@ -17,6 +17,7 @@ import '../data/voice.dart';
 import '../src/rust/api/text.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'settings_sheet.dart';
 
 /// Where the menus act, and how they tell the person what happened.
 class Manager {
@@ -263,8 +264,8 @@ class Manager {
         _item(
           context,
           'Channel Settings…',
-          () => showDialog<void>(
-            context: context,
+          () => showSettingsSheet<void>(
+            context,
             builder: (_) => ChannelSettingsDialog(manager: this, view: view),
           ),
         ),
@@ -279,16 +280,16 @@ class Manager {
       _item(
         context,
         'New Channel in Space…',
-        () => showDialog<void>(
-          context: context,
+        () => showSettingsSheet<void>(
+          context,
           builder: (_) => CreateDialog(manager: this, space: space.id),
         ),
       ),
       _item(
         context,
         'Space Settings…',
-        () => showDialog<void>(
-          context: context,
+        () => showSettingsSheet<void>(
+          context,
           builder: (_) => SpaceSettingsDialog(manager: this, space: space),
         ),
       ),
@@ -511,35 +512,6 @@ List<TopEntry> topLevel(Gateway gateway) => [
     ),
 ]..sort((a, b) => a.position.compareTo(b.position));
 
-/// Asks before something that can't be undone; true to go ahead.
-Future<bool> confirm(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String action,
-}) async {
-  final palette = context.palette;
-  final yes = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: palette.error),
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(action),
-        ),
-      ],
-    ),
-  );
-  return yes ?? false;
-}
-
 class _HeaderEntry extends PopupMenuEntry<VoidCallback> {
   const _HeaderEntry({required this.title, this.detail});
 
@@ -632,7 +604,11 @@ class _VolumeEntryState extends State<_VolumeEntry> {
   }
 }
 
-// --- Dialogs -----------------------------------------------------------------
+// --- Forms -------------------------------------------------------------------
+//
+// Each one is a SettingsSheet (settings_sheet.dart): a page on a phone, a
+// sheet in the middle of a wide window. Errors from the server show under
+// the first group, where the person is looking, not in a toast behind it.
 
 const _bitrates = [32, 48, 64, 96, 128, 192, 256, 320, 510];
 
@@ -641,6 +617,16 @@ String _kbps(int value) => switch (value) {
   >= 256 => '$value kbps (music)',
   _ => '$value kbps',
 };
+
+/// Who may own a channel or a space, for a picker: nobody, or an account.
+/// The current owner stays listed while the accounts load.
+List<(String?, String)> _owners(List<AccountSummary> accounts, String? owner) =>
+    [
+      (null, 'Nobody'),
+      for (final a in accounts) (a.id, '${a.displayName} (@${a.username})'),
+      if (owner != null && !accounts.any((a) => a.id == owner))
+        (owner, accounts.isEmpty ? '…' : 'Someone else'),
+    ];
 
 /// A new channel, or for admins a new space.
 class CreateDialog extends StatefulWidget {
@@ -662,10 +648,11 @@ class _CreateDialogState extends State<CreateDialog> {
       if (_gateway.managesSpace(s)) s,
   ];
   var _space = false;
-  final _name = TextEditingController();
+  late final _name = TextEditingController()
+    ..addListener(() => setState(() {}));
   late String? _in =
       widget.space ?? (_gateway.isAdmin ? null : _spaces.firstOrNull?.id);
-  bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -675,8 +662,6 @@ class _CreateDialogState extends State<CreateDialog> {
 
   Future<void> _create() async {
     final name = _name.text.trim();
-    if (name.isEmpty) return;
-    setState(() => _busy = true);
     try {
       final api = widget.manager.api;
       if (_space) {
@@ -686,73 +671,53 @@ class _CreateDialogState extends State<CreateDialog> {
       }
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
-      widget.manager.toast(e.message);
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _error = e.message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    return AlertDialog(
-      title: Text(_space ? 'New Space' : 'New Channel'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_gateway.isAdmin && widget.space == null) ...[
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Channel')),
-                  ButtonSegment(value: true, label: Text('Space')),
-                ],
-                selected: {_space},
-                onSelectionChanged: (s) => setState(() => _space = s.first),
-              ),
-              const SizedBox(height: 12),
+    final named = _name.text.trim().isNotEmpty;
+    return SettingsSheet(
+      title: _space ? 'New Space' : 'New Channel',
+      action: 'Create',
+      dirty: named,
+      onAction: named ? _create : null,
+      children: [
+        if (_gateway.isAdmin && widget.space == null)
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('Channel')),
+              ButtonSegment(value: true, label: Text('Space')),
             ],
-            Text(
-              _space
-                  ? 'A folder that groups channels in the sidebar.'
-                  : 'A voice room people join, with its own chat.',
-              style: TextStyle(color: palette.muted, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
+            selected: {_space},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => setState(() => _space = s.first),
+          ),
+        SettingsGroup(
+          footer: _space
+              ? 'A folder that groups channels in the sidebar.'
+              : 'A voice room people join, with its own chat.',
+          error: _error,
+          children: [
+            TextFieldRow(
+              label: 'Name',
               controller: _name,
-              autofocus: true,
+              hint: _space ? 'DOTA 2' : 'Team Blue',
               maxLength: 64,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                hintText: _space ? 'DOTA 2' : 'Team Blue',
-              ),
-              onSubmitted: (_) => _create(),
+              autofocus: true,
             ),
             if (!_space)
-              DropdownButtonFormField<String?>(
-                initialValue: _in,
-                decoration: const InputDecoration(labelText: 'Space'),
-                items: [
-                  if (_gateway.isAdmin)
-                    const DropdownMenuItem(value: null, child: Text('None')),
-                  for (final s in _spaces)
-                    DropdownMenuItem(value: s.id, child: Text(s.name)),
+              PickerRow<String?>(
+                label: 'Space',
+                value: _in,
+                options: [
+                  if (_gateway.isAdmin) (null, 'None'),
+                  for (final s in _spaces) (s.id, s.name),
                 ],
                 onChanged: (id) => setState(() => _in = id),
               ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _busy ? null : _create,
-          child: const Text('Create'),
         ),
       ],
     );
@@ -778,17 +743,20 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
   Gateway get _gateway => _manager.gateway;
   Channel get _channel => widget.view.channel;
 
-  late final _name = TextEditingController(text: _channel.name);
+  late final _name = TextEditingController(text: _channel.name)
+    ..addListener(_edited);
   late final _limit = TextEditingController(
     text: _channel.maxParticipants?.toString() ?? '',
-  );
+  )..addListener(_edited);
   late String? _space = _channel.space;
   late String? _owner = _channel.owner;
   late int _bitrate = _channel.audio.bitrate ~/ 1000;
   late bool _stereo = _channel.audio.stereo;
   late AccessFlags _flags = _channel.flags;
   List<AccountSummary> _accounts = [];
-  bool _busy = false;
+  String? _error;
+
+  void _edited() => setState(() {});
 
   @override
   void initState() {
@@ -820,16 +788,19 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
         s,
   ];
 
-  Future<void> _save() async {
+  /// A name, and a limit from 1 to 99 or none.
+  bool get _valid {
+    final limit = _limit.text.trim();
+    final number = int.tryParse(limit);
+    return _name.text.trim().isNotEmpty &&
+        (limit.isEmpty || (number != null && number >= 1 && number <= 99));
+  }
+
+  /// What the server is told: only what changed.
+  Map<String, dynamic> get _changes {
     final name = _name.text.trim();
-    final limitText = _limit.text.trim();
-    final limit = limitText.isEmpty ? null : int.tryParse(limitText);
-    if (name.isEmpty ||
-        (limitText.isNotEmpty && (limit == null || limit < 1 || limit > 99))) {
-      _manager.toast('Give it a name, and a limit from 1 to 99 or none.');
-      return;
-    }
-    final fields = <String, dynamic>{
+    final limit = int.tryParse(_limit.text.trim());
+    return {
       if (name != _channel.name) 'name': name,
       if (_space != _channel.space) 'space': _space,
       if (_gateway.isAdmin && _owner != _channel.owner) 'owner': _owner,
@@ -837,15 +808,16 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
       if (_bitrate * 1000 != _channel.audio.bitrate ||
           _stereo != _channel.audio.stereo)
         'audio': {'bitrate': _bitrate * 1000, 'stereo': _stereo},
-      'flags': _flags.toJson(),
+      if (_flags != _channel.flags) 'flags': _flags.toJson(),
     };
-    setState(() => _busy = true);
+  }
+
+  Future<void> _save() async {
     try {
-      await _manager.api.updateChannel(_channel.id, fields);
+      await _manager.api.updateChannel(_channel.id, _changes);
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
-      _manager.toast(e.message);
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _error = e.message);
     }
   }
 
@@ -862,123 +834,95 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
       await _manager.api.deleteChannel(_channel.id);
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
-      _manager.toast(e.message);
+      if (mounted) setState(() => _error = e.message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final inherited =
         _gateway.spaces.where((s) => s.id == _space).firstOrNull?.flags ??
         const AccessFlags();
     final bitrates = {..._bitrates, _bitrate}.toList()..sort();
-    return AlertDialog(
-      title: const Text('Channel Settings'),
-      scrollable: true,
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
+    final changed = _changes.isNotEmpty;
+    return SettingsSheet(
+      title: 'Channel Settings',
+      action: 'Save',
+      dirty: changed,
+      onAction: changed && _valid ? _save : null,
+      children: [
+        SettingsGroup(
+          footer: _gateway.isAdmin
+              ? 'The owner manages this channel. Only admins choose who '
+                    'owns it.'
+              : null,
+          error: _error,
           children: [
-            TextField(
-              controller: _name,
-              maxLength: 64,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            DropdownButtonFormField<String?>(
-              initialValue: _space,
-              decoration: const InputDecoration(labelText: 'Space'),
-              items: [
-                if (_gateway.isAdmin || _channel.space == null)
-                  const DropdownMenuItem(value: null, child: Text('None')),
-                for (final s in _spaces)
-                  DropdownMenuItem(value: s.id, child: Text(s.name)),
+            TextFieldRow(label: 'Name', controller: _name, maxLength: 64),
+            PickerRow<String?>(
+              label: 'Space',
+              value: _space,
+              options: [
+                if (_gateway.isAdmin || _channel.space == null) (null, 'None'),
+                for (final s in _spaces) (s.id, s.name),
               ],
               onChanged: (id) => setState(() => _space = id),
             ),
-            if (_gateway.isAdmin) ...[
-              DropdownButtonFormField<String?>(
-                initialValue: _accounts.any((a) => a.id == _owner)
-                    ? _owner
-                    : null,
-                decoration: const InputDecoration(
-                  labelText: 'Owner',
-                  helperText: 'The owner manages this channel. Only admins choose who owns it.',
-                  helperMaxLines: 2,
-                ),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('Nobody')),
-                  for (final a in _accounts)
-                    DropdownMenuItem(
-                      value: a.id,
-                      child: Text(
-                        '${a.displayName} (@${a.username})',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
+            if (_gateway.isAdmin)
+              PickerRow<String?>(
+                label: 'Owner',
+                value: _owner,
+                options: _owners(_accounts, _owner),
                 onChanged: (id) => setState(() => _owner = id),
               ),
-            ],
-            const SizedBox(height: 16),
-            _Section('People and Sound'),
-            TextField(
+          ],
+        ),
+        SettingsGroup(
+          header: 'People and Sound',
+          footer:
+              'When the channel is full, only people who manage it can '
+              'still join. From 1 to 99 people, or no limit.',
+          children: [
+            TextFieldRow(
+              label: 'Max People',
               controller: _limit,
+              hint: 'No limit',
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Max People',
-                hintText: 'No limit',
-                helperText: 'When the channel is full, only people who manage it can still join.',
-                helperMaxLines: 2,
-              ),
-            ),
-            DropdownButtonFormField<int>(
-              initialValue: _bitrate,
-              decoration: const InputDecoration(labelText: 'Audio Quality'),
-              items: [
-                for (final b in bitrates)
-                  DropdownMenuItem(value: b, child: Text(_kbps(b))),
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(2),
               ],
-              onChanged: (b) => setState(() => _bitrate = b ?? _bitrate),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Stereo'),
+            PickerRow<int>(
+              label: 'Audio Quality',
+              value: _bitrate,
+              options: [for (final b in bitrates) (b, _kbps(b))],
+              onChanged: (b) => setState(() => _bitrate = b),
+            ),
+            SwitchRow(
+              label: 'Stereo',
               value: _stereo,
               onChanged: (on) => setState(() => _stereo = on),
             ),
-            const SizedBox(height: 8),
-            _Section('Access'),
-            _AccessSwitches(
-              flags: _flags,
-              inherited: inherited,
-              subject: 'channel',
-              onChanged: (flags) => setState(() => _flags = flags),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: _delete,
-                style: TextButton.styleFrom(foregroundColor: palette.error),
-                child: const Text('Delete Channel…'),
-              ),
-            ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+        SettingsGroup(
+          header: 'Access',
+          footer: 'Edit the whitelist in the web client for now.',
+          children: _accessRows(
+            flags: _flags,
+            inherited: inherited,
+            onChanged: (flags) => setState(() => _flags = flags),
+          ),
         ),
-        FilledButton(
-          onPressed: _busy ? null : _save,
-          child: const Text('Save'),
+        SettingsGroup(
+          children: [
+            ButtonRow(
+              label: 'Delete Channel…',
+              destructive: true,
+              onTap: _delete,
+            ),
+          ],
         ),
       ],
     );
@@ -1001,17 +945,19 @@ class SpaceSettingsDialog extends StatefulWidget {
 
 class _SpaceSettingsDialogState extends State<SpaceSettingsDialog> {
   Manager get _manager => widget.manager;
+  bool get _admin => _manager.gateway.isAdmin;
   Space get _space => widget.space;
-  late final _name = TextEditingController(text: _space.name);
+  late final _name = TextEditingController(text: _space.name)
+    ..addListener(() => setState(() {}));
   late String? _owner = _space.owner;
   late AccessFlags _flags = _space.flags;
   List<AccountSummary> _accounts = [];
-  bool _busy = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    if (_manager.gateway.isAdmin) {
+    if (_admin) {
       _manager.api
           .accounts()
           .then((a) {
@@ -1027,168 +973,109 @@ class _SpaceSettingsDialogState extends State<SpaceSettingsDialog> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Map<String, dynamic> get _changes {
     final name = _name.text.trim();
-    if (name.isEmpty) return;
-    setState(() => _busy = true);
+    return {
+      if (name != _space.name) 'name': name,
+      if (_admin && _owner != _space.owner) 'owner': _owner,
+      if (_flags != _space.flags) 'flags': _flags.toJson(),
+    };
+  }
+
+  Future<void> _save() async {
     try {
-      await _manager.api.updateSpace(_space.id, {
-        if (name != _space.name) 'name': name,
-        if (_manager.gateway.isAdmin && _owner != _space.owner) 'owner': _owner,
-        'flags': _flags.toJson(),
-      });
+      await _manager.api.updateSpace(_space.id, _changes);
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
-      _manager.toast(e.message);
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _error = e.message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    return AlertDialog(
-      title: const Text('Space Settings'),
-      scrollable: true,
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
+    final changed = _changes.isNotEmpty;
+    return SettingsSheet(
+      title: 'Space Settings',
+      action: 'Save',
+      dirty: changed,
+      onAction: changed && _name.text.trim().isNotEmpty ? _save : null,
+      children: [
+        SettingsGroup(
+          footer: _admin
+              ? 'The owner manages the space and every channel in it. Only '
+                    'admins choose who owns it.'
+              : null,
+          error: _error,
           children: [
-            TextField(
-              controller: _name,
-              maxLength: 64,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            if (_manager.gateway.isAdmin)
-              DropdownButtonFormField<String?>(
-                initialValue: _accounts.any((a) => a.id == _owner)
-                    ? _owner
-                    : null,
-                decoration: const InputDecoration(
-                  labelText: 'Owner',
-                  helperText:
-                      'The owner manages the space and every channel in it. '
-                      'Only admins choose who owns it.',
-                  helperMaxLines: 2,
-                ),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('Nobody')),
-                  for (final a in _accounts)
-                    DropdownMenuItem(
-                      value: a.id,
-                      child: Text(
-                        '${a.displayName} (@${a.username})',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
+            TextFieldRow(label: 'Name', controller: _name, maxLength: 64),
+            if (_admin)
+              PickerRow<String?>(
+                label: 'Owner',
+                value: _owner,
+                options: _owners(_accounts, _owner),
                 onChanged: (id) => setState(() => _owner = id),
               ),
-            const SizedBox(height: 16),
-            _Section('Access'),
-            _AccessSwitches(
-              flags: _flags,
-              inherited: const AccessFlags(),
-              subject: 'space',
-              onChanged: (flags) => setState(() => _flags = flags),
-            ),
-            Text(
-              'These limits apply to every channel in the space; a channel '
-              'can only add its own.',
-              style: TextStyle(color: palette.muted, fontSize: 13),
-            ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _busy ? null : _save,
-          child: const Text('Save'),
+        SettingsGroup(
+          header: 'Access',
+          footer:
+              'These limits apply to every channel in the space; a channel '
+              'can only add its own. Edit the whitelist in the web client '
+              'for now.',
+          children: _accessRows(
+            flags: _flags,
+            inherited: const AccessFlags(),
+            onChanged: (flags) => setState(() => _flags = flags),
+          ),
         ),
       ],
     );
   }
-}
-
-class _Section extends StatelessWidget {
-  const _Section(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-      color: context.palette.muted,
-    ),
-  );
 }
 
 /// Accounts Only, Whitelist Only and Hidden; those its space already sets
 /// show on and can't be turned off here.
-class _AccessSwitches extends StatelessWidget {
-  const _AccessSwitches({
-    required this.flags,
-    required this.inherited,
-    required this.subject,
-    required this.onChanged,
-  });
-
-  final AccessFlags flags;
-  final AccessFlags inherited;
-  final String subject;
-  final ValueChanged<AccessFlags> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget row(
-      String label,
-      String detail,
-      bool on,
-      bool fromSpace,
-      AccessFlags Function(bool) set,
-    ) => SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(label),
-      subtitle: Text(fromSpace ? 'Set by the space' : detail),
-      value: on || fromSpace,
-      onChanged: fromSpace ? null : (value) => onChanged(set(value)),
-    );
-    return Column(
-      children: [
-        row(
-          'Accounts Only',
-          'No guests',
-          flags.authRequired,
-          inherited.authRequired,
-          (v) => flags.copyWith(authRequired: v),
-        ),
-        row(
-          'Whitelist Only',
-          'Only the people and roles on its list; edit the list in the web client for now',
-          flags.whitelist,
-          inherited.whitelist,
-          (v) => flags.copyWith(whitelist: v),
-        ),
-        row(
-          'Hidden',
-          'Invisible to those who may not enter',
-          flags.hidden,
-          inherited.hidden,
-          (v) => flags.copyWith(hidden: v),
-        ),
-      ],
-    );
-  }
+List<Widget> _accessRows({
+  required AccessFlags flags,
+  required AccessFlags inherited,
+  required ValueChanged<AccessFlags> onChanged,
+}) {
+  Widget row(
+    String label,
+    String detail,
+    bool on,
+    bool fromSpace,
+    AccessFlags Function(bool) set,
+  ) => SwitchRow(
+    label: label,
+    detail: fromSpace ? 'Set by the space' : detail,
+    value: on || fromSpace,
+    onChanged: fromSpace ? null : (value) => onChanged(set(value)),
+  );
+  return [
+    row(
+      'Accounts Only',
+      'No guests',
+      flags.authRequired,
+      inherited.authRequired,
+      (v) => flags.copyWith(authRequired: v),
+    ),
+    row(
+      'Whitelist Only',
+      'Only the people and roles on its list',
+      flags.whitelist,
+      inherited.whitelist,
+      (v) => flags.copyWith(whitelist: v),
+    ),
+    row(
+      'Hidden',
+      'Invisible to those who may not enter',
+      flags.hidden,
+      inherited.hidden,
+      (v) => flags.copyWith(hidden: v),
+    ),
+  ];
 }
 
 /// Summon someone into the call: a search among those who could come.
@@ -1203,12 +1090,14 @@ class SummonDialog extends StatefulWidget {
 }
 
 class _SummonDialogState extends State<SummonDialog> {
-  final _query = TextEditingController();
+  late final _query = TextEditingController()..addListener(_typed);
+  String _searched = '';
   Timer? _debounce;
   int _ticket = 0;
   List<AccountSummary> _found = [];
   AccountSummary? _chosen;
   String? _note;
+  String? _error;
 
   @override
   void dispose() {
@@ -1217,101 +1106,92 @@ class _SummonDialogState extends State<SummonDialog> {
     super.dispose();
   }
 
-  void _search(String text) {
+  /// The controller also speaks up when only the cursor moves.
+  void _typed() {
+    final query = _query.text.trim();
+    if (query == _searched) return;
+    _searched = query;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 150), () async {
-      final ticket = ++_ticket;
-      final query = text.trim();
-      if (query.isEmpty) {
-        setState(() {
-          _found = [];
-          _chosen = null;
-          _note = null;
-        });
-        return;
+    _debounce = Timer(const Duration(milliseconds: 150), () => _search(query));
+  }
+
+  Future<void> _search(String query) async {
+    final ticket = ++_ticket;
+    if (query.isEmpty) {
+      setState(() {
+        _found = [];
+        _chosen = null;
+        _note = null;
+        _error = null;
+      });
+      return;
+    }
+    try {
+      final found = await widget.manager.api.summonable(
+        widget.view.channel.id,
+        query,
+      );
+      if (!mounted || ticket != _ticket) return;
+      final bare = query.replaceFirst('@', '').toLowerCase();
+      setState(() {
+        _found = found;
+        _chosen =
+            found.where((a) => a.username.toLowerCase() == bare).firstOrNull ??
+            found.firstOrNull;
+        _note = found.isEmpty ? 'Nobody matching who could come here.' : null;
+        _error = null;
+      });
+    } on ApiException {
+      if (mounted && ticket == _ticket) {
+        setState(() => _error = 'Cannot search.');
       }
-      try {
-        final found = await widget.manager.api.summonable(
-          widget.view.channel.id,
-          query,
-        );
-        if (!mounted || ticket != _ticket) return;
-        final bare = query.replaceFirst('@', '').toLowerCase();
-        setState(() {
-          _found = found;
-          _chosen =
-              found
-                  .where((a) => a.username.toLowerCase() == bare)
-                  .firstOrNull ??
-              found.firstOrNull;
-          _note = found.isEmpty ? 'Nobody matching who could come here.' : null;
-        });
-      } on ApiException {
-        if (mounted && ticket == _ticket) {
-          setState(() => _note = 'Cannot search.');
-        }
-      }
-    });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final gateway = widget.manager.gateway;
     final chosen = _chosen;
-    return AlertDialog(
-      title: Text('Summon to ${widget.view.channel.name}'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _query,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Nickname'),
-              onChanged: _search,
-              onSubmitted: (_) {
-                if (chosen != null) Navigator.pop(context, chosen);
-              },
-            ),
-            const SizedBox(height: 8),
-            for (final account in _found)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                selected: account.id == chosen?.id,
-                leading: Avatar(
-                  name: account.displayName,
-                  size: 32,
-                  image: gateway.avatar(account.id, account.avatar),
-                ),
-                title: Text(account.displayName),
-                subtitle: Text('@${account.username}'),
-                onTap: () => setState(() => _chosen = account),
-              ),
-            Text(
+    return SettingsSheet(
+      title: 'Summon to ${widget.view.channel.name}',
+      action: 'Summon',
+      onAction: chosen == null
+          ? null
+          : () async => Navigator.pop(context, chosen),
+      children: [
+        SettingsGroup(
+          footer:
               _note ??
-                  'They get a notification that you are waiting. Once per '
-                      '5 minutes per person.',
-              style: TextStyle(color: palette.muted, fontSize: 13),
+              'They get a notification that you are waiting. Once per '
+                  '5 minutes per person.',
+          error: _error,
+          children: [
+            TextFieldRow(
+              label: 'Nickname',
+              controller: _query,
+              hint: 'Who?',
+              autofocus: true,
+              autocorrect: false,
             ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: chosen == null
-              ? null
-              : () => Navigator.pop(context, chosen),
-          child: Text(
-            chosen == null ? 'Summon' : 'Summon ${chosen.displayName}',
+        if (_found.isNotEmpty)
+          SettingsGroup(
+            children: [
+              for (final account in _found)
+                CheckRow(
+                  leading: Avatar(
+                    name: account.displayName,
+                    size: 32,
+                    image: gateway.avatar(account.id, account.avatar),
+                  ),
+                  label: account.displayName,
+                  detail: '@${account.username}',
+                  selected: account.id == chosen?.id,
+                  onTap: () => setState(() => _chosen = account),
+                ),
+            ],
           ),
-        ),
       ],
     );
   }

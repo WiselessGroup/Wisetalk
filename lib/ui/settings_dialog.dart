@@ -1,7 +1,8 @@
 // Settings: the account's picture, which microphone, camera and speakers,
 // voice processing, summons, notifications and, on desktops, keyboard
 // shortcuts. The web client's Settings dialog, plus the app's own
-// notification switches and shortcuts.
+// notification switches and shortcuts. Everything applies as it changes,
+// so the sheet has Done only.
 
 import 'dart:async';
 
@@ -18,6 +19,7 @@ import '../data/shortcuts.dart';
 import '../src/rust/api/picture.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'settings_sheet.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({
@@ -39,6 +41,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   bool? _allowSummons;
   bool _busy = false;
   String? _profileError;
+  String? _summonsError;
 
   Preferences get _prefs => widget.preferences;
   Gateway get _gateway => widget.gateway;
@@ -121,14 +124,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 
   Future<void> _setAllowSummons(bool allow) async {
-    setState(() => _allowSummons = allow);
+    setState(() {
+      _allowSummons = allow;
+      _summonsError = null;
+    });
     try {
       await _api.setAllowSummons(allow);
     } catch (_) {
       if (mounted) {
-        setState(() => _allowSummons = !allow);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Cannot save.')));
+        setState(() {
+          _allowSummons = !allow;
+          _summonsError = 'Cannot save.';
+        });
       }
     }
   }
@@ -138,311 +145,156 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _prefs.changed();
   }
 
+  /// Which microphone, camera or speakers: the system's own, or one of
+  /// those plugged in. One chosen earlier and unplugged since reads as the
+  /// default.
+  Widget _device(
+    String label,
+    String kind,
+    String? value,
+    void Function(String?) set,
+  ) {
+    final devices = _of(kind);
+    return PickerRow<String?>(
+      label: label,
+      value: devices.any((d) => d.deviceId == value) ? value : null,
+      options: [
+        (null, 'System Default'),
+        for (final d in devices)
+          (d.deviceId, d.label.isEmpty ? label : d.label),
+      ],
+      onChanged: (id) => _change(() => set(id)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final me = _gateway.session.me;
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    final picture = _gateway.myAvatar;
+    return SettingsSheet(
+      title: 'Settings',
+      children: [
+        if (_account)
+          SettingsGroup(
+            error: _profileError,
+            children: [
+              SettingsRow(
+                leading: Avatar(
+                  name: me.displayName,
+                  size: 56,
+                  image: _gateway.avatar(me.id, picture),
+                ),
+                label: me.displayName,
+                detail: me.username == null ? null : '@${me.username}',
+              ),
+              ButtonRow(
+                label: picture == null ? 'Add Picture…' : 'Change Picture…',
+                onTap: _busy ? null : _pickPicture,
+              ),
+              if (picture != null)
+                ButtonRow(
+                  label: 'Remove Picture',
+                  destructive: true,
+                  onTap: _busy ? null : _removePicture,
+                ),
+            ],
+          ),
+        SettingsGroup(
+          header: 'Audio and Video',
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-              child: Text(
-                'Settings',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: palette.text,
-                ),
-              ),
+            _device(
+              'Microphone',
+              'audioinput',
+              _prefs.microphone,
+              (id) => _prefs.microphone = id,
             ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                children: [
-                  if (_account) ...[
-                    _Group(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              Avatar(
-                                name: me.displayName,
-                                size: 56,
-                                image: _gateway.avatar(
-                                  me.id,
-                                  _gateway.myAvatar,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      me.displayName,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: palette.text,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        OutlinedButton(
-                                          onPressed: _busy
-                                              ? null
-                                              : _pickPicture,
-                                          child: Text(
-                                            _gateway.myAvatar == null
-                                                ? 'Add Picture…'
-                                                : 'Change Picture…',
-                                          ),
-                                        ),
-                                        if (_gateway.myAvatar != null)
-                                          TextButton(
-                                            onPressed: _busy
-                                                ? null
-                                                : _removePicture,
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: palette.error,
-                                            ),
-                                            child: const Text('Remove'),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_profileError case final error?)
-                      _Footer(error, color: palette.error),
-                  ],
-                  const _Header('Audio and Video'),
-                  _Group(
-                    children: [
-                      _DeviceRow(
-                        label: 'Microphone',
-                        devices: _of('audioinput'),
-                        value: _prefs.microphone,
-                        onChanged: (id) =>
-                            _change(() => _prefs.microphone = id),
-                      ),
-                      _DeviceRow(
-                        label: 'Camera',
-                        devices: _of('videoinput'),
-                        value: _prefs.camera,
-                        onChanged: (id) => _change(() => _prefs.camera = id),
-                      ),
-                      _DeviceRow(
-                        label: 'Output',
-                        devices: _of('audiooutput'),
-                        value: _prefs.speaker,
-                        onChanged: (id) => _change(() => _prefs.speaker = id),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _Group(
-                    children: [
-                      _SwitchRow(
-                        label: 'Voice Processing',
-                        detail: 'Noise suppression and echo cancellation',
-                        value: _prefs.processing,
-                        onChanged: (on) =>
-                            _change(() => _prefs.processing = on),
-                      ),
-                    ],
-                  ),
-                  const _Footer(
-                    'Turn it off for the best sound, and wear headphones then: '
-                    'without echo cancellation others hear themselves through '
-                    'your speakers.',
-                  ),
-                  const SizedBox(height: 14),
-                  _Group(
-                    children: [
-                      _SwitchRow(
-                        label: 'Join and Leave Sounds',
-                        detail:
-                            'An owl hoots when someone comes or goes, and '
-                            'shortcuts tick',
-                        value: _prefs.cues,
-                        onChanged: (on) => _change(() => _prefs.cues = on),
-                      ),
-                    ],
-                  ),
-                  if (hasShortcuts) ...[
-                    const _Header('Shortcuts'),
-                    _ShortcutsGroup(preferences: _prefs),
-                  ],
-                  if (_account && _allowSummons != null) ...[
-                    const _Header('Summons'),
-                    _Group(
-                      children: [
-                        _SwitchRow(
-                          label: 'Others May Summon Me',
-                          value: _allowSummons!,
-                          onChanged: _setAllowSummons,
-                        ),
-                      ],
-                    ),
-                  ],
-                  const _Header('Notifications on This Device'),
-                  _Group(
-                    children: [
-                      _SwitchRow(
-                        label: 'New Messages',
-                        detail: 'In your call’s chat and chats you opened',
-                        value: _prefs.notifyMessages,
-                        onChanged: (on) =>
-                            _change(() => _prefs.notifyMessages = on),
-                      ),
-                      _SwitchRow(
-                        label: 'Summons',
-                        detail: 'When someone calls you into a channel',
-                        value: _prefs.notifySummons,
-                        onChanged: (on) =>
-                            _change(() => _prefs.notifySummons = on),
-                      ),
-                    ],
-                  ),
-                  const _Footer('Shown while Wisetalk is in the background.'),
-                  if (crashReports.available) ...[
-                    const _Header('Privacy'),
-                    _Group(
-                      children: [
-                        _SwitchRow(
-                          label: 'Send Crash Reports',
-                          value: _prefs.crashReports,
-                          onChanged: (on) =>
-                              _change(() => _prefs.crashReports = on),
-                        ),
-                      ],
-                    ),
-                    const _Footer(
-                      'When something in Wisetalk breaks, tell its developers '
-                      'what broke and where in the code. Never your messages, '
-                      'names, keys or servers.',
-                    ),
-                  ],
-                ],
-              ),
+            _device(
+              'Camera',
+              'videoinput',
+              _prefs.camera,
+              (id) => _prefs.camera = id,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Done'),
-                ),
-              ),
+            _device(
+              'Output',
+              'audiooutput',
+              _prefs.speaker,
+              (id) => _prefs.speaker = id,
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Rounded rows with separators between them, as in iOS Settings.
-class _Group extends StatelessWidget {
-  const _Group({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    // Material, not a decorated box: switch rows paint their ink on it.
-    return Material(
-      color: palette.cell,
-      clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(14),
-      child: Column(
-        children: [
-          for (final (i, child) in children.indexed) ...[
-            if (i > 0) Divider(height: 1, indent: 14, color: palette.separator),
-            child,
+        SettingsGroup(
+          footer:
+              'Turn it off for the best sound, and wear headphones then: '
+              'without echo cancellation others hear themselves through '
+              'your speakers.',
+          children: [
+            SwitchRow(
+              label: 'Voice Processing',
+              detail: 'Noise suppression and echo cancellation',
+              value: _prefs.processing,
+              onChanged: (on) => _change(() => _prefs.processing = on),
+            ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 18, 14, 6),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: context.palette.muted,
-      ),
-    ),
-  );
-}
-
-class _Footer extends StatelessWidget {
-  const _Footer(this.text, {this.color});
-
-  final String text;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-    child: Text(
-      text,
-      style: TextStyle(fontSize: 13, color: color ?? context.palette.muted),
-    ),
-  );
-}
-
-class _SwitchRow extends StatelessWidget {
-  const _SwitchRow({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-    this.detail,
-  });
-
-  final String label;
-  final String? detail;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return SwitchListTile(
-      value: value,
-      onChanged: onChanged,
-      title: Text(label, style: TextStyle(color: palette.text)),
-      subtitle: detail == null
-          ? null
-          : Text(detail!, style: TextStyle(color: palette.muted, fontSize: 13)),
+        ),
+        SettingsGroup(
+          children: [
+            SwitchRow(
+              label: 'Join and Leave Sounds',
+              detail:
+                  'An owl hoots when someone comes or goes, and shortcuts '
+                  'tick',
+              value: _prefs.cues,
+              onChanged: (on) => _change(() => _prefs.cues = on),
+            ),
+          ],
+        ),
+        if (hasShortcuts) _ShortcutsGroup(preferences: _prefs),
+        if (_account && _allowSummons != null)
+          SettingsGroup(
+            header: 'Summons',
+            error: _summonsError,
+            children: [
+              SwitchRow(
+                label: 'Others May Summon Me',
+                value: _allowSummons!,
+                onChanged: _setAllowSummons,
+              ),
+            ],
+          ),
+        SettingsGroup(
+          header: 'Notifications on This Device',
+          footer: 'Shown while Wisetalk is in the background.',
+          children: [
+            SwitchRow(
+              label: 'New Messages',
+              detail: 'In your call’s chat and chats you opened',
+              value: _prefs.notifyMessages,
+              onChanged: (on) => _change(() => _prefs.notifyMessages = on),
+            ),
+            SwitchRow(
+              label: 'Summons',
+              detail: 'When someone calls you into a channel',
+              value: _prefs.notifySummons,
+              onChanged: (on) => _change(() => _prefs.notifySummons = on),
+            ),
+          ],
+        ),
+        if (crashReports.available)
+          SettingsGroup(
+            header: 'Privacy',
+            footer:
+                'When something in Wisetalk breaks, tell its developers '
+                'what broke and where in the code. Never your messages, '
+                'names, keys or servers.',
+            children: [
+              SwitchRow(
+                label: 'Send Crash Reports',
+                value: _prefs.crashReports,
+                onChanged: (on) => _change(() => _prefs.crashReports = on),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }
@@ -459,7 +311,7 @@ class _ShortcutsGroup extends StatefulWidget {
 }
 
 class _ShortcutsGroupState extends State<_ShortcutsGroup> {
-  /// Takes the keys while recording, before the dialog sees Esc.
+  /// Takes the keys while recording, before the sheet sees Esc.
   final _focus = FocusNode(debugLabel: 'shortcut recorder');
   CallAction? _recording;
   String? _refusal;
@@ -533,136 +385,57 @@ class _ShortcutsGroupState extends State<_ShortcutsGroup> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Focus(
-          focusNode: _focus,
-          onKeyEvent: _key,
-          child: _Group(
-            children: [
-              for (final action in CallAction.values)
-                _ShortcutRow(
-                  action: action,
-                  combo: _prefs.shortcut(action),
-                  recording: _recording == action,
-                  onTap: () => _record(action),
-                ),
-            ],
-          ),
-        ),
-        if (_refusal case final refusal?)
-          _Footer(refusal, color: palette.error)
-        else if (_recording != null)
-          const _Footer(
-            'Press the new keys. Backspace removes the shortcut, '
-            'Esc keeps it.',
-          )
-        else
-          const _Footer(
-            'They work while Wisetalk’s window is in front. Click one to '
-            'change it.',
-          ),
-      ],
-    );
-  }
-}
-
-class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow({
-    required this.action,
-    required this.combo,
-    required this.recording,
-    required this.onTap,
-  });
-
-  final CallAction action;
-  final KeyCombo? combo;
-  final bool recording;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final keys = recording ? 'Press keys…' : combo?.label ?? 'None';
-    return ListTile(
-      title: Text(action.label, style: TextStyle(color: palette.text)),
-      trailing: DecoratedBox(
-        decoration: BoxDecoration(
-          color: recording
-              ? palette.accent.withValues(alpha: 0.2)
-              : palette.fill,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          child: Text(
-            keys,
-            style: TextStyle(
-              color: recording || combo != null ? palette.text : palette.muted,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-}
-
-class _DeviceRow extends StatelessWidget {
-  const _DeviceRow({
-    required this.label,
-    required this.devices,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final List<lk.MediaDevice> devices;
-  final String? value;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    // A device chosen earlier and unplugged since reads as the default.
-    final current = devices.any((d) => d.deviceId == value) ? value : null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: Row(
+    return Focus(
+      focusNode: _focus,
+      onKeyEvent: _key,
+      child: SettingsGroup(
+        header: 'Shortcuts',
+        error: _refusal,
+        footer: _recording != null
+            ? 'Press the new keys. Backspace removes the shortcut, '
+                  'Esc keeps it.'
+            : 'They work while Wisetalk’s window is in front. Click one to '
+                  'change it.',
         children: [
-          Text(label, style: TextStyle(color: palette.text)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: DropdownButton<String?>(
-              value: current,
-              style: TextStyle(color: palette.text, fontSize: 14),
-              isExpanded: true,
-              underline: const SizedBox(),
-              alignment: AlignmentDirectional.centerEnd,
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text(
-                    'System Default',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                for (final device in devices)
-                  DropdownMenuItem(
-                    value: device.deviceId,
-                    child: Text(
-                      device.label.isEmpty ? label : device.label,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: onChanged,
+          for (final action in CallAction.values)
+            SettingsRow(
+              label: action.label,
+              trailing: _Keys(
+                recording: _recording == action,
+                combo: _prefs.shortcut(action),
+              ),
+              onTap: () => _record(action),
             ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// The keys of one shortcut, or what recording is waiting for.
+class _Keys extends StatelessWidget {
+  const _Keys({required this.recording, required this.combo});
+
+  final bool recording;
+  final KeyCombo? combo;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: recording ? palette.accent.withValues(alpha: 0.2) : palette.fill,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          recording ? 'Press keys…' : combo?.label ?? 'None',
+          style: TextStyle(
+            color: recording || combo != null ? palette.text : palette.muted,
+            fontSize: 13,
+          ),
+        ),
       ),
     );
   }

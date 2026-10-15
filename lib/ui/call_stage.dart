@@ -13,6 +13,7 @@ import '../theme.dart';
 import 'common.dart';
 import 'grid.dart';
 import 'screen_share_dialog.dart';
+import 'settings_sheet.dart';
 
 const _gap = 8.0;
 const _stagePadding = 16.0;
@@ -141,8 +142,9 @@ class CallControls extends StatelessWidget {
 
   Future<void> _toggleScreen(BuildContext context) async {
     if (voice.screen) return voice.stopScreen();
-    final choice = await showDialog<ScreenShareChoice>(
-      context: context,
+    final choice = await showSettingsSheet<ScreenShareChoice>(
+      context,
+      short: true,
       builder: (context) => const ScreenShareDialog(),
     );
     if (choice == null || !context.mounted) return;

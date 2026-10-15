@@ -26,6 +26,7 @@ import 'call_stage.dart';
 import 'chat_panel.dart';
 import 'manage.dart';
 import 'settings_dialog.dart';
+import 'settings_sheet.dart';
 import 'common.dart';
 
 class WorkspaceScreen extends ConsumerWidget {
@@ -329,8 +330,8 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   );
 
   void _openSettings() => unawaited(
-    showDialog<void>(
-      context: context,
+    showSettingsSheet<void>(
+      context,
       builder: (_) => SettingsDialog(
         gateway: _gateway,
         preferences: ref.read(preferencesProvider),
@@ -360,8 +361,8 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   }
 
   Future<void> _summon(ChannelView view) async {
-    final account = await showDialog<AccountSummary>(
-      context: context,
+    final account = await showSettingsSheet<AccountSummary>(
+      context,
       builder: (_) => SummonDialog(manager: _manager, view: view),
     );
     if (account == null || _voice.channel == null) return;
@@ -629,8 +630,8 @@ class _Sidebar extends ConsumerWidget {
                   IconButton(
                     tooltip: 'New Channel or Space',
                     icon: Icon(Icons.add, color: palette.muted),
-                    onPressed: () => showDialog<void>(
-                      context: context,
+                    onPressed: () => showSettingsSheet<void>(
+                      context,
                       builder: (_) => CreateDialog(manager: manager),
                     ),
                   ),

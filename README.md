@@ -64,6 +64,11 @@ flutter test integration_test/chat_test.dart -d linux
 flutter test integration_test/shortcuts_test.dart -d linux
 # Needs an account's session (see the file) and a camera:
 WISETALK_TEST_TOKEN=... flutter test integration_test/video_test.dart -d linux
+# An owner's session; WISETALK_SHOTS=<folder> saves pictures of each step,
+# sheets_test.dart at a phone's size (412 x 915) for the forms:
+WISETALK_TEST_TOKEN=... flutter test integration_test/manage_test.dart -d linux
+WISETALK_TEST_TOKEN=... WISETALK_SHOTS=/tmp/shots \
+  flutter test integration_test/sheets_test.dart -d linux
 cd rust && cargo test       # the bridge on its own
 flutter_rust_bridge_codegen generate   # after changing rust/src/api
 ```
