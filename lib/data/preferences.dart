@@ -57,6 +57,9 @@ class Preferences extends ChangeNotifier {
   /// second while the window shows. Off: the icon alone costs nothing.
   bool showPingAndLoss = false;
 
+  /// Share the sound with a screen or window, where the app can (Windows).
+  bool screenSound = true;
+
   /// Send crash reports to the developers; off unless turned on.
   bool crashReports = false;
 
@@ -112,6 +115,7 @@ class Preferences extends ChangeNotifier {
       showPingAndLoss = json['show_ping_and_loss'] as bool? ?? false;
       notifyMessages = json['notify_messages'] as bool? ?? true;
       notifySummons = json['notify_summons'] as bool? ?? true;
+      screenSound = json['screen_sound'] as bool? ?? true;
       collapsed = {
         for (final id in json['collapsed'] as List<dynamic>? ?? [])
           id as String,
@@ -144,6 +148,7 @@ class Preferences extends ChangeNotifier {
           'show_ping_and_loss': showPingAndLoss,
           'notify_messages': notifyMessages,
           'notify_summons': notifySummons,
+          'screen_sound': screenSound,
           'collapsed': collapsed.toList(),
         }),
       ),
