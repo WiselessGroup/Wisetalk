@@ -31,6 +31,7 @@ import 'preferences.dart';
 import 'protocol.dart';
 import 'shortcuts.dart';
 import 'sounds.dart';
+import 'stereo_audio.dart';
 
 /// LiveKit keeps this many keys; our key epoch picks the slot.
 const _keyringSize = 16;
@@ -123,7 +124,8 @@ class Voice extends ChangeNotifier {
   final Preferences preferences;
 
   /// What the microphone was published with, to notice a change.
-  (String?, bool)? _published;
+  (String?, bool, AudioQuality)? _published;
+  final _audio = StereoAudio();
   final _service = CallService();
   late final StreamSubscription<GatewayEvent> _subscription;
 
@@ -356,6 +358,36 @@ class Voice extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// What the microphone goes out with: the channel's quality, as the web
+  /// client publishes it, but in stereo only where that brings something.
+  /// Echo cancellation works on one channel, so with the processing on both
+  /// channels would carry the same sound and only cost bits; and Android and
+  /// Apple platforms record one channel whatever the call asks (WLK-2).
+  AudioQuality _quality() {
+    final audio =
+        gateway.channel(channel ?? '')?.channel.audio ??
+        const AudioQuality(bitrate: 64000, stereo: false);
+    return AudioQuality(
+      bitrate: audio.bitrate,
+      stereo:
+          audio.stereo &&
+          !preferences.processing &&
+          (Platform.isLinux || Platform.isWindows),
+    );
+  }
+
+  /// Whether the microphone went out otherwise than it would now.
+  bool get _publishedStale {
+    final published = _published;
+    if (published == null) return false;
+    final (microphone, processing, quality) = published;
+    final now = _quality();
+    return microphone != preferences.microphone ||
+        processing != preferences.processing ||
+        quality.bitrate != now.bitrate ||
+        quality.stereo != now.stereo;
+  }
+
   lk.AudioCaptureOptions _audioCapture() => lk.AudioCaptureOptions(
     deviceId: preferences.microphone,
     noiseSuppression: preferences.processing,
@@ -401,11 +433,7 @@ class Voice extends ChangeNotifier {
     _applyVolumes();
     final room = _room;
     if (room == null || state != VoiceState.connected) return;
-    if (!muted &&
-        _published != (preferences.microphone, preferences.processing)) {
-      await _unpublish(lk.TrackSource.microphone);
-      await _publishMicrophone();
-    }
+    if (!muted && _publishedStale) await _republishMicrophone();
     final camera = await _device('videoinput', preferences.camera);
     if (camera != null && this.camera) {
       try {
@@ -439,6 +467,11 @@ class Voice extends ChangeNotifier {
         );
       }
     }
+  }
+
+  Future<void> _republishMicrophone() async {
+    await _unpublish(lk.TrackSource.microphone);
+    await _publishMicrophone();
   }
 
   /// Turns the microphone or camera off by unpublishing it. LiveKit's own
@@ -660,6 +693,16 @@ class Voice extends ChangeNotifier {
           error = 'A moderator lifted your mute. Unmute when you are ready.';
         }
         _refreshMicStates();
+      case 'channel_updated':
+        // A new audio quality: publish again with it, as the web client does.
+        final view = data as Map<String, dynamic>;
+        final updated = (view['channel'] as Map<String, dynamic>)['id'];
+        if (updated == channel &&
+            state == VoiceState.connected &&
+            !muted &&
+            _publishedStale) {
+          unawaited(_republishMicrophone());
+        }
       case 'channel_removed':
         if ((data as Map<String, dynamic>)['channel'] == channel) _reset();
       case 'voice_elsewhere':
@@ -719,22 +762,12 @@ class Voice extends ChangeNotifier {
       final early = _key;
       if (early != null) await keys.use(early);
       if (attempt != _attempt) return;
-      // The channel's audio quality, as the web client publishes it: low
-      // bitrates may pause in silence (DTX), RED repeats packets against loss.
-      final audio =
-          gateway.channel(channel!)?.channel.audio ??
-          const AudioQuality(bitrate: 64000, stereo: false);
-      final room = lk.Room(
-        roomOptions: lk.RoomOptions(
+      final room = _audio.room(
+        lk.RoomOptions(
           adaptiveStream: true,
           dynacast: true,
           encryption: lk.E2EEOptions(keyProvider: keys),
           defaultAudioCaptureOptions: _audioCapture(),
-          defaultAudioPublishOptions: lk.AudioPublishOptions(
-            encoding: lk.AudioEncoding(maxBitrate: audio.bitrate),
-            dtx: audio.bitrate <= 64000,
-            red: true,
-          ),
         ),
       );
       _room = room;
@@ -859,13 +892,25 @@ class Voice extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    final local = room.localParticipant;
+    if (local == null) return;
     try {
       await _selectMicrophone();
-      await room.localParticipant?.setMicrophoneEnabled(
-        true,
-        audioCaptureOptions: _audioCapture(),
+      // Low bitrates may pause in silence (DTX), RED repeats packets
+      // against loss.
+      final quality = _quality();
+      _audio
+        ..stereo = quality.stereo
+        ..bitrate = quality.bitrate;
+      await local.publishAudioTrack(
+        await lk.LocalAudioTrack.create(_audioCapture()),
+        publishOptions: lk.AudioPublishOptions(
+          encoding: lk.AudioEncoding(maxBitrate: quality.bitrate),
+          dtx: quality.bitrate <= 64000,
+          red: true,
+        ),
       );
-      _published = (preferences.microphone, preferences.processing);
+      _published = (preferences.microphone, preferences.processing, quality);
       muted = false;
     } catch (e) {
       debugPrint('microphone unavailable: $e');
