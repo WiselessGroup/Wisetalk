@@ -25,6 +25,20 @@ function Fail([string]$Message) {
     exit 1
 }
 
+# Runs a program, its error output mixed into what it prints. Windows
+# PowerShell 5.1 takes any line a program writes to stderr ("Building
+# flutter tool...") for a failure while errors stop the script; the exit
+# code ($LASTEXITCODE) says whether it failed.
+function Run([scriptblock]$Block) {
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        (& $Block 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    } finally {
+        $ErrorActionPreference = $saved
+    }
+}
+
 if ($Tag -notmatch '^v\d') { Fail 'usage: .\scripts\release-windows.ps1 vX.Y.Z' }
 $version = $Tag.Substring(1)
 $base = ($version -split '-')[0]
@@ -49,21 +63,22 @@ Need dotnet 'winget install Microsoft.DotNet.SDK.8'
 Need vpk "dotnet tool install -g vpk --version $vpkVersion"
 Need curl.exe 'comes with Windows 10 and later'
 if ($missing.Count -gt 0) { Fail ("missing tools:`n" + ($missing -join "`n")) }
-Write-Host 'Visual Studio 2022 with "Desktop development with C++" is needed too; flutter doctor checks it.'
 
-$flutterSays = (& flutter --version 2>$null) -join "`n"
+$flutterSays = Run { flutter --version }
 if ($flutterSays -notmatch "Flutter $([regex]::Escape($flutterVersion)) ") {
     Fail "Flutter $flutterVersion needed (flutter --version says otherwise)"
 }
 
-$head = git rev-parse HEAD
-$tagged = git rev-parse -q --verify "$Tag^{commit}"
-if ($head -ne $tagged) { Fail "check out $Tag first" }
-git diff --quiet
+# The tag's app, built by release scripts that may be newer than it.
+$null = Run { git rev-parse -q --verify "$Tag^{commit}" }
+if ($LASTEXITCODE -ne 0) { Fail "no tag $Tag here: git fetch --tags" }
+$null = Run { git diff --quiet $Tag HEAD -- . ':!scripts' }
+if ($LASTEXITCODE -ne 0) { Fail "check out $Tag first (git checkout $Tag)" }
+$null = Run { git diff --quiet }
 $dirty = $LASTEXITCODE
-git diff --cached --quiet
+$null = Run { git diff --cached --quiet }
 if ($dirty -ne 0 -or $LASTEXITCODE -ne 0) { Fail 'commit or stash your changes first' }
-git ls-remote --exit-code --tags origin $Tag | Out-Null
+$null = Run { git ls-remote --exit-code --tags origin $Tag }
 if ($LASTEXITCODE -ne 0) { Fail "push $Tag first" }
 
 $token = $env:WISETALK_FORGEJO_TOKEN
@@ -191,8 +206,10 @@ function Upload {
         foreach ($asset in @($release.assets | Where-Object { $_.name -eq $name })) {
             Invoke-RestMethod -Method Delete -Headers $headers "$api/releases/$($release.id)/assets/$($asset.id)" | Out-Null
         }
-        $answer = & curl.exe -sS --fail-with-body -H "Authorization: token $token" `
-            -F "attachment=@$file" "$api/releases/$($release.id)/assets?name=$name"
+        $answer = Run {
+            curl.exe -sS --fail-with-body -H "Authorization: token $token" `
+                -F "attachment=@$file" "$api/releases/$($release.id)/assets?name=$name"
+        }
         if ($LASTEXITCODE -ne 0) { throw "cannot attach ${name}: $answer" }
     }
 }

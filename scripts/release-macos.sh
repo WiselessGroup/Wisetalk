@@ -46,8 +46,9 @@ xcodebuild -version >/dev/null 2>&1 || fail "Xcode isn't set up: sudo xcode-sele
 flutter --version 2>/dev/null | grep -q "Flutter $flutter_version " \
     || fail "Flutter $flutter_version needed (flutter --version says otherwise)"
 
-[ "$(git rev-parse HEAD)" = "$(git rev-parse -q --verify "$tag^{commit}")" ] \
-    || fail "check out $tag first"
+# The tag's app, built by release scripts that may be newer than it.
+git rev-parse -q --verify "$tag^{commit}" >/dev/null || fail "no tag $tag here: git fetch --tags"
+git diff --quiet "$tag" HEAD -- . ':!scripts' || fail "check out $tag first (git checkout $tag)"
 if ! git diff --quiet || ! git diff --cached --quiet; then
     fail "commit or stash your changes first"
 fi
