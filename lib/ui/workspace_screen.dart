@@ -942,6 +942,7 @@ class _ChannelRow extends StatelessWidget {
                         size: 20,
                         image: gateway.avatar(p.account, p.avatar),
                         speaking: voice.speaking.contains(p.session),
+                        dimmed: voice.isAway(p),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -960,6 +961,15 @@ class _ChannelRow extends StatelessWidget {
                             color: palette.tertiary,
                           ),
                         ),
+                      if (voice.isAway(p))
+                        Tooltip(
+                          message: 'Away',
+                          child: Icon(
+                            Icons.headset_off,
+                            size: 14,
+                            color: palette.tertiary,
+                          ),
+                        ),
                       if (p.serverMuted)
                         Tooltip(
                           message: 'Muted by a moderator',
@@ -969,7 +979,9 @@ class _ChannelRow extends StatelessWidget {
                             color: palette.error,
                           ),
                         )
-                      else if (voice.micOff.contains(p.session))
+                      // Away says the microphone is off already.
+                      else if (voice.micOff.contains(p.session) &&
+                          !voice.isAway(p))
                         Icon(Icons.mic_off, size: 14, color: palette.tertiary),
                     ],
                   ),

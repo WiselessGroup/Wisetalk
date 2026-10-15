@@ -128,10 +128,14 @@ class Avatar extends StatelessWidget {
     required this.size,
     this.image,
     this.speaking = false,
+    this.dimmed = false,
   });
 
   final String name;
   final double size;
+
+  /// Faded, for someone who stepped away.
+  final bool dimmed;
 
   /// Their picture, see [avatarUrl]; the initial shows until it loads.
   final Uri? image;
@@ -145,7 +149,7 @@ class Avatar extends StatelessWidget {
     // Decoded at the size it shows, not the size it was uploaded.
     final pixels = ((size - ring * 4) * MediaQuery.devicePixelRatioOf(context))
         .round();
-    return Container(
+    final avatar = Container(
       width: size,
       height: size,
       padding: EdgeInsets.all(ring),
@@ -174,5 +178,6 @@ class Avatar extends StatelessWidget {
         ),
       ),
     );
+    return dimmed ? Opacity(opacity: 0.4, child: avatar) : avatar;
   }
 }

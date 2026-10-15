@@ -129,6 +129,23 @@ class Voice extends ChangeNotifier {
   bool muted = false;
   bool serverMuted = false;
 
+  /// Stepped away (ADR-0026): the microphone off and nobody heard. We
+  /// unsubscribe from everyone's sound rather than turn it down, so none of
+  /// it is received or decoded.
+  bool away = false;
+
+  /// Whether the microphone was off before stepping away, to come back the
+  /// same way.
+  bool _mutedBeforeAway = false;
+
+  /// `set_away` sent and not answered yet. Servers before 1.7.0 can't read
+  /// it and answer with a protocol_mismatch error instead.
+  bool _awayAsked = false;
+
+  /// This server can't show others that we stepped away: Away still works
+  /// here, only nobody sees it.
+  bool _awayUnsupported = false;
+
   /// Session ids of who is talking right now.
   Set<String> speaking = {};
 
@@ -179,9 +196,10 @@ class Voice extends ChangeNotifier {
     _reset();
   }
 
-  /// Someone came or went: hoot, once we're in the call ourselves.
+  /// Someone came or went: hoot, once we're in the call ourselves and
+  /// listening.
   void _cue(Cue cue) {
-    if (state != VoiceState.connected || !preferences.cues) return;
+    if (state != VoiceState.connected || away || !preferences.cues) return;
     unawaited(sounds.play(cue));
   }
 
@@ -196,6 +214,9 @@ class Voice extends ChangeNotifier {
   Future<void> toggleMute() async {
     final room = _room;
     if (room == null) return;
+    // Away the microphone is off: turning it on means coming back, to talk
+    // and to hear the answer.
+    if (away) return _comeBack(unmute: true);
     if (!muted) {
       await _unpublish(lk.TrackSource.microphone);
       muted = true;
@@ -206,6 +227,65 @@ class Voice extends ChangeNotifier {
       await _publishMicrophone();
     }
     _refreshMicStates();
+  }
+
+  /// Steps away or comes back (ADR-0026). Hotkeys call this too.
+  Future<void> toggleAway() async {
+    if (_room == null || state != VoiceState.connected) return;
+    if (away) return _comeBack();
+    away = true;
+    _mutedBeforeAway = muted;
+    _tellAway();
+    _hearOthers(false);
+    if (!muted) {
+      muted = true;
+      await _unpublish(lk.TrackSource.microphone);
+    }
+    _refreshMicStates();
+  }
+
+  /// Back from away: everyone's sound again, and the microphone as it was
+  /// unless [unmute]. A moderator's mute stays.
+  Future<void> _comeBack({bool unmute = false}) async {
+    away = false;
+    _tellAway();
+    _hearOthers(true);
+    if ((unmute || !_mutedBeforeAway) && muted && !serverMuted) {
+      muted = false;
+      await _publishMicrophone();
+    } else if (unmute && serverMuted) {
+      error = 'A moderator muted you; only they can lift it.';
+    }
+    _refreshMicStates();
+  }
+
+  /// Whether [p] stepped away. Our own state is known here first, and on
+  /// servers that can't show it, only here.
+  bool isAway(Participant p) =>
+      p.away || (away && p.session == gateway.sessionId);
+
+  void _tellAway() {
+    if (_awayUnsupported) return;
+    _awayAsked = true;
+    gateway.send('set_away', {'away': away});
+  }
+
+  /// Receives everyone's sound (microphones and screen shares), or stops
+  /// receiving it. Tracks published while away are dealt with as they come
+  /// (see [_connect]).
+  void _hearOthers(bool hear) {
+    final room = _room;
+    if (room == null) return;
+    for (final remote in room.remoteParticipants.values) {
+      for (final publication in remote.audioTrackPublications) {
+        unawaited(hear ? _listen(publication) : publication.unsubscribe());
+      }
+    }
+  }
+
+  Future<void> _listen(lk.RemoteTrackPublication publication) async {
+    if (!publication.enabled) await publication.enable();
+    await publication.subscribe();
   }
 
   Future<void> toggleCamera() async {
@@ -416,6 +496,8 @@ class Voice extends ChangeNotifier {
     micOff = {};
     muted = false;
     serverMuted = false;
+    away = false;
+    _awayAsked = false;
     camera = false;
     screen = false;
     tiles = const [];
@@ -520,6 +602,9 @@ class Voice extends ChangeNotifier {
             participant.session != gateway.sessionId) {
           return;
         }
+        if (participant.away == away) _awayAsked = false;
+        // Our own Away coming back to us: nothing changed here.
+        if (participant.serverMuted == serverMuted) return;
         serverMuted = participant.serverMuted;
         if (serverMuted) {
           muted = true;
@@ -543,9 +628,19 @@ class Voice extends ChangeNotifier {
         if (kicked['channel'] == channel) _reset();
         error = 'You left the channel: ${kicked['reason']}.';
         notifyListeners();
+      case 'ready':
+        // Maybe a newer server after a reconnect: ask again.
+        _awayUnsupported = false;
       case 'error':
         final failure = data as Map<String, dynamic>;
         if (failure['code'] == 'chat_key') return;
+        if (failure['code'] == 'protocol_mismatch' && _awayAsked) {
+          // An older server that can't read set_away. Away goes on working
+          // here; others just don't see it.
+          _awayAsked = false;
+          _awayUnsupported = true;
+          return;
+        }
         error = failure['message'] as String?;
         if (state == VoiceState.joining) _reset();
         notifyListeners();
@@ -601,14 +696,29 @@ class Voice extends ChangeNotifier {
           speaking = {for (final p in e.speakers) p.identity};
           notifyListeners();
         })
-        ..on<lk.TrackPublishedEvent>((_) => _refreshMicStates())
+        ..on<lk.TrackPublishedEvent>((e) {
+          // Away: ask the server not to send the sound that the automatic
+          // subscription is about to bring.
+          if (away && e.publication.kind == lk.TrackType.AUDIO) {
+            unawaited(e.publication.disable());
+          }
+          _refreshMicStates();
+        })
         ..on<lk.TrackUnpublishedEvent>((_) => _refreshMicStates())
         ..on<lk.TrackSubscribedEvent>((e) {
           final track = e.track;
           if (track is lk.VideoTrack && !e.publication.muted) {
             _addTile(e.publication, e.participant, track, local: false);
           }
-          if (track is lk.AudioTrack) _applyVolumes();
+          if (track is lk.AudioTrack) {
+            if (away) {
+              // Silent at once, then gone: nothing to receive or decode.
+              track.mediaStreamTrack.enabled = false;
+              unawaited(e.publication.unsubscribe());
+            } else {
+              _applyVolumes();
+            }
+          }
         })
         ..on<lk.TrackUnsubscribedEvent>((e) => _removeTile(e.publication.sid))
         ..on<lk.LocalTrackPublishedEvent>((e) {
