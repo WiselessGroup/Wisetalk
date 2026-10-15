@@ -96,9 +96,6 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   String? _lastChannel;
   String? _lastChat;
 
-  /// Whether Wisetalk is the window in front: notifications only when not.
-  bool _focused = true;
-  late final AppLifecycleListener _lifecycle;
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   @override
@@ -106,9 +103,6 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     super.initState();
     _voice.addListener(_voiceChanged);
     _chats.addListener(_chatsChanged);
-    _lifecycle = AppLifecycleListener(
-      onStateChange: (state) => _focused = state == AppLifecycleState.resumed,
-    );
     final notifications = ref.read(notificationsProvider);
     unawaited(notifications.prepare());
     _subscriptions.addAll([
@@ -122,7 +116,6 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   void dispose() {
     _voice.removeListener(_voiceChanged);
     _chats.removeListener(_chatsChanged);
-    _lifecycle.dispose();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
@@ -142,7 +135,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     final followed =
         message.channel == _voice.channel ||
         _chats.opened.contains(message.channel);
-    if (ours || !followed || _focused) return;
+    if (ours || !followed || appInFront) return;
     if (!ref.read(preferencesProvider).notifyMessages) return;
     final text = message.text;
     unawaited(
@@ -194,7 +187,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         ),
       ),
     );
-    if (!_focused && ref.read(preferencesProvider).notifySummons) {
+    if (!appInFront && ref.read(preferencesProvider).notifySummons) {
       unawaited(
         ref
             .read(notificationsProvider)

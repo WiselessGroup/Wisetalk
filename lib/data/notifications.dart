@@ -4,9 +4,28 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'linux_notifications.dart';
+
+/// Whether [state] means the person is looking at Wisetalk. Only `resumed`
+/// does: a window in the background is `inactive` (on GNOME's Wayland a
+/// minimized one too, the system doesn't tell), a hidden one `hidden`, an
+/// app in the background on a phone `paused`. `null` is before the window
+/// first showed, right after the person started the app.
+bool isInFront(AppLifecycleState? state) =>
+    state == null || state == AppLifecycleState.resumed;
+
+/// Whether Wisetalk is the window in front now: notifications only when not.
+/// Read from the binding, which follows every change from the start, and
+/// never kept by whoever asks: the desktop embedders tell only changes, so a
+/// workspace built for a new connection while Wisetalk was in the
+/// background thought it was in front until the window was focused and left
+/// again (WLK-1).
+bool get appInFront => isInFront(WidgetsBinding.instance.lifecycleState);
 
 /// What a notification leads to when clicked.
 sealed class NotificationTarget {
@@ -47,8 +66,13 @@ class SummonTarget extends NotificationTarget {
   String get payload => 'summon:$channel';
 }
 
+/// The Linux runner's window (linux/runner/my_application.cc).
+const _window = MethodChannel('net.wiseless.wisetalk/window');
+
 class Notifications {
   final _plugin = FlutterLocalNotificationsPlugin();
+  // Linux has its own, for the click to bring the window forward.
+  late final _linux = Platform.isLinux ? LinuxNotifications() : null;
   final _clicks = StreamController<NotificationTarget>.broadcast();
   Future<bool>? _ready;
   int _next = 0;
@@ -62,9 +86,13 @@ class Notifications {
 
   Future<bool> _start() async {
     try {
+      if (_linux case final linux?) {
+        linux.clicks.listen(_linuxClicked);
+        await linux.start();
+        return true;
+      }
       final ok = await _plugin.initialize(
         settings: const InitializationSettings(
-          linux: LinuxInitializationSettings(defaultActionName: 'Open'),
           windows: WindowsInitializationSettings(
             appName: 'Wisetalk',
             appUserModelId: 'net.wiseless.wisetalk',
@@ -100,15 +128,16 @@ class Notifications {
   }) async {
     if (!await prepare()) return;
     try {
+      if (_linux case final linux?) {
+        await linux.show(title: title, body: body, payload: target.payload);
+        return;
+      }
       await _plugin.show(
         id: _next++,
         title: title,
         body: body,
         payload: target.payload,
         notificationDetails: const NotificationDetails(
-          linux: LinuxNotificationDetails(
-            category: LinuxNotificationCategory.imReceived,
-          ),
           android: AndroidNotificationDetails(
             'messages',
             'Messages and summons',
@@ -121,6 +150,15 @@ class Notifications {
     } catch (e) {
       debugPrint('cannot show a notification: $e');
     }
+  }
+
+  void _linuxClicked(LinuxClick click) {
+    // Forward first: on Wayland the token is only good for a moment.
+    _window.invokeMethod<void>('present', click.token).catchError((Object e) {
+      debugPrint('cannot bring the window forward: $e');
+    });
+    final target = NotificationTarget.parse(click.payload);
+    if (target != null) _clicks.add(target);
   }
 }
 
