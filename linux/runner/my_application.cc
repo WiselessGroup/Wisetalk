@@ -4,15 +4,56 @@
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
+#ifdef GDK_WINDOWING_WAYLAND
+#include <gdk/gdkwayland.h>
+#endif
 
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  FlMethodChannel* window_channel;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+// Brings the window forward with an activation token, as GtkApplication does
+// with the one in a launch: the notification server's for a click on a
+// notification. On Wayland a window can't come forward without one (GNOME
+// says "Wisetalk is ready" instead); on X11 it carries the click's time past
+// focus stealing prevention.
+static void present_window(GtkWindow* window, const gchar* token) {
+  GdkDisplay* display = gtk_widget_get_display(GTK_WIDGET(window));
+  if (token != nullptr) {
+#ifdef GDK_WINDOWING_WAYLAND
+    if (GDK_IS_WAYLAND_DISPLAY(display)) {
+      gdk_wayland_display_set_startup_notification_id(display, token);
+    }
+#endif
+#ifdef GDK_WINDOWING_X11
+    if (GDK_IS_X11_DISPLAY(display)) {
+      gdk_x11_display_set_startup_notification_id(display, token);
+    }
+#endif
+  }
+  gtk_window_present(window);
+}
+
+// net.wiseless.wisetalk/window: "present" with a token or null.
+static void window_method_cb(FlMethodChannel* channel, FlMethodCall* call,
+                             gpointer user_data) {
+  GtkWindow* window = GTK_WINDOW(user_data);
+  if (g_strcmp0(fl_method_call_get_name(call), "present") != 0) {
+    fl_method_call_respond_not_implemented(call, nullptr);
+    return;
+  }
+  FlValue* args = fl_method_call_get_args(call);
+  present_window(window, fl_value_get_type(args) == FL_VALUE_TYPE_STRING
+                             ? fl_value_get_string(args)
+                             : nullptr);
+  fl_method_call_respond_success(call, nullptr, nullptr);
+}
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
@@ -84,6 +125,13 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  self->window_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "net.wiseless.wisetalk/window", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      self->window_channel, window_method_cb, window, nullptr);
+
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
@@ -132,6 +180,7 @@ static void my_application_shutdown(GApplication* application) {
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
+  g_clear_object(&self->window_channel);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 

@@ -14,6 +14,10 @@ import 'package:flutter/services.dart';
 
 const _id = 'net.wiseless.wisetalk';
 
+/// The desktop entry that starts this Wisetalk, for notifications to name
+/// the app by: Wisetalk's own, or the AppImage manager's that took over.
+String desktopEntryId = _id;
+
 Future<void> registerDesktopEntry() async {
   final image = Platform.environment['APPIMAGE'];
   final home = Platform.environment['HOME'];
@@ -37,6 +41,10 @@ Future<void> registerDesktopEntry() async {
         )
         .firstOrNull;
     if (handler != null) {
+      desktopEntryId = handler.uri.pathSegments.last.replaceFirst(
+        RegExp(r'\.desktop$'),
+        '',
+      );
       if (entry.existsSync()) await entry.delete();
       await _handleLinksWith(handler);
       return;
