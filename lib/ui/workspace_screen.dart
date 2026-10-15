@@ -9,10 +9,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/address.dart';
+import '../data/api.dart';
 import '../data/chat.dart';
 import '../data/connection.dart';
 import '../data/gateway.dart';
 import '../data/notifications.dart';
+import '../data/preferences.dart';
 import '../data/protocol.dart';
 import '../data/servers.dart';
 import '../data/session.dart';
@@ -21,6 +23,8 @@ import '../data/voice.dart';
 import '../theme.dart';
 import 'call_stage.dart';
 import 'chat_panel.dart';
+import 'manage.dart';
+import 'settings_dialog.dart';
 import 'common.dart';
 
 class WorkspaceScreen extends ConsumerWidget {
@@ -69,7 +73,19 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     _voice,
     _chats,
     ref.read(updatesProvider),
+    ref.read(preferencesProvider),
   ]);
+  late final _manager = Manager(
+    gateway: _gateway,
+    voice: _voice,
+    chats: _chats,
+    preferences: ref.read(preferencesProvider),
+    toast: _toast,
+    openSettings: _openSettings,
+  );
+
+  /// Names of those we summoned, for the answer.
+  final Map<String, String> _summoned = {};
   String? _shownError;
 
   /// Phones in a call: the channel list, folded into one row until opened.
@@ -124,6 +140,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         message.channel == _voice.channel ||
         _chats.opened.contains(message.channel);
     if (ours || !followed || _focused) return;
+    if (!ref.read(preferencesProvider).notifyMessages) return;
     final text = message.text;
     unawaited(
       ref
@@ -141,7 +158,23 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   }
 
   void _event(GatewayEvent event) {
-    if (event.type != 'summoned' || !mounted) return;
+    if (!mounted) return;
+    if (event.type == 'summon_sent') {
+      final data = event.data as Map<String, dynamic>;
+      final name = _summoned[data['account']] ?? 'They';
+      _toast(
+        (data['pushed'] as int? ?? 0) > 0
+            ? '$name got a notification.'
+            : 'Summoned $name. They have notifications off, so only an open '
+                  'Wisetalk shows it.',
+      );
+      return;
+    }
+    if (event.type == 'role_changed') {
+      _toast('Your server role is now ${_gateway.role ?? 'guest'}.');
+      return;
+    }
+    if (event.type != 'summoned') return;
     final data = event.data as Map<String, dynamic>;
     final channel = data['channel'] as String;
     final from = data['from'] as String;
@@ -158,7 +191,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         ),
       ),
     );
-    if (!_focused) {
+    if (!_focused && ref.read(preferencesProvider).notifySummons) {
       unawaited(
         ref
             .read(notificationsProvider)
@@ -285,13 +318,52 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   }
 
   _Sidebar _sidebar({bool flat = false}) => _Sidebar(
-    gateway: _gateway,
-    voice: _voice,
-    chats: _chats,
+    manager: _manager,
     updates: ref.read(updatesProvider),
     session: widget.session,
     flat: flat,
   );
+
+  void _openSettings() => unawaited(
+    showDialog<void>(
+      context: context,
+      builder: (_) => SettingsDialog(
+        gateway: _gateway,
+        preferences: ref.read(preferencesProvider),
+      ),
+    ),
+  );
+
+  /// The call's own buttons: an invite link, and summoning for accounts.
+  List<Widget> _callActions(ChannelView? view) {
+    if (view == null) return const [];
+    final palette = context.palette;
+    return [
+      IconButton(
+        tooltip: 'Copy Invite Link',
+        icon: Icon(Icons.link, color: palette.muted),
+        onPressed: () => _manager.copyInvite(view),
+      ),
+      if (!widget.session.me.isGuest)
+        IconButton(
+          tooltip: 'Summon',
+          icon: Icon(Icons.person_add_alt, color: palette.muted),
+          onPressed: _voice.state == VoiceState.joining
+              ? null
+              : () => _summon(view),
+        ),
+    ];
+  }
+
+  Future<void> _summon(ChannelView view) async {
+    final account = await showDialog<AccountSummary>(
+      context: context,
+      builder: (_) => SummonDialog(manager: _manager, view: view),
+    );
+    if (account == null || _voice.channel == null) return;
+    _summoned[account.id] = account.displayName;
+    _gateway.send('summon', {'channel': _voice.channel, 'account': account.id});
+  }
 
   /// One column, as the web client on a phone. Out of a call it's the
   /// channel list; in a call the list folds into one row above the stage.
@@ -320,7 +392,12 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
             Expanded(
               child:
                   chat ??
-                  CallArea(gateway: _gateway, voice: _voice, showName: false),
+                  CallArea(
+                    gateway: _gateway,
+                    voice: _voice,
+                    showName: false,
+                    actions: _callActions(call),
+                  ),
             ),
         ],
       );
@@ -354,7 +431,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
           Expanded(child: panel)
         else ...[
           Expanded(
-            child: CallArea(gateway: _gateway, voice: _voice),
+            child: CallArea(
+              gateway: _gateway,
+              voice: _voice,
+              actions: _callActions(_gateway.channel(_voice.channel ?? '')),
+            ),
           ),
           if (panel != null) SizedBox(width: 380, child: panel),
         ],
@@ -455,31 +536,58 @@ class _Card extends StatelessWidget {
 
 class _Sidebar extends ConsumerWidget {
   const _Sidebar({
-    required this.gateway,
-    required this.voice,
-    required this.chats,
+    required this.manager,
     required this.updates,
     required this.session,
     this.flat = false,
   });
 
-  final Gateway gateway;
-  final Voice voice;
-  final Chats chats;
+  final Manager manager;
   final Updates updates;
   final Session session;
 
   /// Phones: the whole width, without the floating card.
   final bool flat;
 
+  Gateway get gateway => manager.gateway;
+  Voice get voice => manager.voice;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
-    final loose = gateway.channels
-        .where((v) => v.channel.space == null)
-        .toList();
-    final spaces = [...gateway.spaces]
-      ..sort((a, b) => a.position.compareTo(b.position));
+    final collapsed = manager.preferences.collapsed;
+    final rows = <Widget>[];
+    for (final entry in topLevel(gateway)) {
+      if (entry.view case final view?) {
+        rows.add(_ChannelRow(view: view, manager: manager));
+        continue;
+      }
+      final space = entry.space!;
+      final inside =
+          gateway.channels.where((v) => v.channel.space == space.id).toList()
+            ..sort((a, b) => a.channel.position.compareTo(b.channel.position));
+      // Nothing to see in it, and nothing to manage.
+      if (inside.isEmpty && !gateway.managesSpace(space)) continue;
+      final folded = collapsed.contains(space.id);
+      rows.add(
+        _SpaceHeader(
+          space: space,
+          folded: folded,
+          people: inside.fold(0, (n, v) => n + v.participants.length),
+          onToggle: () {
+            if (!collapsed.remove(space.id)) collapsed.add(space.id);
+            manager.preferences.changed();
+          },
+          onMenu: (at) => manager.spaceMenu(context, at, space),
+        ),
+      );
+      for (final view in inside) {
+        // Folded, the space still shows the call we're in.
+        if (!folded || view.channel.id == voice.channel) {
+          rows.add(_ChannelRow(view: view, manager: manager));
+        }
+      }
+    }
     return Container(
       width: flat ? null : 260,
       decoration: flat
@@ -493,7 +601,7 @@ class _Sidebar extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
             child: Row(
               children: [
                 ClipRRect(
@@ -512,6 +620,15 @@ class _Sidebar extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (gateway.isAdmin)
+                  IconButton(
+                    tooltip: 'New Channel or Space',
+                    icon: Icon(Icons.add, color: palette.muted),
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => CreateDialog(manager: manager),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -527,50 +644,34 @@ class _Sidebar extends ConsumerWidget {
               ),
             ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              children: [
-                for (final view in loose)
-                  _ChannelRow(
-                    view: view,
-                    gateway: gateway,
-                    voice: voice,
-                    chats: chats,
-                  ),
-                for (final space in spaces) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
+            child: gateway.status == GatewayStatus.ready && rows.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(16),
                     child: Text(
-                      space.name,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: palette.muted,
-                      ),
+                      gateway.isAdmin
+                          ? 'No channels yet. Create one with the + button.'
+                          : 'No channels yet. An admin can add some.',
+                      style: TextStyle(color: palette.muted, fontSize: 13),
                     ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    children: rows,
                   ),
-                  for (final view in gateway.channels.where(
-                    (v) => v.channel.space == space.id,
-                  ))
-                    _ChannelRow(
-                      view: view,
-                      gateway: gateway,
-                      voice: voice,
-                      chats: chats,
-                    ),
-                ],
-              ],
-            ),
           ),
           if (updates.ready != null || updates.available != null)
             _UpdateButton(updates: updates),
           Divider(height: 1, color: palette.separator),
           ListTile(
             dense: true,
+            contentPadding: const EdgeInsets.only(left: 12, right: 4),
             leading: Avatar(
               name: session.me.displayName,
               size: 30,
-              image: gateway.avatar(session.me.id, session.me.avatar),
+              image: gateway.avatar(session.me.id, gateway.myAvatar),
             ),
             title: Text(
               session.me.displayName,
@@ -585,32 +686,42 @@ class _Sidebar extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: palette.muted, fontSize: 12),
             ),
-            trailing: PopupMenuButton<void>(
-              tooltip: 'More',
-              icon: Icon(Icons.more_horiz, color: palette.muted),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  enabled: false,
-                  child: Text('Wisetalk $versionName'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Settings',
+                  icon: Icon(Icons.settings_outlined, color: palette.muted),
+                  onPressed: manager.openSettings,
                 ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  onTap: () async {
-                    voice.leave();
-                    await ref.read(serversProvider.notifier).leave();
-                    if (context.mounted) context.go('/servers');
-                  },
-                  child: const Text('Change Server'),
-                ),
-                PopupMenuItem(
-                  onTap: () {
-                    voice.leave();
-                    ref.read(sessionProvider.notifier).signOut();
-                  },
-                  child: Text(
-                    'Sign Out',
-                    style: TextStyle(color: palette.error),
-                  ),
+                PopupMenuButton<void>(
+                  tooltip: 'More',
+                  icon: Icon(Icons.more_horiz, color: palette.muted),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      enabled: false,
+                      child: Text('Wisetalk $versionName'),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      onTap: () async {
+                        voice.leave();
+                        await ref.read(serversProvider.notifier).leave();
+                        if (context.mounted) context.go('/servers');
+                      },
+                      child: const Text('Change Server'),
+                    ),
+                    PopupMenuItem(
+                      onTap: () {
+                        voice.leave();
+                        ref.read(sessionProvider.notifier).signOut();
+                      },
+                      child: Text(
+                        'Sign Out',
+                        style: TextStyle(color: palette.error),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -621,89 +732,199 @@ class _Sidebar extends ConsumerWidget {
   }
 }
 
-class _ChannelRow extends StatelessWidget {
-  const _ChannelRow({
-    required this.view,
-    required this.gateway,
-    required this.voice,
-    required this.chats,
+/// A space's name, folding its channels away on a click; its menu on a
+/// right click or a long press, for those who manage it.
+class _SpaceHeader extends StatelessWidget {
+  const _SpaceHeader({
+    required this.space,
+    required this.folded,
+    required this.people,
+    required this.onToggle,
+    required this.onMenu,
   });
 
-  final ChannelView view;
-  final Gateway gateway;
-  final Voice voice;
-  final Chats chats;
+  final Space space;
+  final bool folded;
+
+  /// How many sit in the space's channels, shown while it's folded.
+  final int people;
+  final VoidCallback onToggle;
+  final void Function(Offset) onMenu;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final here = voice.channel == view.channel.id;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Material(
-          color: here
-              ? palette.accent.withValues(alpha: 0.22)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: GestureDetector(
+        onSecondaryTapUp: (d) => onMenu(d.globalPosition),
+        onLongPressStart: (d) => onMenu(d.globalPosition),
+        child: Semantics(
+          button: true,
+          expanded: !folded,
           child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: view.locked ? null : () => voice.join(view.channel.id),
+            borderRadius: BorderRadius.circular(8),
+            onTap: onToggle,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(10, 6, 8, 4),
               child: Row(
                 children: [
-                  Icon(
-                    view.locked ? Icons.lock_outline : Icons.volume_up_outlined,
-                    size: 17,
-                    color: view.locked ? palette.tertiary : palette.accent,
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      view.channel.name,
+                      space.name,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: view.locked ? palette.tertiary : palette.text,
-                        fontWeight: here ? FontWeight.w600 : FontWeight.w400,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: palette.muted,
                       ),
                     ),
                   ),
-                  if (!view.locked)
-                    _ChatButton(
-                      open: chats.open == view.channel.id,
-                      unread: chats.unread[view.channel.id] ?? 0,
-                      onPressed: () => chats.open == view.channel.id
-                          ? chats.hide()
-                          : chats.show(view.channel.id),
+                  if (folded && people > 0)
+                    Tooltip(
+                      message: '$people in voice',
+                      child: Text(
+                        '$people',
+                        style: TextStyle(fontSize: 12, color: palette.accent),
+                      ),
                     ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: folded ? 0 : 0.25,
+                    duration: const Duration(milliseconds: 150),
+                    child: Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: palette.tertiary,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ChannelRow extends StatelessWidget {
+  const _ChannelRow({required this.view, required this.manager});
+
+  final ChannelView view;
+  final Manager manager;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final voice = manager.voice;
+    final chats = manager.chats;
+    final gateway = manager.gateway;
+    final silenced = manager.preferences.silenced;
+    final here = voice.channel == view.channel.id;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) =>
+              manager.channelMenu(context, d.globalPosition, view),
+          onLongPressStart: (d) =>
+              manager.channelMenu(context, d.globalPosition, view),
+          child: Material(
+            color: here
+                ? palette.accent.withValues(alpha: 0.22)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: view.locked ? null : () => voice.join(view.channel.id),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      view.locked
+                          ? Icons.lock_outline
+                          : Icons.volume_up_outlined,
+                      size: 17,
+                      color: view.locked ? palette.tertiary : palette.accent,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        view.channel.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: view.locked ? palette.tertiary : palette.text,
+                          fontWeight: here ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    if (!view.locked)
+                      _ChatButton(
+                        open: chats.open == view.channel.id,
+                        unread: chats.unread[view.channel.id] ?? 0,
+                        onPressed: () => chats.open == view.channel.id
+                            ? chats.hide()
+                            : chats.show(view.channel.id),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
         for (final p in view.participants)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(34, 3, 8, 3),
-            child: Row(
-              children: [
-                Avatar(
-                  name: p.displayName,
-                  size: 20,
-                  image: gateway.avatar(p.account, p.avatar),
-                  speaking: voice.speaking.contains(p.session),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    p.displayName,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: palette.muted, fontSize: 13),
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTapUp: (d) =>
+                manager.personMenu(context, d.globalPosition, view, p),
+            onTap: () {},
+            onSecondaryTapUp: (d) =>
+                manager.personMenu(context, d.globalPosition, view, p),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(34, 4, 8, 4),
+              child: Row(
+                children: [
+                  Avatar(
+                    name: p.displayName,
+                    size: 20,
+                    image: gateway.avatar(p.account, p.avatar),
+                    speaking: voice.speaking.contains(p.session),
                   ),
-                ),
-                if (p.serverMuted || voice.micOff.contains(p.session))
-                  Icon(Icons.mic_off, size: 14, color: palette.tertiary),
-              ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      p.displayName,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: palette.muted, fontSize: 13),
+                    ),
+                  ),
+                  if (silenced.contains(personKey(p)))
+                    Tooltip(
+                      message: 'Muted for you',
+                      child: Icon(
+                        Icons.volume_off,
+                        size: 14,
+                        color: palette.tertiary,
+                      ),
+                    ),
+                  if (p.serverMuted)
+                    Tooltip(
+                      message: 'Muted by a moderator',
+                      child: Icon(
+                        Icons.shield_outlined,
+                        size: 14,
+                        color: palette.error,
+                      ),
+                    )
+                  else if (voice.micOff.contains(p.session))
+                    Icon(Icons.mic_off, size: 14, color: palette.tertiary),
+                ],
+              ),
             ),
           ),
       ],

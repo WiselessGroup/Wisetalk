@@ -121,6 +121,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PkcePair dco_decode_pkce_pair(dynamic raw);
 
   @protected
+  (Uint8List, String) dco_decode_record_list_prim_u_8_strict_string(
+    dynamic raw,
+  );
+
+  @protected
   SealedImage dco_decode_sealed_image(dynamic raw);
 
   @protected
@@ -218,6 +223,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PkcePair sse_decode_pkce_pair(SseDeserializer deserializer);
+
+  @protected
+  (Uint8List, String) sse_decode_record_list_prim_u_8_strict_string(
+    SseDeserializer deserializer,
+  );
 
   @protected
   SealedImage sse_decode_sealed_image(SseDeserializer deserializer);
@@ -341,6 +351,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_pkce_pair(PkcePair self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_record_list_prim_u_8_strict_string(
+    (Uint8List, String) self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_sealed_image(SealedImage self, SseSerializer serializer);

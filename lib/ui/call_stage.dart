@@ -23,10 +23,14 @@ class CallArea extends StatefulWidget {
     required this.gateway,
     required this.voice,
     this.showName = true,
+    this.actions = const [],
   });
 
   final Gateway gateway;
   final Voice voice;
+
+  /// Buttons at the end of the call's title row.
+  final List<Widget> actions;
 
   /// Off on phones, where the row above the stage names the channel.
   final bool showName;
@@ -99,10 +103,14 @@ class _CallAreaState extends State<CallArea> {
               ],
               Icon(Icons.lock_outline, size: 13, color: palette.muted),
               const SizedBox(width: 4),
-              Text(
-                status,
-                style: TextStyle(fontSize: 12, color: palette.muted),
+              Expanded(
+                child: Text(
+                  status,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: palette.muted),
+                ),
               ),
+              ...widget.actions,
             ],
           ),
         ),

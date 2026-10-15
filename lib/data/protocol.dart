@@ -2,11 +2,47 @@
 // JSON of wisetalk_core::{protocol, gateway}; fields the app doesn't use yet
 // are left out.
 
+/// Who may enter: accounts only, a whitelist, hidden from the rest.
+class AccessFlags {
+  const AccessFlags({
+    this.authRequired = false,
+    this.whitelist = false,
+    this.hidden = false,
+  });
+
+  factory AccessFlags.fromJson(Map<String, dynamic>? json) => AccessFlags(
+    authRequired: json?['auth_required'] as bool? ?? false,
+    whitelist: json?['whitelist'] as bool? ?? false,
+    hidden: json?['hidden'] as bool? ?? false,
+  );
+
+  final bool authRequired;
+  final bool whitelist;
+  final bool hidden;
+
+  bool get any => authRequired || whitelist || hidden;
+
+  AccessFlags copyWith({bool? authRequired, bool? whitelist, bool? hidden}) =>
+      AccessFlags(
+        authRequired: authRequired ?? this.authRequired,
+        whitelist: whitelist ?? this.whitelist,
+        hidden: hidden ?? this.hidden,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'auth_required': authRequired,
+    'whitelist': whitelist,
+    'hidden': hidden,
+  };
+}
+
 class Space {
   const Space({
     required this.id,
     required this.name,
     required this.position,
+    this.flags = const AccessFlags(),
+    this.owner,
     this.icon,
   });
 
@@ -14,12 +50,18 @@ class Space {
     id: json['id'] as String,
     name: json['name'] as String,
     position: json['position'] as int? ?? 0,
+    flags: AccessFlags.fromJson(json['flags'] as Map<String, dynamic>?),
+    owner: json['owner'] as String?,
     icon: json['icon'] as String?,
   );
 
   final String id;
   final String name;
   final int position;
+  final AccessFlags flags;
+
+  /// The account that manages the space and its channels, if any.
+  final String? owner;
   final String? icon;
 }
 
@@ -41,8 +83,11 @@ class Channel {
     required this.name,
     required this.position,
     required this.audio,
+    this.flags = const AccessFlags(),
     this.space,
+    this.owner,
     this.icon,
+    this.maxParticipants,
   });
 
   factory Channel.fromJson(Map<String, dynamic> json) => Channel(
@@ -50,14 +95,24 @@ class Channel {
     name: json['name'] as String,
     position: json['position'] as int? ?? 0,
     audio: AudioQuality.fromJson(json['audio'] as Map<String, dynamic>?),
+    flags: AccessFlags.fromJson(json['flags'] as Map<String, dynamic>?),
     space: json['space'] as String?,
+    owner: json['owner'] as String?,
     icon: json['icon'] as String?,
+    maxParticipants: json['max_participants'] as int?,
   );
 
   final String id;
   final String name;
   final int position;
   final AudioQuality audio;
+  final AccessFlags flags;
+
+  /// The account that manages the channel, if any.
+  final String? owner;
+
+  /// `null` for no limit.
+  final int? maxParticipants;
 
   /// `null` for a channel outside any space.
   final String? space;

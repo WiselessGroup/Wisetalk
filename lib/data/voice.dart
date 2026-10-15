@@ -25,6 +25,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
+import 'preferences.dart';
 import 'protocol.dart';
 
 /// LiveKit keeps this many keys; our key epoch picks the slot.
@@ -108,11 +109,17 @@ enum ScreenQuality {
 }
 
 class Voice extends ChangeNotifier {
-  Voice(this.gateway) {
+  Voice(this.gateway, this.preferences) {
     _subscription = gateway.events.listen(_onEvent);
+    preferences.addListener(_preferencesChanged);
+    unawaited(_applyOutput());
   }
 
   final Gateway gateway;
+  final Preferences preferences;
+
+  /// What the microphone was published with, to notice a change.
+  (String?, bool)? _published;
   final _service = CallService();
   late final StreamSubscription<GatewayEvent> _subscription;
 
@@ -171,6 +178,14 @@ class Voice extends ChangeNotifier {
     _reset();
   }
 
+  /// Moderators: turns someone's microphone off for everyone, or lets
+  /// them speak again. The server checks the right and the rank.
+  void serverMute(String session, {required bool muted}) =>
+      gateway.send('server_mute', {'session': session, 'muted': muted});
+
+  /// Moderators: takes someone out of the call.
+  void kick(String session) => gateway.send('kick', {'session': session});
+
   Future<void> toggleMute() async {
     final room = _room;
     if (room == null) return;
@@ -196,7 +211,8 @@ class Voice extends ChangeNotifier {
         await local.setCameraEnabled(
           true,
           // 720p: plenty for a face, and light on the machine sending it.
-          cameraCaptureOptions: const lk.CameraCaptureOptions(
+          cameraCaptureOptions: lk.CameraCaptureOptions(
+            deviceId: preferences.camera,
             params: lk.VideoParametersPresets.h720_169,
           ),
         );
@@ -208,6 +224,91 @@ class Voice extends ChangeNotifier {
     // Read the state back: unpublish events fire while the call above runs.
     camera = _room?.localParticipant?.isCameraEnabled() ?? false;
     notifyListeners();
+  }
+
+  lk.AudioCaptureOptions _audioCapture() => lk.AudioCaptureOptions(
+    deviceId: preferences.microphone,
+    noiseSuppression: preferences.processing,
+    echoCancellation: preferences.processing,
+    autoGainControl: preferences.processing,
+    highPassFilter: preferences.processing,
+  );
+
+  /// The chosen device among those there now; `null` when it's gone.
+  Future<lk.MediaDevice?> _device(String kind, String? id) async {
+    if (id == null) return null;
+    final devices = await lk.Hardware.instance.enumerateDevices(type: kind);
+    return devices.where((d) => d.deviceId == id).firstOrNull;
+  }
+
+  /// Desktop libwebrtc records from one device for the whole app, set
+  /// apart from the track; Android picks it with the track's constraints.
+  Future<void> _selectMicrophone() async {
+    if (Platform.isAndroid || Platform.isIOS) return;
+    final device = await _device('audioinput', preferences.microphone);
+    if (device == null) return;
+    try {
+      await lk.Hardware.instance.selectAudioInput(device);
+    } catch (e) {
+      debugPrint('cannot select the microphone: $e');
+    }
+  }
+
+  Future<void> _applyOutput() async {
+    final device = await _device('audiooutput', preferences.speaker);
+    if (device == null) return;
+    try {
+      await lk.Hardware.instance.selectAudioOutput(device);
+    } catch (e) {
+      debugPrint('cannot select the speakers: $e');
+    }
+  }
+
+  /// Applies a changed setting to the call: speakers and volumes at once,
+  /// the microphone by publishing it again, the camera by switching it.
+  Future<void> _preferencesChanged() async {
+    await _applyOutput();
+    _applyVolumes();
+    final room = _room;
+    if (room == null || state != VoiceState.connected) return;
+    if (!muted &&
+        _published != (preferences.microphone, preferences.processing)) {
+      await _unpublish(lk.TrackSource.microphone);
+      await _publishMicrophone();
+    }
+    final camera = await _device('videoinput', preferences.camera);
+    if (camera != null && this.camera) {
+      try {
+        await room.setVideoInputDevice(camera);
+      } catch (e) {
+        debugPrint('cannot switch the camera: $e');
+        error = 'Cannot switch to that camera.';
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Everyone else as loud as this person set them, or silent.
+  void _applyVolumes() {
+    final room = _room;
+    if (room == null) return;
+    for (final remote in room.remoteParticipants.values) {
+      final person = _participants
+          .where((p) => p.session == remote.identity)
+          .firstOrNull;
+      if (person == null) continue;
+      final volume = preferences.volumeOf(person);
+      for (final publication in remote.audioTrackPublications) {
+        final track = publication.track;
+        if (track == null) continue;
+        unawaited(
+          rtc.Helper.setVolume(
+            volume,
+            track.mediaStreamTrack,
+          ).catchError((Object e) => debugPrint('cannot set a volume: $e')),
+        );
+      }
+    }
   }
 
   /// Turns the microphone or camera off by unpublishing it. LiveKit's own
@@ -275,6 +376,7 @@ class Voice extends ChangeNotifier {
 
   @override
   void dispose() {
+    preferences.removeListener(_preferencesChanged);
     leave();
     _disposed = true;
     _subscription.cancel();
@@ -475,9 +577,7 @@ class Voice extends ChangeNotifier {
           adaptiveStream: true,
           dynacast: true,
           encryption: lk.E2EEOptions(keyProvider: keys),
-          // Echo cancellation and friends on, the web client's default until
-          // the app has settings.
-          defaultAudioCaptureOptions: const lk.AudioCaptureOptions(),
+          defaultAudioCaptureOptions: _audioCapture(),
           defaultAudioPublishOptions: lk.AudioPublishOptions(
             encoding: lk.AudioEncoding(maxBitrate: audio.bitrate),
             dtx: audio.bitrate <= 64000,
@@ -498,6 +598,7 @@ class Voice extends ChangeNotifier {
           if (track is lk.VideoTrack && !e.publication.muted) {
             _addTile(e.publication, e.participant, track, local: false);
           }
+          if (track is lk.AudioTrack) _applyVolumes();
         })
         ..on<lk.TrackUnsubscribedEvent>((e) => _removeTile(e.publication.sid))
         ..on<lk.LocalTrackPublishedEvent>((e) {
@@ -587,7 +688,12 @@ class Voice extends ChangeNotifier {
       return;
     }
     try {
-      await room.localParticipant?.setMicrophoneEnabled(true);
+      await _selectMicrophone();
+      await room.localParticipant?.setMicrophoneEnabled(
+        true,
+        audioCaptureOptions: _audioCapture(),
+      );
+      _published = (preferences.microphone, preferences.processing);
       muted = false;
     } catch (e) {
       debugPrint('microphone unavailable: $e');

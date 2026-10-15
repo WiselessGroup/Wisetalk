@@ -36,6 +36,24 @@ class Gateway extends ChangeNotifier {
   /// Why this session is over: banned, signed out elsewhere.
   String? ended;
 
+  /// Our role on the server: owner, admin, moderator or member; `null` for
+  /// guests. Changes while connected (`role_changed`).
+  late String? role = session.me.role;
+
+  bool get isAdmin => role == 'owner' || role == 'admin';
+
+  /// Our own picture's version, changed from Settings.
+  late int? myAvatar = session.me.avatar;
+
+  void avatarChanged(int? version) {
+    myAvatar = version;
+    notifyListeners();
+  }
+
+  /// Admins manage every space; an owner manages their own.
+  bool managesSpace(Space space) =>
+      isAdmin || (space.owner != null && space.owner == session.me.id);
+
   WebSocket? _socket;
   final _events = StreamController<GatewayEvent>.broadcast();
   int _retry = 0;
@@ -219,6 +237,8 @@ class Gateway extends ChangeNotifier {
         final left = data as Map<String, dynamic>;
         channel(left['channel'] as String)?.participants
             .removeWhere((p) => p.session == left['session']);
+      case 'role_changed':
+        role = (data as Map<String, dynamic>)['role'] as String?;
       case 'error':
         final failure = data as Map<String, dynamic>;
         if (failure['code'] == 'banned') {

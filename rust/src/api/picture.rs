@@ -9,6 +9,7 @@ use anyhow::{Context, bail};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat, ImageReader, RgbaImage};
+use wisetalk_core::api::AVATAR_MAX_BYTES;
 use wisetalk_core::protocol::{CHAT_IMAGE_MAX_BYTES, CHAT_IMAGE_MAX_SIDE, CHAT_IMAGE_SCALE_TO};
 
 /// A picture ready to encrypt and send.
@@ -106,6 +107,45 @@ fn fit(image: DynamicImage) -> anyhow::Result<Picture> {
         height,
     })
 }
+
+/// An account's picture, as the web client makes it: the middle square of
+/// a picture, at most 256 pixels wide, as JPEG (PNG when it has
+/// transparency). Returns the bytes and their media type.
+pub fn prepare_avatar(bytes: Vec<u8>) -> anyhow::Result<(Vec<u8>, String)> {
+    let image = ImageReader::new(Cursor::new(&bytes))
+        .with_guessed_format()?
+        .decode()
+        .context("This picture can't be read.")?;
+    let side = image.width().min(image.height());
+    let image = image.crop_imm(
+        (image.width() - side) / 2,
+        (image.height() - side) / 2,
+        side,
+        side,
+    );
+    let image = if side > AVATAR_SIDE {
+        image.resize_exact(AVATAR_SIDE, AVATAR_SIDE, FilterType::CatmullRom)
+    } else {
+        image
+    };
+    let transparent =
+        image.color().has_alpha() && image.to_rgba8().pixels().any(|pixel| pixel.0[3] < u8::MAX);
+    let mut out = Vec::new();
+    let kind = if transparent {
+        image.write_to(&mut Cursor::new(&mut out), ImageFormat::Png)?;
+        "image/png"
+    } else {
+        JpegEncoder::new_with_quality(&mut out, 90).encode_image(&image.to_rgb8())?;
+        "image/jpeg"
+    };
+    if out.len() > AVATAR_MAX_BYTES {
+        bail!("This picture is too big even after scaling it down.");
+    }
+    Ok((out, kind.into()))
+}
+
+/// Pixels on a side of an account's picture.
+const AVATAR_SIDE: u32 = 256;
 
 #[cfg(test)]
 mod tests {

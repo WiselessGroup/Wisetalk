@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'chat.dart';
 import 'device.dart';
 import 'gateway.dart';
+import 'preferences.dart';
 import 'servers.dart';
 import 'session.dart';
 import 'voice.dart';
@@ -30,7 +31,7 @@ final connectionProvider = FutureProvider<Connection?>((ref) async {
     guest: session.me.isGuest,
   );
   final gateway = Gateway(session, device);
-  final voice = Voice(gateway);
+  final voice = Voice(gateway, ref.read(preferencesProvider));
   final chats = Chats(gateway, device, account: session.me.id);
   ref.onDispose(() {
     chats.dispose();

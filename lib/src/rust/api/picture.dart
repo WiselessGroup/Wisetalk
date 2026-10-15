@@ -19,6 +19,12 @@ Future<Picture> preparePicture({required List<int> bytes}) =>
 Future<Picture?> clipboardPicture() =>
     RustLib.instance.api.crateApiPictureClipboardPicture();
 
+/// An account's picture, as the web client makes it: the middle square of
+/// a picture, at most 256 pixels wide, as JPEG (PNG when it has
+/// transparency). Returns the bytes and their media type.
+Future<(Uint8List, String)> prepareAvatar({required List<int> bytes}) =>
+    RustLib.instance.api.crateApiPicturePrepareAvatar(bytes: bytes);
+
 /// A picture ready to encrypt and send.
 class Picture {
   final Uint8List bytes;

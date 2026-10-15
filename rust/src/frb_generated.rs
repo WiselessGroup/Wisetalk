@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 800495390;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1535036161;
 
 // Section: executor
 
@@ -1237,6 +1237,41 @@ fn wire__crate__api__auth__pkce_impl(
         },
     )
 }
+fn wire__crate__api__picture__prepare_avatar_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "prepare_avatar",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::picture::prepare_avatar(api_bytes)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__picture__prepare_picture_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1550,6 +1585,15 @@ impl SseDecode for crate::api::auth::PkcePair {
     }
 }
 
+impl SseDecode for (Vec<u8>, String) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_field0 = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_field1 = <String>::sse_decode(deserializer);
+        return (var_field0, var_field1);
+    }
+}
+
 impl SseDecode for crate::api::chat::SealedImage {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1621,9 +1665,10 @@ fn pde_ffi_dispatcher_primary_impl(
         12 => wire__crate__api__chat__ChatKey_open_image_impl(port, ptr, rust_vec_len, data_len),
         20 => wire__crate__api__picture__clipboard_picture_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__update__download_update_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__update__restart_to_update_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__picture__prepare_avatar_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__update__restart_to_update_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1660,8 +1705,8 @@ fn pde_ffi_dispatcher_sync_impl(
         25 => wire__crate__api__text__normalize_chat_body_impl(ptr, rust_vec_len, data_len),
         26 => wire__crate__api__text__normalize_display_name_impl(ptr, rust_vec_len, data_len),
         27 => wire__crate__api__auth__pkce_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__update__start_updates_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__update__start_updates_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1875,6 +1920,14 @@ impl SseEncode for crate::api::auth::PkcePair {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.verifier, serializer);
         <String>::sse_encode(self.challenge, serializer);
+    }
+}
+
+impl SseEncode for (Vec<u8>, String) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<u8>>::sse_encode(self.0, serializer);
+        <String>::sse_encode(self.1, serializer);
     }
 }
 

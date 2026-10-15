@@ -37,6 +37,41 @@ class Me {
   bool get isGuest => id == null;
 }
 
+/// An account as the server's people list shows it (`GET /api/accounts`).
+class AccountSummary {
+  const AccountSummary({
+    required this.id,
+    required this.username,
+    required this.displayName,
+    required this.role,
+    this.avatar,
+  });
+
+  factory AccountSummary.fromJson(Map<String, dynamic> json) => AccountSummary(
+    id: json['id'] as String,
+    username: json['username'] as String,
+    displayName: json['display_name'] as String,
+    role: json['role'] as String,
+    avatar: json['avatar'] as int?,
+  );
+
+  final String id;
+  final String username;
+  final String displayName;
+  final String role;
+  final int? avatar;
+}
+
+/// Server roles from the most to the least powerful; someone may moderate
+/// only those ranked below them.
+const roleRank = {
+  'owner': 4,
+  'admin': 3,
+  'moderator': 2,
+  'member': 1,
+  'guest': 0,
+};
+
 /// How a server presents itself, set by its admins. Every field is optional.
 class Branding {
   const Branding({this.community, this.tagline, this.loginLabel});
@@ -324,5 +359,103 @@ class Api {
       throw ApiException(response.statusCode, _message(response));
     }
     return response.bodyBytes;
+  }
+
+  // --- Managing the server, for whoever may ---------------------------
+
+  Future<List<AccountSummary>> accounts() async => [
+    for (final a in await _send('GET', '/accounts') as List<dynamic>)
+      AccountSummary.fromJson(a as Map<String, dynamic>),
+  ];
+
+  /// Makes an account an admin, or a member again (owners only).
+  Future<void> setRole(String account, String role) =>
+      _send('PUT', '/accounts/$account/role', {'role': role});
+
+  Future<void> ban(String account) =>
+      _send('POST', '/bans', {'account': account});
+
+  /// Removes a guest and blocks guests from their address for a day.
+  Future<void> banGuest(String session) =>
+      _send('POST', '/guest-bans', {'session': session});
+
+  Future<void> createChannel(String name, {String? space}) =>
+      _send('POST', '/channels', {'name': name, 'space': space});
+
+  Future<void> createSpace(String name) =>
+      _send('POST', '/spaces', {'name': name});
+
+  /// Changes the given fields of a channel; `owner` and `space` may be
+  /// `null` to clear them, so they are sent only when in [fields].
+  Future<void> updateChannel(String channel, Map<String, dynamic> fields) =>
+      _send('PATCH', '/channels/$channel', fields);
+
+  Future<void> updateSpace(String space, Map<String, dynamic> fields) =>
+      _send('PATCH', '/spaces/$space', fields);
+
+  Future<void> deleteChannel(String channel) =>
+      _send('DELETE', '/channels/$channel');
+
+  Future<void> deleteSpace(String space) => _send('DELETE', '/spaces/$space');
+
+  /// The whole order of the channel list: spaces with their channels, and
+  /// channels outside any space.
+  Future<void> setLayout(List<Map<String, dynamic>> items) =>
+      _send('PUT', '/layout', {'items': items});
+
+  // --- Me -----------------------------------------------------------------
+
+  /// Sets the account's picture: PNG, JPEG or WebP, at most 256 KB. Returns
+  /// the new version.
+  Future<int> setAvatar(Uint8List bytes, String contentType) async {
+    final request = http.Request('PUT', _url('/me/avatar'))
+      ..headers.addAll({..._headers, 'content-type': contentType})
+      ..bodyBytes = bytes;
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(
+        await _client.send(request).timeout(const Duration(seconds: 30)),
+      );
+    } on Exception {
+      throw const ApiException(0, "Can't reach the server.");
+    }
+    if (response.statusCode >= 400) {
+      throw ApiException(response.statusCode, _message(response));
+    }
+    final json = jsonDecode(utf8.decode(response.bodyBytes));
+    return (json as Map<String, dynamic>)['avatar'] as int;
+  }
+
+  Future<void> removeAvatar() => _send('DELETE', '/me/avatar');
+
+  /// Whether others may summon this account.
+  Future<bool> allowsSummons() async {
+    final json = await _send('GET', '/me/settings') as Map<String, dynamic>;
+    return json['allow_summons'] as bool? ?? true;
+  }
+
+  Future<void> setAllowSummons(bool allow) =>
+      _send('PUT', '/me/settings', {'allow_summons': allow});
+
+  /// Accounts matching [query] that could come into [channel] when summoned.
+  Future<List<AccountSummary>> summonable(String channel, String query) async =>
+      [
+        for (final a in await _send(
+          'GET',
+          '/channels/$channel/summonable',
+          null,
+          {'q': query},
+        ) as List<dynamic>)
+          AccountSummary.fromJson(a as Map<String, dynamic>),
+      ];
+
+  /// A key that lets someone into a restricted channel: once used, it lets
+  /// anyone in for 10 minutes; unused, it lasts a day.
+  Future<String> createInvite(String channel) async {
+    final json = await _send(
+      'POST',
+      '/channels/$channel/invites',
+    ) as Map<String, dynamic>;
+    return json['token'] as String;
   }
 }
