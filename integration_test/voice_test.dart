@@ -15,6 +15,7 @@ import 'package:wisetalk/data/secrets.dart';
 import 'package:wisetalk/data/servers.dart';
 import 'package:wisetalk/main.dart';
 import 'package:wisetalk/src/rust/frb_generated.dart';
+import 'package:wisetalk/ui/connection_status.dart';
 
 Future<void> waitFor(
   WidgetTester tester,
@@ -73,6 +74,18 @@ void main() {
     await tester.tap(away);
     await waitFor(tester, find.byIcon(Icons.mic));
     expect(find.byType(SnackBar), findsNothing);
+
+    // The connection popover reads real WebRTC stats: the ping comes from
+    // the microphone sender's candidate pair.
+    final status = find.byType(ConnectionStatus);
+    await waitFor(tester, status);
+    await tester.tap(status);
+    await waitFor(tester, find.text('Ping'));
+    await waitFor(tester, find.textContaining(RegExp(r'^\d+ ms$')));
+    await waitFor(tester, find.textContaining(RegExp(r'^Opus')));
+    await tester.tap(status);
+    await tester.pump();
+    expect(find.text('Ping'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.call_end));
     await waitFor(tester, find.text('Pick a Voice Channel'));

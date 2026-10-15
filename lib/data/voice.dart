@@ -25,6 +25,8 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
+import 'link.dart';
+import 'link_stats.dart';
 import 'preferences.dart';
 import 'protocol.dart';
 import 'shortcuts.dart';
@@ -162,6 +164,13 @@ class Voice extends ChangeNotifier {
 
   /// Cameras and screen shares, in the order they appeared.
   List<VideoTile> tiles = const [];
+
+  /// Everyone's connection quality in the call, ours too. Changes don't go
+  /// through [notifyListeners]: only the icons showing them rebuild.
+  final qualities = Qualities();
+
+  /// Our ping, loss and bitrate, measured while something shows them.
+  late final link = LinkMonitor(_sampleLink);
 
   lk.Room? _room;
   lk.EventsListener<lk.RoomEvent>? _roomEvents;
@@ -501,6 +510,8 @@ class Voice extends ChangeNotifier {
     leave();
     _disposed = true;
     _subscription.cancel();
+    qualities.dispose();
+    link.dispose();
     super.dispose();
   }
 
@@ -535,6 +546,8 @@ class Voice extends ChangeNotifier {
     camera = false;
     screen = false;
     tiles = const [];
+    qualities.clear();
+    link.reset();
     unawaited(_service.update(channel: null));
     notifyListeners();
   }
@@ -794,6 +807,11 @@ class Voice extends ChangeNotifier {
         })
         ..on<lk.ParticipantConnectedEvent>((_) => _refreshMicStates())
         ..on<lk.ParticipantDisconnectedEvent>((_) => _refreshMicStates())
+        // The server rates everyone's connection every few seconds and
+        // LiveKit tells only of changes.
+        ..on<lk.ParticipantConnectionQualityUpdatedEvent>(
+          (e) => qualities.set(e.participant.identity, e.connectionQuality),
+        )
         ..on<lk.RoomDisconnectedEvent>((_) {
           if (_room == room) leave();
         });
@@ -920,6 +938,51 @@ class Voice extends ChangeNotifier {
       'to': to.device,
       'envelope': jsonDecode(envelope),
     });
+  }
+
+  /// One round of stats for [link]: the microphone's sender, and the
+  /// receivers of everything we're subscribed to plus our other senders
+  /// (for the ping when the microphone is off). Each getStats() is one
+  /// call into WebRTC, made only while the numbers are on screen.
+  Future<LinkSample?> _sampleLink(Duration at) async {
+    final room = _room;
+    final local = room?.localParticipant;
+    if (room == null || local == null || state != VoiceState.connected) {
+      return null;
+    }
+    Future<List<rtc.StatsReport>> stats(
+      Future<List<rtc.StatsReport>>? asked,
+    ) async {
+      try {
+        return await asked ?? const [];
+      } catch (e) {
+        // A track that just went away; the next round won't ask for it.
+        debugPrint('no stats this time: $e');
+        return const [];
+      }
+    }
+
+    final mic = local
+        .getTrackPublicationBySource(lk.TrackSource.microphone)
+        ?.track;
+    final others = [
+      for (final publication in local.trackPublications.values)
+        if (publication.source != lk.TrackSource.microphone)
+          publication.track?.sender?.getStats(),
+      for (final remote in room.remoteParticipants.values)
+        for (final publication in remote.trackPublications.values)
+          publication.track?.receiver?.getStats(),
+    ].nonNulls;
+    final results = await Future.wait([
+      stats(mic?.sender?.getStats()),
+      for (final asked in others) stats(asked),
+    ]);
+    if (room != _room) return null;
+    return readStats(
+      at,
+      microphone: results.first,
+      others: results.skip(1).toList(),
+    );
   }
 
   void _refreshMicStates() {

@@ -246,6 +246,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
               value: _prefs.cues,
               onChanged: (on) => _change(() => _prefs.cues = on),
             ),
+            SwitchRow(
+              label: 'Show Ping and Loss',
+              detail: 'Next to the connection icon in a call',
+              value: _prefs.showPingAndLoss,
+              onChanged: (on) => _change(() => _prefs.showPingAndLoss = on),
+            ),
           ],
         ),
         if (hasShortcuts) _ShortcutsGroup(preferences: _prefs),

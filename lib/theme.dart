@@ -20,6 +20,7 @@ class Palette extends ThemeExtension<Palette> {
     required this.accent,
     required this.onAccent,
     required this.speaking,
+    required this.warning,
     required this.error,
   });
 
@@ -35,6 +36,9 @@ class Palette extends ThemeExtension<Palette> {
   final Color accent;
   final Color onAccent;
   final Color speaking;
+
+  /// Yellow, between the green of [speaking] and [error]'s red.
+  final Color warning;
   final Color error;
 
   static const dark = Palette(
@@ -50,6 +54,7 @@ class Palette extends ThemeExtension<Palette> {
     accent: Color(0xFFCBA6F7),
     onAccent: Color(0xFF11111B),
     speaking: Color(0xFFA6E3A1),
+    warning: Color(0xFFF9E2AF),
     error: Color(0xFFF38BA8),
   );
 
@@ -66,6 +71,7 @@ class Palette extends ThemeExtension<Palette> {
     accent: Color(0xFFFE640B),
     onAccent: Color(0xFF1E1E2E),
     speaking: Color(0xFF40A02B),
+    warning: Color(0xFFDF8E1D),
     error: Color(0xFFD20F39),
   );
 

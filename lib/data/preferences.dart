@@ -1,8 +1,8 @@
 // What a person sets for themselves on this device: which microphone,
 // camera and speakers, voice processing, how loud each person in a call is
-// for them, which notifications to show, which spaces are folded and the
-// keyboard shortcuts. The web client's Preferences, plus what only the app
-// has.
+// for them, which notifications to show, whether to show ping and loss,
+// which spaces are folded and the keyboard shortcuts. The web client's
+// Preferences, plus what only the app has.
 
 import 'dart:async';
 import 'dart:convert';
@@ -52,6 +52,10 @@ class Preferences extends ChangeNotifier {
   /// System notifications while Wisetalk is in the background.
   bool notifyMessages = true;
   bool notifySummons = true;
+
+  /// Ping and loss next to the connection icon in a call, measured once a
+  /// second while the window shows. Off: the icon alone costs nothing.
+  bool showPingAndLoss = false;
 
   /// Send crash reports to the developers; off unless turned on.
   bool crashReports = false;
@@ -105,6 +109,7 @@ class Preferences extends ChangeNotifier {
               : KeyCombo.parse(value as String),
       };
       crashReports = json['crash_reports'] as bool? ?? false;
+      showPingAndLoss = json['show_ping_and_loss'] as bool? ?? false;
       notifyMessages = json['notify_messages'] as bool? ?? true;
       notifySummons = json['notify_summons'] as bool? ?? true;
       collapsed = {
@@ -136,6 +141,7 @@ class Preferences extends ChangeNotifier {
               key.name: value?.toString(),
           },
           'crash_reports': crashReports,
+          'show_ping_and_loss': showPingAndLoss,
           'notify_messages': notifyMessages,
           'notify_summons': notifySummons,
           'collapsed': collapsed.toList(),
