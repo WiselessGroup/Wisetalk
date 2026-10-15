@@ -26,8 +26,9 @@ import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
 import 'preferences.dart';
-import 'sounds.dart';
 import 'protocol.dart';
+import 'shortcuts.dart';
+import 'sounds.dart';
 
 /// LiveKit keeps this many keys; our key epoch picks the slot.
 const _keyringSize = 16;
@@ -229,7 +230,40 @@ class Voice extends ChangeNotifier {
     _refreshMicStates();
   }
 
-  /// Steps away or comes back (ADR-0026). Hotkeys call this too.
+  /// Turns the microphone on or off, whichever way it is now. Turning it
+  /// off while away keeps it off on coming back.
+  Future<void> setMicrophone({required bool on}) async {
+    if (away && !on) {
+      _mutedBeforeAway = true;
+      return;
+    }
+    if (on == muted) await toggleMute();
+  }
+
+  /// Does what a shortcut asks (ADR-0027) and ticks the outcome, since the
+  /// window may be out of sight: away and back, or the microphone off and
+  /// on. A refused unmute ticks off.
+  Future<void> perform(CallAction action) async {
+    if (_room == null || state != VoiceState.connected) return;
+    final wasAway = away;
+    switch (action) {
+      case CallAction.toggleMute:
+        await toggleMute();
+      case CallAction.toggleAway:
+        await toggleAway();
+      case CallAction.mute:
+        await setMicrophone(on: false);
+      case CallAction.unmute:
+        await setMicrophone(on: true);
+    }
+    if (!preferences.cues) return;
+    final cue = away != wasAway
+        ? (away ? Cue.away : Cue.back)
+        : (muted ? Cue.mute : Cue.unmute);
+    unawaited(sounds.play(cue));
+  }
+
+  /// Steps away or comes back (ADR-0026).
   Future<void> toggleAway() async {
     if (_room == null || state != VoiceState.connected) return;
     if (away) return _comeBack();

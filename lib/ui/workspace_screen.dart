@@ -21,6 +21,7 @@ import '../data/session.dart';
 import '../data/updates.dart';
 import '../data/voice.dart';
 import '../theme.dart';
+import 'call_shortcuts.dart';
 import 'call_stage.dart';
 import 'chat_panel.dart';
 import 'manage.dart';
@@ -296,8 +297,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         child: LayoutBuilder(
           builder: (context, constraints) => ListenableBuilder(
             listenable: _changes,
-            builder: (context, _) =>
-                constraints.maxWidth < _phoneWidth ? _phone() : _desktop(),
+            builder: (context, _) => CallShortcuts(
+              voice: _voice,
+              preferences: ref.read(preferencesProvider),
+              child: constraints.maxWidth < _phoneWidth ? _phone() : _desktop(),
+            ),
           ),
         ),
       ),
