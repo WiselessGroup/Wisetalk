@@ -1,5 +1,6 @@
 // Pieces the screens share: the centered card the web client's sign-in
-// page uses, the way errors are shown, and people's avatars.
+// page uses, the way errors are shown, people's avatars, and the alert
+// that asks before something can't be undone.
 
 import 'package:flutter/material.dart';
 
@@ -175,4 +176,35 @@ class Avatar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Asks before something that can't be undone; true to go ahead. Short,
+/// so an alert on every screen size, unlike the forms in a SettingsSheet.
+Future<bool> confirm(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String action,
+  String cancel = 'Cancel',
+}) async {
+  final palette = context.palette;
+  final yes = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: palette.error),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+  return yes ?? false;
 }

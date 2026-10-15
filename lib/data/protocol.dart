@@ -34,6 +34,16 @@ class AccessFlags {
     'whitelist': whitelist,
     'hidden': hidden,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      other is AccessFlags &&
+      other.authRequired == authRequired &&
+      other.whitelist == whitelist &&
+      other.hidden == hidden;
+
+  @override
+  int get hashCode => Object.hash(authRequired, whitelist, hidden);
 }
 
 class Space {

@@ -511,35 +511,6 @@ List<TopEntry> topLevel(Gateway gateway) => [
     ),
 ]..sort((a, b) => a.position.compareTo(b.position));
 
-/// Asks before something that can't be undone; true to go ahead.
-Future<bool> confirm(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String action,
-}) async {
-  final palette = context.palette;
-  final yes = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: palette.error),
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(action),
-        ),
-      ],
-    ),
-  );
-  return yes ?? false;
-}
-
 class _HeaderEntry extends PopupMenuEntry<VoidCallback> {
   const _HeaderEntry({required this.title, this.detail});
 
