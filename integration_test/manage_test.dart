@@ -70,7 +70,17 @@ void main() {
       await tester.tap(find.byTooltip('Settings'));
       await waitFor(tester, find.text('Audio and Video'));
       expect(find.text('Voice Processing'), findsOneWidget);
-      await waitFor(tester, find.text('Others May Summon Me'));
+      // Far down the list, past Shortcuts: the list builds rows on demand.
+      await tester.scrollUntilVisible(
+        find.text('Others May Summon Me'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(SettingsSheet),
+              matching: find.byType(Scrollable),
+            )
+            .last,
+      );
       await shot(tester, '2-settings');
       await tester.tap(find.text('Done'));
       await tester.pump(const Duration(milliseconds: 400));
