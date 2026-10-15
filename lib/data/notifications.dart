@@ -4,9 +4,25 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Whether [state] means the person is looking at Wisetalk. Only `resumed`
+/// does: a window in the background is `inactive` (on GNOME's Wayland a
+/// minimized one too, the system doesn't tell), a hidden one `hidden`, an
+/// app in the background on a phone `paused`. `null` is before the window
+/// first showed, right after the person started the app.
+bool isInFront(AppLifecycleState? state) =>
+    state == null || state == AppLifecycleState.resumed;
+
+/// Whether Wisetalk is the window in front now: notifications only when not.
+/// Read from the binding, which follows every change from the start, and
+/// never kept by whoever asks: the desktop embedders tell only changes, so a
+/// workspace built for a new connection while Wisetalk was in the
+/// background thought it was in front until the window was focused and left
+/// again (WLK-1).
+bool get appInFront => isInFront(WidgetsBinding.instance.lifecycleState);
 
 /// What a notification leads to when clicked.
 sealed class NotificationTarget {
