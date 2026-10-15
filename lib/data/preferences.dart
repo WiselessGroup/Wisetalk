@@ -1,8 +1,8 @@
 // What a person sets for themselves on this device: which microphone,
 // camera and speakers, voice processing, how loud each person in a call is
 // for them, which notifications to show, whether to show ping and loss,
-// which spaces are folded and the keyboard shortcuts. The web client's
-// Preferences, plus what only the app has.
+// which spaces are folded, the keyboard shortcuts and the interface's
+// language. The web client's Preferences, plus what only the app has.
 
 import 'dart:async';
 import 'dart:convert';
@@ -80,6 +80,9 @@ class Preferences extends ChangeNotifier {
     }
     changed();
   }
+  /// A key of `languages` (language.dart), `null` for the system's. Its own
+  /// notifier: changing it rebuilds the whole app, a volume slider must not.
+  final language = ValueNotifier<String?>(null);
 
   double volumeOf(Participant p) =>
       silenced.contains(personKey(p)) ? 0 : volumes[personKey(p)] ?? 1;
@@ -120,10 +123,17 @@ class Preferences extends ChangeNotifier {
         for (final id in json['collapsed'] as List<dynamic>? ?? [])
           id as String,
       };
+      language.value = json['language'] as String?;
       notifyListeners();
     } catch (e) {
       debugPrint('ignoring unreadable preferences: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    language.dispose();
+    super.dispose();
   }
 
   /// Saves and tells everyone listening (the call applies the change).
@@ -150,6 +160,7 @@ class Preferences extends ChangeNotifier {
           'notify_summons': notifySummons,
           'screen_sound': screenSound,
           'collapsed': collapsed.toList(),
+          'language': language.value,
         }),
       ),
     );

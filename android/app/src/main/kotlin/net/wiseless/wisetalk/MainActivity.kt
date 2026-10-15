@@ -23,7 +23,12 @@ class MainActivity : FlutterActivity() {
                             result.success(false)
                         } else {
                             val sharing = call.argument<Boolean>("sharing") ?: false
-                            CallService.update(this, title, sharing) { result.success(it) }
+                            // In the app's language, which may not be the system's.
+                            val text = call.argument<String>("text") ?: ""
+                            val channelName = call.argument<String>("channelName") ?: "Calls"
+                            CallService.update(this, title, text, channelName, sharing) {
+                                result.success(it)
+                            }
                         }
                     }
                     else -> result.notImplemented()

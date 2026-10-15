@@ -11,6 +11,7 @@ import '../data/api.dart';
 import '../data/browser_sign_in.dart';
 import '../data/servers.dart';
 import '../data/session.dart';
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/text.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -67,7 +68,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final name = normalizeDisplayName(raw: _name.text);
     if (server == null) return;
     if (name == null) {
-      setState(() => _error = 'A name is 1 to 32 characters.');
+      setState(() => _error = AppLocalizations.of(context).signInNameLength);
       return;
     }
     setState(() {
@@ -104,11 +105,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     final server = ref.watch(serversProvider).value?.currentServer;
     final info = ref.watch(_infoProvider);
     final branding = info.value?.branding ?? const Branding();
+    final texts = AppLocalizations.of(context);
 
     final back = TextButton.icon(
       onPressed: _changeServer,
       icon: const Icon(Icons.chevron_left),
-      label: Text(server == null ? 'Servers' : displayAddress(server.origin)),
+      label: Text(
+        server == null ? texts.signInServers : displayAddress(server.origin),
+      ),
     );
 
     if (info.hasError) {
@@ -122,12 +126,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ErrorBox(
               info.error is ApiException
                   ? (info.error! as ApiException).message
-                  : "Can't reach the server.",
+                  : texts.signInUnreachable,
             ),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => ref.invalidate(_infoProvider),
-              child: const Text('Try Again'),
+              child: Text(texts.tryAgain),
             ),
           ],
         ),
@@ -143,7 +147,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Masthead(subtitle: info.isLoading ? ' ' : branding.taglineText),
+          Masthead(
+            subtitle: info.isLoading ? ' ' : branding.taglineText(texts),
+          ),
           const SizedBox(height: 24),
           if (_error != null) ...[
             ErrorBox(_error!),
@@ -162,18 +168,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 onPressed: waiting || _guestBusy ? null : _withAccount,
                 icon: const Icon(Icons.login, size: 20),
                 label: Text(
-                  waiting ? 'Continue in Your Browser…' : branding.signInText,
+                  waiting ? texts.signInInBrowser : branding.signInText(texts),
                 ),
               ),
               const SizedBox(height: 8),
               if (waiting)
                 TextButton(
                   onPressed: () => _browser?.cancel(),
-                  child: const Text('Cancel'),
+                  child: Text(texts.cancel),
                 )
               else
                 Text(
-                  'Your name, avatar and summons follow you everywhere.',
+                  texts.signInAccountHelp,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: palette.muted),
                 ),
@@ -181,7 +187,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             if (guests) ...[
               if (accounts) const _Or(),
               Text(
-                'Join as a guest',
+                texts.signInGuest,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -195,29 +201,31 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 maxLength: 32,
                 textInputAction: TextInputAction.go,
                 onSubmitted: (_) => _asGuest(),
-                decoration: const InputDecoration(
-                  hintText: 'Your name',
+                decoration: InputDecoration(
+                  hintText: texts.signInGuestName,
                   counterText: '',
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Guests can talk and listen, but not share video or be summoned.',
+                texts.signInGuestHelp,
                 style: TextStyle(fontSize: 13, color: palette.muted),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _guestBusy || waiting ? null : _asGuest,
                 icon: const Icon(Icons.person_outline, size: 20),
-                label: Text(_guestBusy ? 'Joining…' : 'Continue as Guest'),
+                label: Text(
+                  _guestBusy ? texts.signInJoining : texts.signInAsGuest,
+                ),
               ),
             ] else if (!accounts)
-              const ErrorBox('This server lets nobody in right now.')
+              ErrorBox(texts.signInNobody)
             else
               Padding(
                 padding: const EdgeInsets.only(top: 16),
                 child: Text(
-                  'Guest sign-in is closed for now.',
+                  texts.signInGuestsClosed,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: palette.muted),
                 ),
@@ -236,8 +244,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               Flexible(
                 child: Text(
                   [
-                    'Calls are end-to-end encrypted.',
-                    if (branding.hostedByText != null) branding.hostedByText!,
+                    texts.signInEncrypted,
+                    ?branding.hostedByText(texts),
                   ].join(' '),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: palette.tertiary),
@@ -265,7 +273,7 @@ class _Or extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
-              'or',
+              AppLocalizations.of(context).signInOr,
               style: TextStyle(color: palette.tertiary, fontSize: 13),
             ),
           ),

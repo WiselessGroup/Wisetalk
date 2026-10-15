@@ -1,7 +1,7 @@
 #!/bin/sh
-# What has to pass before a push: the Rust bridge, up-to-date bindings,
-# formatting, the analyzer and the tests. Runs here; the server builds
-# nothing of the client.
+# What has to pass before a push: the Rust bridge, up-to-date bindings and
+# translations, formatting, the analyzer and the tests. Runs here; the
+# server builds nothing of the client.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -15,7 +15,9 @@ cd "$(dirname "$0")/.."
 )
 flutter pub get --enforce-lockfile
 flutter_rust_bridge_codegen generate
-git diff --exit-code -- lib/src/rust rust/src/frb_generated.rs
+# Committed like the bindings, so a build needs neither step.
+flutter gen-l10n
+git diff --exit-code -- lib/src/rust rust/src/frb_generated.rs lib/l10n
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test

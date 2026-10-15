@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../l10n/app_localizations.dart';
 import 'protocol.dart';
 
 /// Who a session belongs to (`GET /api/me`).
@@ -87,12 +88,13 @@ class Branding {
   final String? loginLabel;
 
   /// The same fallbacks as the web client's `lib/branding.ts`.
-  String get taglineText =>
-      tagline ?? 'Voice and video chat for your community';
-  String get signInText =>
-      loginLabel == null ? 'Sign In' : 'Sign In with $loginLabel';
-  String? get hostedByText =>
-      community == null ? null : 'Hosted by $community.';
+  String taglineText(AppLocalizations texts) =>
+      tagline ?? texts.brandingTagline;
+  String signInText(AppLocalizations texts) => loginLabel == null
+      ? texts.brandingSignIn
+      : texts.brandingSignInWith(loginLabel!);
+  String? hostedByText(AppLocalizations texts) =>
+      community == null ? null : texts.brandingHostedBy(community!);
 }
 
 /// `GET /api/server`: what a server is, asked before signing in.

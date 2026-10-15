@@ -7,8 +7,11 @@ import 'data/android_logs.dart';
 import 'data/crash_reports.dart';
 import 'data/desktop_entry.dart';
 import 'data/input_filters.dart';
+import 'data/language.dart';
 import 'data/links.dart';
+import 'data/preferences.dart';
 import 'data/updates.dart';
+import 'l10n/app_localizations.dart';
 import 'router.dart';
 import 'src/rust/api/update.dart';
 import 'src/rust/frb_generated.dart';
@@ -36,12 +39,21 @@ class WisetalkApp extends ConsumerWidget {
     // in or not.
     ref.watch(updatesProvider);
     ref.watch(linksProvider);
-    return MaterialApp.router(
-      title: 'Wisetalk',
-      debugShowCheckedModeBanner: false,
-      theme: themeFor(Brightness.light),
-      darkTheme: themeFor(Brightness.dark),
-      routerConfig: ref.watch(routerProvider),
+    final router = ref.watch(routerProvider);
+    return ValueListenableBuilder(
+      valueListenable: ref.watch(preferencesProvider).language,
+      builder: (context, language, _) => MaterialApp.router(
+        title: 'Wisetalk',
+        debugShowCheckedModeBanner: false,
+        theme: themeFor(Brightness.light),
+        darkTheme: themeFor(Brightness.dark),
+        // Picked in Settings, or the system's (asked again when it changes).
+        locale: language == null ? null : Locale(language),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localeListResolutionCallback: (wanted, _) => negotiateLocale(wanted),
+        routerConfig: router,
+      ),
     );
   }
 }

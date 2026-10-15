@@ -22,12 +22,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart' as lk;
 
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
 import 'input_filters.dart';
 import 'link.dart';
 import 'link_stats.dart';
+import 'language.dart';
 import 'preferences.dart';
 import 'protocol.dart';
 import 'shortcuts.dart';
@@ -580,7 +582,7 @@ class Voice extends ChangeNotifier {
     if (Platform.isAndroid) {
       if (!await rtc.Helper.requestCapturePermission()) return;
       final name = gateway.channel(channel ?? '')?.channel.name ?? 'Wisetalk';
-      if (!await _service.update(channel: name, sharing: true)) {
+      if (!await _service.update(channel: name, sharing: true, texts: _texts)) {
         error = 'Screen sharing unavailable.';
         notifyListeners();
         return;
@@ -698,7 +700,7 @@ class Voice extends ChangeNotifier {
     qualities.clear();
     trust?.clear();
     link.reset();
-    unawaited(_service.update(channel: null));
+    unawaited(_service.update(channel: null, texts: _texts));
     notifyListeners();
   }
 
@@ -710,8 +712,12 @@ class Voice extends ChangeNotifier {
           ? null
           : gateway.channel(id)?.channel.name ?? 'Wisetalk',
       sharing: screen,
+      texts: _texts,
     );
   }
+
+  /// For what is shown outside the app's windows.
+  AppLocalizations get _texts => textsFor(preferences.language.value);
 
   void _addTile(
     lk.TrackPublication publication,

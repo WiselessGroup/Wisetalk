@@ -1,0 +1,75 @@
+{
+  "@@locale": "en",
+  "brandingTagline": "Voice and video chat for your community",
+  "@brandingTagline": {
+    "description": "Under the logo when the server set no tagline of its own."
+  },
+  "brandingSignIn": "Sign In",
+  "brandingSignInWith": "Sign In with {provider}",
+  "@brandingSignInWith": {
+    "description": "The account button when the server named its identity provider.",
+    "placeholders": {
+      "provider": {
+        "type": "String",
+        "example": "Wiseless"
+      }
+    }
+  },
+  "brandingHostedBy": "Hosted by {community}.",
+  "@brandingHostedBy": {
+    "placeholders": {
+      "community": {
+        "type": "String",
+        "example": "Wiseless"
+      }
+    }
+  },
+  "signInServers": "Servers",
+  "@signInServers": {
+    "description": "Back to the list of servers."
+  },
+  "signInUnreachable": "Can't reach the server.",
+  "tryAgain": "Try Again",
+  "cancel": "Cancel",
+  "signInInBrowser": "Continue in Your Browser…",
+  "@signInInBrowser": {
+    "description": "While the browser is open for signing in with an account."
+  },
+  "signInAccountHelp": "Your name, avatar and summons follow you everywhere.",
+  "signInOr": "or",
+  "@signInOr": {
+    "description": "Between signing in with an account and joining as a guest."
+  },
+  "signInGuest": "Join as a guest",
+  "signInGuestName": "Your name",
+  "signInGuestHelp": "Guests can talk and listen, but not share video or be summoned.",
+  "signInJoining": "Joining…",
+  "signInAsGuest": "Continue as Guest",
+  "signInNobody": "This server lets nobody in right now.",
+  "signInGuestsClosed": "Guest sign-in is closed for now.",
+  "signInEncrypted": "Calls are end-to-end encrypted.",
+  "signInNameLength": "A name is 1 to 32 characters.",
+  "callMute": "Mute",
+  "callUnmute": "Unmute",
+  "callCameraOn": "Turn Camera On",
+  "callCameraOff": "Turn Camera Off",
+  "callShareScreen": "Share Screen",
+  "callStopSharing": "Stop Sharing",
+  "callLeave": "Leave",
+  "callServiceChannel": "Calls",
+  "@callServiceChannel": {
+    "description": "Android: the name of the ongoing call notification's channel in the system settings."
+  },
+  "callServiceInCall": "In a voice call",
+  "@callServiceInCall": {
+    "description": "Android: the ongoing call notification, under the channel name."
+  },
+  "callServiceSharing": "Sharing your screen",
+  "@callServiceSharing": {
+    "description": "Android: the ongoing call notification while sharing the screen."
+  },
+  "settingsTitle": "Settings",
+  "settingsLanguage": "Language",
+  "settingsSystemDefault": "System Default",
+  "settingsDone": "Done"
+}

@@ -1,0 +1,13 @@
+# Interface languages (ADR-0024, WLK-13): `flutter gen-l10n` turns the ARB
+# files into lib/l10n/app_localizations*.dart, committed like the Rust
+# bindings and checked by scripts/check.sh. English is the template; a
+# message missing from another language shows in English. app_zh is
+# Simplified Chinese and app_pt Brazilian Portuguese: each language has one
+# file, named without a region, so Flutter falls back to it for them all.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+nullable-getter: false
+format: true
+# Lists what each language still lacks, instead of a warning on every run.
+untranslated-messages-file: build/untranslated_messages.json

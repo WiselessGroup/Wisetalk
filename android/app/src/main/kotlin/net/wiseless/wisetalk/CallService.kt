@@ -24,6 +24,8 @@ class CallService : Service() {
         private const val CHANNEL = "call"
         private const val NOTIFICATION = 1
         private const val TITLE = "title"
+        private const val TEXT = "text"
+        private const val CHANNEL_NAME = "channelName"
         private const val SHARING = "sharing"
 
         /** Answers the latest [update] once the service is in the foreground. */
@@ -42,10 +44,18 @@ class CallService : Service() {
 
         /**
          * Starts the service, or changes what it says and does, for a call in
-         * [title]; [done] gets whether it runs. Screen capture may start only
-         * after the system's consent and once this ran with [sharing].
+         * [title], with [text] under it and its notification channel called
+         * [channelName]; [done] gets whether it runs. Screen capture may start
+         * only after the system's consent and once this ran with [sharing].
          */
-        fun update(context: Context, title: String, sharing: Boolean, done: (Boolean) -> Unit) {
+        fun update(
+            context: Context,
+            title: String,
+            text: String,
+            channelName: String,
+            sharing: Boolean,
+            done: (Boolean) -> Unit,
+        ) {
             // Without the microphone and not sharing there is nothing to keep.
             if (types(context, sharing) == 0) {
                 stop(context)
@@ -57,6 +67,8 @@ class CallService : Service() {
                 context.startForegroundService(
                     Intent(context, CallService::class.java)
                         .putExtra(TITLE, title)
+                        .putExtra(TEXT, text)
+                        .putExtra(CHANNEL_NAME, channelName)
                         .putExtra(SHARING, sharing),
                 )
             } catch (e: Exception) {
@@ -75,9 +87,15 @@ class CallService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val title = intent?.getStringExtra(TITLE) ?: "Wisetalk"
+        val text = intent?.getStringExtra(TEXT) ?: ""
+        val channelName = intent?.getStringExtra(CHANNEL_NAME) ?: "Calls"
         val sharing = intent?.getBooleanExtra(SHARING, false) ?: false
         val ok = try {
-            startForeground(NOTIFICATION, notification(title, sharing), types(this, sharing))
+            startForeground(
+                NOTIFICATION,
+                notification(title, text, channelName),
+                types(this, sharing),
+            )
             true
         } catch (e: Exception) {
             Log.w(TAG, "cannot go to the foreground: $e")
@@ -94,10 +112,11 @@ class CallService : Service() {
         stopSelf()
     }
 
-    private fun notification(title: String, sharing: Boolean): Notification {
+    private fun notification(title: String, text: String, channelName: String): Notification {
         val manager = getSystemService(NotificationManager::class.java)
+        // Creating it again renames it, after a change of language.
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Calls", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL, channelName, NotificationManager.IMPORTANCE_LOW),
         )
         val open = PendingIntent.getActivity(
             this,
@@ -108,7 +127,7 @@ class CallService : Service() {
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_call_notification)
             .setContentTitle(title)
-            .setContentText(if (sharing) "Sharing your screen" else "In a voice call")
+            .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_CALL)
