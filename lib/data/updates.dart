@@ -1,7 +1,8 @@
 // Keeping the app current. On desktop Velopack downloads updates from the
 // client's releases in the background and "Restart to Update" applies them
-// (the next start does it anyway). On Android the server's download list
-// tells of a newer APK, which the browser fetches and the system installs.
+// (the next start does it anyway). On Android, and on a desktop copy
+// Velopack didn't install, the server's download list tells of a newer
+// version, which the browser fetches.
 
 import 'dart:async';
 import 'dart:io';
@@ -30,7 +31,8 @@ class Updates extends ChangeNotifier {
     });
   }
 
-  /// The server to ask on Android, the one in use; `null` before picking one.
+  /// The server whose download list to read, the one in use; `null` before
+  /// picking one.
   final Uri? Function() _server;
   Timer? _timer;
   bool _disposed = false;
@@ -38,7 +40,8 @@ class Updates extends ChangeNotifier {
   /// Desktop: a version downloaded and waiting for [restart].
   String? ready;
 
-  /// Android: a newer version, and where the browser gets it.
+  /// Without Velopack (Android, say): a newer version, and where the
+  /// browser gets it.
   ({String version, Uri url})? available;
 
   @override
@@ -56,7 +59,7 @@ class Updates extends ChangeNotifier {
   Future<void> _check() async {
     try {
       if (Platform.isAndroid) {
-        await _checkAndroid();
+        await _checkDownloads('android');
       } else if (installedVersion() != null) {
         final version = await downloadUpdate();
         if (version != null && version != ready) {
@@ -64,6 +67,10 @@ class Updates extends ChangeNotifier {
           ready = version;
           notifyListeners();
         }
+      } else if (Platform.isMacOS) {
+        await _checkDownloads('macos');
+      } else if (Platform.isWindows) {
+        await _checkDownloads('windows_x64');
       }
     } catch (e) {
       // Offline, or the releases are unreachable: next time.
@@ -71,16 +78,17 @@ class Updates extends ChangeNotifier {
     }
   }
 
-  Future<void> _checkAndroid() async {
+  /// Looks for a newer file for [platform] in the server's download list.
+  Future<void> _checkDownloads(String platform) async {
     final server = _server();
     if (appVersion.isEmpty || server == null) return;
     final downloads = await Api(server).downloads();
     final latest = downloads.version;
-    final apk = downloads.files
-        .where((f) => f.platform == 'android')
+    final file = downloads.files
+        .where((f) => f.platform == platform)
         .firstOrNull;
-    if (latest == null || apk == null || !isNewer(latest, appVersion)) return;
-    available = (version: latest, url: Uri.parse(apk.url));
+    if (latest == null || file == null || !isNewer(latest, appVersion)) return;
+    available = (version: latest, url: Uri.parse(file.url));
     notifyListeners();
   }
 

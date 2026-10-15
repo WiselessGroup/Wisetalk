@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "net.wiseless" "\0"
-            VALUE "FileDescription", "wisetalk" "\0"
+            VALUE "CompanyName", "Wiseless" "\0"
+            VALUE "FileDescription", "Wisetalk" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "wisetalk" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 net.wiseless. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Wiseless. Free software under the AGPL-3.0." "\0"
             VALUE "OriginalFilename", "wisetalk.exe" "\0"
-            VALUE "ProductName", "wisetalk" "\0"
+            VALUE "ProductName", "Wisetalk" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

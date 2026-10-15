@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
-</dict>
+<!-- No App Sandbox: Wisetalk isn't on the App Store, and the sandbox would
+     need an entitlement for every server, device and file it touches. -->
+<dict/>
 </plist>

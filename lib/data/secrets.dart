@@ -18,7 +18,12 @@ abstract interface class Secrets {
 /// The system's own store: Keychain on Apple systems, Keystore on Android,
 /// the Secret Service (GNOME Keyring, KWallet) on Linux, DPAPI on Windows.
 class SystemSecrets implements Secrets {
-  SystemSecrets() : _storage = const FlutterSecureStorage();
+  SystemSecrets()
+    : _storage = const FlutterSecureStorage(
+        // The data protection keychain wants an app signed with a team's
+        // identity; ours are signed ad hoc, so the login keychain instead.
+        mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+      );
 
   final FlutterSecureStorage _storage;
 

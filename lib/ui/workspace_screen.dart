@@ -750,8 +750,8 @@ class _ChatButton extends StatelessWidget {
   }
 }
 
-/// Shows once a new version is waiting: restarts into it on desktop, gets
-/// the APK on Android.
+/// Shows once a new version is waiting: restarts into it where Velopack
+/// updates the app, downloads it elsewhere (Android, say).
 class _UpdateButton extends StatelessWidget {
   const _UpdateButton({required this.updates});
 

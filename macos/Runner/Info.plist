@@ -28,5 +28,20 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Wisetalk uses the microphone so people in your calls can hear you.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Wisetalk uses the camera when you turn it on in a call.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>net.wiseless.wisetalk</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wisetalk</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
