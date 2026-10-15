@@ -1,7 +1,9 @@
 // On Linux an AppImage is just a file: nothing puts it in the app menu or
 // tells the system it opens wisetalk: links. Wisetalk does both itself,
 // once per start (the file may have moved), so a server's web page can hand
-// the app its address.
+// the app its address. When an AppImage manager (Gear Lever,
+// AppImageLauncher) already made a menu entry, Wisetalk's own stays out of
+// the menu and only opens the links.
 
 import 'dart:io';
 
@@ -24,6 +26,7 @@ Future<void> registerDesktopEntry() async {
     }
 
     final entry = File('$data/applications/$_id.desktop');
+    final hidden = _integrated(image, Directory('$data/applications'), entry);
     final text =
         '''[Desktop Entry]
 Type=Application
@@ -35,7 +38,7 @@ Categories=Network;InstantMessaging;AudioVideo;
 Terminal=false
 StartupWMClass=$_id
 MimeType=x-scheme-handler/wisetalk;
-''';
+${hidden ? 'NoDisplay=true\n' : ''}''';
     if (entry.existsSync() && entry.readAsStringSync() == text) return;
     await entry.parent.create(recursive: true);
     await entry.writeAsString(text);
@@ -49,6 +52,30 @@ MimeType=x-scheme-handler/wisetalk;
     // A read-only home, no xdg-utils: links just won't open the app.
     debugPrint('cannot register the desktop entry: $e');
   }
+}
+
+/// Whether something else put this AppImage in the app menu: managers
+/// start it with DESKTOPINTEGRATION set, and their entries name its path.
+bool _integrated(String image, Directory folder, File ours) {
+  if ((Platform.environment['DESKTOPINTEGRATION'] ?? '').isNotEmpty) {
+    return true;
+  }
+  try {
+    for (final file in folder.listSync().whereType<File>()) {
+      if (!file.path.endsWith('.desktop') || file.path == ours.path) continue;
+      final lines = file.readAsLinesSync();
+      if (lines.any(
+        (l) =>
+            (l.startsWith('Exec=') || l.startsWith('TryExec=')) &&
+            l.contains(image),
+      )) {
+        return true;
+      }
+    }
+  } on FileSystemException {
+    // Unreadable: assume nobody else did it.
+  }
+  return false;
 }
 
 /// A path as the desktop entry spec wants it in Exec.
