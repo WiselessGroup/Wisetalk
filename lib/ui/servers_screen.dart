@@ -1,7 +1,8 @@
 // Where the app picks its server. One server is one community; this list
 // is the servers you've used, to go back to or forget. The first run shows
 // only the address field. A server's web page can fill it in too, through
-// a wisetalk: link (see data/links.dart).
+// a wisetalk: link (see data/links.dart). Adding one more, once there are
+// some, is a sheet of its own.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import '../data/servers.dart';
 import '../src/rust/api/text.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'settings_sheet.dart';
 
 class ServersScreen extends ConsumerStatefulWidget {
   const ServersScreen({super.key});
@@ -33,45 +35,31 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
     super.dispose();
   }
 
-  /// Checks that the address is a Wisetalk server this app can talk to,
-  /// then keeps it and goes on to sign in.
+  /// The first run's form: on to signing in once the server checks out.
   Future<void> _connect() async {
-    final origin = parseServerAddress(_address.text);
-    if (origin == null) {
-      setState(
-        () => _error = 'Type the address of a server, like talk.example.com.',
-      );
-      return;
-    }
     setState(() {
       _busy = true;
       _error = null;
     });
-    try {
-      final info = await Api(origin).server();
-      final ours = protocolVersion();
-      if (info.protocol != ours) {
-        throw ApiException(
-          0,
-          info.protocol > ours
-              ? 'This server is newer than this app. Update Wisetalk to join it.'
-              : 'This server runs an older Wisetalk${info.version.isEmpty ? '' : ' (${info.version})'}. Ask its admins to update it.',
-        );
-      }
-      await ref
-          .read(serversProvider.notifier)
-          .add(
-            SavedServer(
-              origin: origin,
-              name: info.branding.community ?? displayAddress(origin),
-            ),
-          );
-      if (mounted) context.go('/');
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    final error = await _addServer(ref, _address.text);
+    if (!mounted) return;
+    if (error == null) {
+      context.go('/');
+    } else {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
     }
+  }
+
+  /// Another server, besides those saved, in a sheet of its own.
+  Future<void> _addAnother({String address = '', String? error}) async {
+    final added = await showSettingsSheet<bool>(
+      context,
+      builder: (_) => _AddServerSheet(address: address, error: error),
+    );
+    if (added == true && mounted) context.go('/');
   }
 
   Future<void> _open(SavedServer server) async {
@@ -80,26 +68,15 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
   }
 
   Future<void> _remove(SavedServer server) async {
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove ${server.name}?'),
-        content: const Text(
-          'This device signs out of it and forgets it. You can add it again with its address.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final sure = await confirm(
+      context,
+      title: 'Remove ${server.name}?',
+      message:
+          'This device signs out of it and forgets it. You can add it again '
+          'with its address.',
+      action: 'Remove',
     );
-    if (sure == true) {
+    if (sure) {
       await ref.read(serversProvider.notifier).remove(server.origin);
     }
   }
@@ -111,11 +88,19 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
     // A link brought a server that didn't work out: show it and why.
     final pending = ref.watch(pendingAddressProvider);
     if (pending != null) {
-      _address.text = pending.address;
-      _error = pending.error;
       Future.microtask(
         () => ref.read(pendingAddressProvider.notifier).set(null),
       );
+      if (saved.isEmpty) {
+        _address.text = pending.address;
+        _error = pending.error;
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _addAnother(address: pending.address, error: pending.error);
+          }
+        });
+      }
     }
     final palette = context.palette;
 
@@ -164,12 +149,108 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
               onOpen: _open,
               onRemove: _remove,
             ),
-            const SizedBox(height: 24),
-            _Header('Add a Server'),
-          ],
-          form,
+            const SizedBox(height: 16),
+            SettingsGroup(
+              children: [
+                ButtonRow(label: 'Add a Server…', onTap: () => _addAnother()),
+              ],
+            ),
+          ] else
+            form,
         ],
       ),
+    );
+  }
+}
+
+/// Checks that [text] is the address of a Wisetalk server this app can
+/// talk to, then keeps it as the one to go to. Null when that worked;
+/// otherwise what went wrong.
+Future<String?> _addServer(WidgetRef ref, String text) async {
+  final origin = parseServerAddress(text);
+  if (origin == null) {
+    return 'Type the address of a server, like talk.example.com.';
+  }
+  try {
+    final info = await Api(origin).server();
+    final ours = protocolVersion();
+    if (info.protocol != ours) {
+      return info.protocol > ours
+          ? 'This server is newer than this app. Update Wisetalk to join it.'
+          : 'This server runs an older Wisetalk${info.version.isEmpty ? '' : ' (${info.version})'}. Ask its admins to update it.';
+    }
+    await ref
+        .read(serversProvider.notifier)
+        .add(
+          SavedServer(
+            origin: origin,
+            name: info.branding.community ?? displayAddress(origin),
+          ),
+        );
+    return null;
+  } on ApiException catch (e) {
+    return e.message;
+  }
+}
+
+/// Adding a server when there are some already. True once it's added.
+class _AddServerSheet extends ConsumerStatefulWidget {
+  const _AddServerSheet({required this.address, this.error});
+
+  /// Filled in already, by a link that didn't work out.
+  final String address;
+  final String? error;
+
+  @override
+  ConsumerState<_AddServerSheet> createState() => _AddServerSheetState();
+}
+
+class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
+  late final _address = TextEditingController(text: widget.address)
+    ..addListener(() => setState(() {}));
+  late String? _error = widget.error;
+
+  @override
+  void dispose() {
+    _address.dispose();
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    setState(() => _error = null);
+    final error = await _addServer(ref, _address.text);
+    if (!mounted) return;
+    if (error == null) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _error = error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final typed = _address.text.trim();
+    return SettingsSheet(
+      title: 'Add a Server',
+      action: 'Connect',
+      dirty: typed.isNotEmpty && typed != widget.address,
+      onAction: typed.isEmpty ? null : _connect,
+      children: [
+        SettingsGroup(
+          footer: 'Ask whoever runs your community for its address.',
+          error: _error,
+          children: [
+            TextFieldRow(
+              label: 'Address',
+              controller: _address,
+              hint: 'talk.example.com',
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              autofocus: true,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

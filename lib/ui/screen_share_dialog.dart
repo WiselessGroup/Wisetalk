@@ -1,5 +1,7 @@
 // Before sharing: what it's for (text or motion), and which screen or
-// window. On Wayland and Android the system asks what to share itself.
+// window. On Wayland and Android the system asks what to share itself, so
+// all that's left is two choices: on a phone they rise from the bottom
+// (a short SettingsSheet, ADR-0029) instead of taking the whole screen.
 
 import 'dart:async';
 import 'dart:io';
@@ -10,6 +12,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 
 import '../data/voice.dart';
 import '../theme.dart';
+import 'settings_sheet.dart';
 
 typedef ScreenShareChoice = ({String? source, ScreenQuality quality});
 
@@ -44,74 +47,68 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final ready = _systemAsks || _source != null;
-    return AlertDialog(
-      title: const Text('Share Your Screen'),
-      content: SizedBox(
-        width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    Widget quality(
+      ScreenQuality value,
+      IconData icon,
+      String label,
+      String detail,
+    ) => CheckRow(
+      leading: Icon(icon, color: palette.muted),
+      label: label,
+      detail: detail,
+      selected: _quality == value,
+      onTap: () => setState(() => _quality = value),
+    );
+    return SettingsSheet(
+      title: 'Share Your Screen',
+      action: 'Share',
+      wide: !_systemAsks,
+      onAction: ready
+          ? () async => Navigator.pop<ScreenShareChoice>(context, (
+              source: _source,
+              quality: _quality,
+            ))
+          : null,
+      children: [
+        SettingsGroup(
+          header: 'Best For',
+          footer: Platform.isAndroid
+              ? 'Android asks next whether to share the entire screen or '
+                    'one app. Without sound, for now.'
+              : systemPicksScreen
+              ? 'The first time, your system asks which screen to share. '
+                    'Later shares reuse that screen until Wisetalk restarts. '
+                    'Whole screens only, without sound, for now.'
+              : null,
           children: [
-            SegmentedButton<ScreenQuality>(
-              segments: const [
-                ButtonSegment(
-                  value: ScreenQuality.text,
-                  icon: Icon(Icons.article_outlined),
-                  label: Text('Text and Slides'),
-                ),
-                ButtonSegment(
-                  value: ScreenQuality.motion,
-                  icon: Icon(Icons.sports_esports_outlined),
-                  label: Text('Video and Games'),
-                ),
-              ],
-              selected: {_quality},
-              onSelectionChanged: (s) => setState(() => _quality = s.single),
+            quality(
+              ScreenQuality.text,
+              Icons.article_outlined,
+              'Text and Slides',
+              'Sharp and light: a few frames a second.',
             ),
-            const SizedBox(height: 8),
-            Text(
-              _quality == ScreenQuality.text
-                  ? 'Sharp and light: a few frames a second.'
-                  : 'Smooth: 30 frames a second, heavier on both ends.',
-              style: TextStyle(fontSize: 13, color: palette.muted),
+            quality(
+              ScreenQuality.motion,
+              Icons.sports_esports_outlined,
+              'Video and Games',
+              'Smooth: 30 frames a second, heavier on both ends.',
             ),
-            const SizedBox(height: 16),
-            if (Platform.isAndroid)
-              Text(
-                'Android asks next whether to share the entire screen or '
-                'one app. Without sound, for now.',
-                style: TextStyle(fontSize: 13, color: palette.muted),
-              )
-            else if (systemPicksScreen)
-              Text(
-                'The first time, your system asks which screen to share. '
-                'Later shares reuse that screen until Wisetalk restarts. '
-                'Whole screens only, without sound, for now.',
-                style: TextStyle(fontSize: 13, color: palette.muted),
-              )
-            else
-              _SourcePicker(
-                sources: _sources,
-                selected: _source,
-                onSelect: (id) => setState(() => _source = id),
-              ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: ready
-              ? () => Navigator.pop<ScreenShareChoice>(context, (
-                  source: _source,
-                  quality: _quality,
-                ))
-              : null,
-          child: const Text('Share'),
-        ),
+        if (!_systemAsks)
+          SettingsGroup(
+            header: 'Screen or Window',
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: _SourcePicker(
+                  sources: _sources,
+                  selected: _source,
+                  onSelect: (id) => setState(() => _source = id),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }

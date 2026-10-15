@@ -553,8 +553,8 @@ class SettingsGroup extends StatelessWidget {
 }
 
 /// One row: a label with an optional line under it, a [value] on the
-/// right, and whatever goes at the end. Long values shorten with an
-/// ellipsis; the label keeps at least half the row.
+/// right, and whatever goes at the end. Long values take two lines, then
+/// shorten with an ellipsis; the label keeps up to half the row.
 class SettingsRow extends StatelessWidget {
   const SettingsRow({
     super.key,
@@ -627,7 +627,7 @@ class SettingsRow extends StatelessWidget {
                     child: Text(
                       value,
                       textAlign: TextAlign.end,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 15, color: palette.muted),
                     ),
