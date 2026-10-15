@@ -26,6 +26,7 @@ import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
 import 'preferences.dart';
+import 'sounds.dart';
 import 'protocol.dart';
 
 /// LiveKit keeps this many keys; our key epoch picks the slot.
@@ -176,6 +177,12 @@ class Voice extends ChangeNotifier {
     if (channel == null) return;
     gateway.send('leave_voice');
     _reset();
+  }
+
+  /// Someone came or went: hoot, once we're in the call ourselves.
+  void _cue(Cue cue) {
+    if (state != VoiceState.connected || !preferences.cues) return;
+    unawaited(sounds.play(cue));
   }
 
   /// Moderators: turns someone's microphone off for everyone, or lets
@@ -490,9 +497,11 @@ class Voice extends ChangeNotifier {
       case 'voice_joined':
         final joined = data as Map<String, dynamic>;
         if (joined['channel'] != channel) return;
-        _welcome(
-          Participant.fromJson(joined['participant'] as Map<String, dynamic>),
+        final newcomer = Participant.fromJson(
+          joined['participant'] as Map<String, dynamic>,
         );
+        _welcome(newcomer);
+        if (newcomer.session != gateway.sessionId) _cue(Cue.join);
       case 'voice_left':
         final left = data as Map<String, dynamic>;
         if (left['channel'] != channel) return;
@@ -500,6 +509,7 @@ class Voice extends ChangeNotifier {
           _reset();
         } else {
           unawaited(_rotate());
+          _cue(Cue.leave);
         }
       case 'participant_updated':
         final updated = data as Map<String, dynamic>;

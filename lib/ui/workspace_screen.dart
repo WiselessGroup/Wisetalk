@@ -579,12 +579,13 @@ class _Sidebar extends ConsumerWidget {
             manager.preferences.changed();
           },
           onMenu: (at) => manager.spaceMenu(context, at, space),
+          manager: manager,
         ),
       );
       for (final view in inside) {
         // Folded, the space still shows the call we're in.
         if (!folded || view.channel.id == voice.channel) {
-          rows.add(_ChannelRow(view: view, manager: manager));
+          rows.add(_ChannelRow(view: view, manager: manager, inSpace: true));
         }
       }
     }
@@ -659,7 +660,10 @@ class _Sidebar extends ConsumerWidget {
                       horizontal: 8,
                       vertical: 4,
                     ),
-                    children: rows,
+                    children: [
+                      ...rows,
+                      _EndDrop(manager: manager),
+                    ],
                   ),
           ),
           if (updates.ready != null || updates.available != null)
@@ -702,6 +706,11 @@ class _Sidebar extends ConsumerWidget {
                       enabled: false,
                       child: Text('Wisetalk $versionName'),
                     ),
+                    PopupMenuItem(
+                      onTap: () async =>
+                          manager.toast(await updates.checkNow()),
+                      child: const Text('Check for Updates'),
+                    ),
                     const PopupMenuDivider(),
                     PopupMenuItem(
                       onTap: () async {
@@ -741,8 +750,10 @@ class _SpaceHeader extends StatelessWidget {
     required this.people,
     required this.onToggle,
     required this.onMenu,
+    required this.manager,
   });
 
+  final Manager manager;
   final Space space;
   final bool folded;
 
@@ -754,51 +765,61 @@ class _SpaceHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final dragged = (id: space.id, space: true, name: space.name);
     return Padding(
       padding: const EdgeInsets.only(top: 10),
-      child: GestureDetector(
-        onSecondaryTapUp: (d) => onMenu(d.globalPosition),
-        onLongPressStart: (d) => onMenu(d.globalPosition),
-        child: Semantics(
-          button: true,
-          expanded: !folded,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: onToggle,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 8, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      space.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: palette.muted,
-                      ),
-                    ),
-                  ),
-                  if (folded && people > 0)
-                    Tooltip(
-                      message: '$people in voice',
+      child: _Drop(
+        manager: manager,
+        accepts: (moving) => moving.id != space.id,
+        // A channel goes into the space; a space goes before it.
+        target: (moving) =>
+            moving.space ? DropBefore(space.id) : DropInto(space.id),
+        child: GestureDetector(
+          onSecondaryTapUp: (d) => onMenu(d.globalPosition),
+          onLongPressStart: (d) => onMenu(d.globalPosition),
+          child: Semantics(
+            button: true,
+            expanded: !folded,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 8, 4),
+                child: Row(
+                  children: [
+                    if (manager.gateway.isAdmin)
+                      _Grip(manager: manager, dragged: dragged),
+                    Expanded(
                       child: Text(
-                        '$people',
-                        style: TextStyle(fontSize: 12, color: palette.accent),
+                        space.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: palette.muted,
+                        ),
                       ),
                     ),
-                  const SizedBox(width: 4),
-                  AnimatedRotation(
-                    turns: folded ? 0 : 0.25,
-                    duration: const Duration(milliseconds: 150),
-                    child: Icon(
-                      Icons.chevron_right,
-                      size: 16,
-                      color: palette.tertiary,
+                    if (folded && people > 0)
+                      Tooltip(
+                        message: '$people in voice',
+                        child: Text(
+                          '$people',
+                          style: TextStyle(fontSize: 12, color: palette.accent),
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                    AnimatedRotation(
+                      turns: folded ? 0 : 0.25,
+                      duration: const Duration(milliseconds: 150),
+                      child: Icon(
+                        Icons.chevron_right,
+                        size: 16,
+                        color: palette.tertiary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -809,10 +830,18 @@ class _SpaceHeader extends StatelessWidget {
 }
 
 class _ChannelRow extends StatelessWidget {
-  const _ChannelRow({required this.view, required this.manager});
+  const _ChannelRow({
+    required this.view,
+    required this.manager,
+    this.inSpace = false,
+  });
 
   final ChannelView view;
   final Manager manager;
+
+  /// Channels in a space sit a step in, so a top-level channel after a
+  /// space doesn't read as part of it.
+  final bool inSpace;
 
   @override
   Widget build(BuildContext context) {
@@ -822,112 +851,249 @@ class _ChannelRow extends StatelessWidget {
     final gateway = manager.gateway;
     final silenced = manager.preferences.silenced;
     final here = voice.channel == view.channel.id;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        GestureDetector(
-          onSecondaryTapUp: (d) =>
-              manager.channelMenu(context, d.globalPosition, view),
-          onLongPressStart: (d) =>
-              manager.channelMenu(context, d.globalPosition, view),
-          child: Material(
-            color: here
-                ? palette.accent.withValues(alpha: 0.22)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: view.locked ? null : () => voice.join(view.channel.id),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      view.locked
-                          ? Icons.lock_outline
-                          : Icons.volume_up_outlined,
-                      size: 17,
-                      color: view.locked ? palette.tertiary : palette.accent,
+    final dragged = (
+      id: view.channel.id,
+      space: false,
+      name: view.channel.name,
+    );
+    return _Drop(
+      manager: manager,
+      accepts: (moving) => moving.id != view.channel.id,
+      target: (_) => DropBefore(view.channel.id),
+      child: Padding(
+        padding: EdgeInsets.only(left: inSpace ? 12 : 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            GestureDetector(
+              onSecondaryTapUp: (d) =>
+                  manager.channelMenu(context, d.globalPosition, view),
+              onLongPressStart: (d) =>
+                  manager.channelMenu(context, d.globalPosition, view),
+              child: Material(
+                color: here
+                    ? palette.accent.withValues(alpha: 0.22)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: view.locked ? null : () => voice.join(view.channel.id),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        view.channel.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: view.locked ? palette.tertiary : palette.text,
-                          fontWeight: here ? FontWeight.w600 : FontWeight.w400,
+                    child: Row(
+                      children: [
+                        if (gateway.isAdmin)
+                          _Grip(manager: manager, dragged: dragged),
+                        Icon(
+                          view.locked
+                              ? Icons.lock_outline
+                              : Icons.volume_up_outlined,
+                          size: 17,
+                          color: view.locked
+                              ? palette.tertiary
+                              : palette.accent,
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            view.channel.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: view.locked
+                                  ? palette.tertiary
+                                  : palette.text,
+                              fontWeight: here
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        if (!view.locked)
+                          _ChatButton(
+                            open: chats.open == view.channel.id,
+                            unread: chats.unread[view.channel.id] ?? 0,
+                            onPressed: () => chats.open == view.channel.id
+                                ? chats.hide()
+                                : chats.show(view.channel.id),
+                          ),
+                      ],
                     ),
-                    if (!view.locked)
-                      _ChatButton(
-                        open: chats.open == view.channel.id,
-                        unread: chats.unread[view.channel.id] ?? 0,
-                        onPressed: () => chats.open == view.channel.id
-                            ? chats.hide()
-                            : chats.show(view.channel.id),
-                      ),
-                  ],
+                  ),
                 ),
               ),
+            ),
+            for (final p in view.participants)
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTapUp: (d) =>
+                    manager.personMenu(context, d.globalPosition, view, p),
+                onTap: () {},
+                onSecondaryTapUp: (d) =>
+                    manager.personMenu(context, d.globalPosition, view, p),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(34, 4, 8, 4),
+                  child: Row(
+                    children: [
+                      Avatar(
+                        name: p.displayName,
+                        size: 20,
+                        image: gateway.avatar(p.account, p.avatar),
+                        speaking: voice.speaking.contains(p.session),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          p.displayName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: palette.muted, fontSize: 13),
+                        ),
+                      ),
+                      if (silenced.contains(personKey(p)))
+                        Tooltip(
+                          message: 'Muted for you',
+                          child: Icon(
+                            Icons.volume_off,
+                            size: 14,
+                            color: palette.tertiary,
+                          ),
+                        ),
+                      if (p.serverMuted)
+                        Tooltip(
+                          message: 'Muted by a moderator',
+                          child: Icon(
+                            Icons.shield_outlined,
+                            size: 14,
+                            color: palette.error,
+                          ),
+                        )
+                      else if (voice.micOff.contains(p.session))
+                        Icon(Icons.mic_off, size: 14, color: palette.tertiary),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The handle admins drag a channel or a space by.
+class _Grip extends StatelessWidget {
+  const _Grip({required this.manager, required this.dragged});
+
+  final Manager manager;
+  final Dragged dragged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Draggable<Dragged>(
+      data: dragged,
+      onDragStarted: () => manager.dragging.value = dragged,
+      onDragEnd: (_) => manager.dragging.value = null,
+      feedback: Material(
+        color: palette.cell,
+        elevation: 6,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(dragged.name, style: TextStyle(color: palette.text)),
+        ),
+      ),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.grab,
+        child: Tooltip(
+          message: 'Drag ${dragged.name}',
+          child: Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Icon(
+              Icons.drag_indicator,
+              size: 14,
+              color: palette.tertiary,
             ),
           ),
         ),
-        for (final p in view.participants)
-          InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTapUp: (d) =>
-                manager.personMenu(context, d.globalPosition, view, p),
-            onTap: () {},
-            onSecondaryTapUp: (d) =>
-                manager.personMenu(context, d.globalPosition, view, p),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(34, 4, 8, 4),
-              child: Row(
-                children: [
-                  Avatar(
-                    name: p.displayName,
-                    size: 20,
-                    image: gateway.avatar(p.account, p.avatar),
-                    speaking: voice.speaking.contains(p.session),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      p.displayName,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: palette.muted, fontSize: 13),
-                    ),
-                  ),
-                  if (silenced.contains(personKey(p)))
-                    Tooltip(
-                      message: 'Muted for you',
-                      child: Icon(
-                        Icons.volume_off,
-                        size: 14,
-                        color: palette.tertiary,
-                      ),
-                    ),
-                  if (p.serverMuted)
-                    Tooltip(
-                      message: 'Muted by a moderator',
-                      child: Icon(
-                        Icons.shield_outlined,
-                        size: 14,
-                        color: palette.error,
-                      ),
-                    )
-                  else if (voice.micOff.contains(p.session))
-                    Icon(Icons.mic_off, size: 14, color: palette.tertiary),
-                ],
-              ),
+      ),
+    );
+  }
+}
+
+/// Takes a dragged channel or space, marking where it would land with a
+/// line above.
+class _Drop extends StatelessWidget {
+  const _Drop({
+    required this.manager,
+    required this.accepts,
+    required this.target,
+    required this.child,
+  });
+
+  final Manager manager;
+  final bool Function(Dragged) accepts;
+  final DropTarget Function(Dragged) target;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!manager.gateway.isAdmin) return child;
+    return DragTarget<Dragged>(
+      onWillAcceptWithDetails: (details) => accepts(details.data),
+      onAcceptWithDetails: (details) =>
+          manager.drop(details.data, target(details.data)),
+      builder: (context, hovering, _) => DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: hovering.isEmpty
+                  ? Colors.transparent
+                  : context.palette.accent,
+              width: 2,
             ),
           ),
-      ],
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// While dragging: the place to drop for the end of the list.
+class _EndDrop extends StatelessWidget {
+  const _EndDrop({required this.manager});
+
+  final Manager manager;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return ValueListenableBuilder(
+      valueListenable: manager.dragging,
+      builder: (context, dragged, _) => dragged == null
+          ? const SizedBox.shrink()
+          : DragTarget<Dragged>(
+              onAcceptWithDetails: (details) =>
+                  manager.drop(details.data, const DropEnd()),
+              builder: (context, hovering, _) => Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: hovering.isEmpty ? palette.tertiary : palette.accent,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'Drop here for the end of the list',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: palette.muted, fontSize: 13),
+                ),
+              ),
+            ),
     );
   }
 }

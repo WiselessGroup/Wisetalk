@@ -58,23 +58,47 @@ class Updates extends ChangeNotifier {
 
   Future<void> _check() async {
     try {
-      if (Platform.isAndroid) {
-        await _checkDownloads('android');
-      } else if (installedVersion() != null) {
-        final version = await downloadUpdate();
-        if (version != null && version != ready) {
-          debugPrint('Wisetalk $version is downloaded');
-          ready = version;
-          notifyListeners();
-        }
-      } else if (Platform.isMacOS) {
-        await _checkDownloads('macos');
-      } else if (Platform.isWindows) {
-        await _checkDownloads('windows_x64');
-      }
+      await _lookup();
     } catch (e) {
       // Offline, or the releases are unreachable: next time.
       debugPrint('cannot check for updates: $e');
+    }
+  }
+
+  /// Looks right away, for "Check for Updates"; says what it found.
+  Future<String> checkNow() async {
+    if (appVersion.isEmpty && installedVersion() == null) {
+      return 'This build of Wisetalk doesn’t update itself.';
+    }
+    try {
+      await _lookup();
+    } catch (e) {
+      debugPrint('cannot check for updates: $e');
+      return 'Cannot check for updates. Try again later.';
+    }
+    if (ready case final version?) {
+      return 'Wisetalk $version is ready: Restart to Update.';
+    }
+    if (available case (:final version, url: _)?) {
+      return 'Wisetalk $version is out: Update to $version.';
+    }
+    return 'Wisetalk $versionName is the latest.';
+  }
+
+  Future<void> _lookup() async {
+    if (Platform.isAndroid) {
+      await _checkDownloads('android');
+    } else if (installedVersion() != null) {
+      final version = await downloadUpdate();
+      if (version != null && version != ready) {
+        debugPrint('Wisetalk $version is downloaded');
+        ready = version;
+        notifyListeners();
+      }
+    } else if (Platform.isMacOS) {
+      await _checkDownloads('macos');
+    } else if (Platform.isWindows) {
+      await _checkDownloads('windows_x64');
     }
   }
 

@@ -38,6 +38,9 @@ class Preferences extends ChangeNotifier {
   /// Per person: muted only for me.
   Set<String> silenced = {};
 
+  /// Hoot when someone comes into or leaves my call.
+  bool cues = true;
+
   /// System notifications while Wisetalk is in the background.
   bool notifyMessages = true;
   bool notifySummons = true;
@@ -66,6 +69,7 @@ class Preferences extends ChangeNotifier {
         for (final key in json['silenced'] as List<dynamic>? ?? [])
           key as String,
       };
+      cues = json['cues'] as bool? ?? true;
       notifyMessages = json['notify_messages'] as bool? ?? true;
       notifySummons = json['notify_summons'] as bool? ?? true;
       collapsed = {
@@ -91,6 +95,7 @@ class Preferences extends ChangeNotifier {
           'processing': processing,
           'volumes': volumes,
           'silenced': silenced.toList(),
+          'cues': cues,
           'notify_messages': notifyMessages,
           'notify_summons': notifySummons,
           'collapsed': collapsed.toList(),

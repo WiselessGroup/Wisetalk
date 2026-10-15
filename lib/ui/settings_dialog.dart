@@ -268,6 +268,17 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     'without echo cancellation others hear themselves through '
                     'your speakers.',
                   ),
+                  const SizedBox(height: 14),
+                  _Group(
+                    children: [
+                      _SwitchRow(
+                        label: 'Join and Leave Sounds',
+                        detail: 'An owl hoots when someone comes or goes',
+                        value: _prefs.cues,
+                        onChanged: (on) => _change(() => _prefs.cues = on),
+                      ),
+                    ],
+                  ),
                   if (_account && _allowSummons != null) ...[
                     const _Header('Summons'),
                     _Group(

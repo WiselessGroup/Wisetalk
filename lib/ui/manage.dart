@@ -335,49 +335,105 @@ class Manager {
     ];
   }
 
-  Future<void> _move(String id, int by) async {
-    final top = topLevel(gateway);
-    final items = [
-      for (final entry in top)
-        if (entry.space case final space?)
-          {
-            'kind': 'space',
-            'id': space.id,
-            'channels': [
-              for (final v
-                  in gateway.channels
-                      .where((v) => v.channel.space == space.id)
-                      .toList()
-                    ..sort(
-                      (a, b) =>
-                          a.channel.position.compareTo(b.channel.position),
-                    ))
-                v.channel.id,
-            ],
-          }
-        else
-          {'kind': 'channel', 'id': entry.id},
-    ];
-    void swap(List<dynamic> list, Object Function(dynamic) idOf) {
-      final from = list.indexWhere((e) => idOf(e) == id);
-      final to = from + by;
-      if (from < 0 || to < 0 || to >= list.length) return;
-      final moved = list.removeAt(from);
-      list.insert(to, moved);
-    }
+  /// The channel list's order as PUT /api/layout takes it, in lists that
+  /// can be changed in place.
+  List<Map<String, dynamic>> _layout() => [
+    for (final entry in topLevel(gateway))
+      if (entry.space case final space?)
+        {
+          'kind': 'space',
+          'id': space.id,
+          'channels': <String>[
+            for (final v
+                in gateway.channels
+                    .where((v) => v.channel.space == space.id)
+                    .toList()
+                  ..sort(
+                    (a, b) => a.channel.position.compareTo(b.channel.position),
+                  ))
+              v.channel.id,
+          ],
+        }
+      else
+        {'kind': 'channel', 'id': entry.id},
+  ];
 
-    swap(items, (e) => (e as Map<String, Object>)['id']!);
-    for (final item in items) {
-      if (item['channels'] case final List<String> channels) {
-        swap(channels, (e) => e as String);
-      }
-    }
+  Future<void> _save(List<Map<String, dynamic>> items) async {
     try {
       await api.setLayout(items);
     } catch (e) {
       debugPrint('cannot reorder: $e');
       toast('Cannot reorder.');
     }
+  }
+
+  Future<void> _move(String id, int by) async {
+    final items = _layout();
+    void swap(List<dynamic> list, Object? Function(dynamic) idOf) {
+      final from = list.indexWhere((e) => idOf(e) == id);
+      final to = from + by;
+      if (from < 0 || to < 0 || to >= list.length) return;
+      list.insert(to, list.removeAt(from));
+    }
+
+    swap(items, (e) => (e as Map<String, dynamic>)['id']);
+    for (final item in items) {
+      if (item['channels'] case final List<String> channels) {
+        swap(channels, (e) => e);
+      }
+    }
+    await _save(items);
+  }
+
+  // --- Dragging (admins) -------------------------------------------------
+
+  /// What is being dragged right now, for the drop zone at the end.
+  final dragging = ValueNotifier<Dragged?>(null);
+
+  /// Puts what was dragged where it was dropped, as the web client does.
+  Future<void> drop(Dragged moving, DropTarget target) async {
+    if (target case DropBefore(:final id) when id == moving.id) return;
+    final items = _layout();
+    int spaceWith(String id) => items.indexWhere(
+      (i) => i['kind'] == 'space' && (i['channels'] as List).contains(id),
+    );
+    if (moving.space) {
+      final entry = items.removeAt(
+        items.indexWhere((i) => i['id'] == moving.id),
+      );
+      // Spaces live at the top level: a drop inside a space means before it.
+      final anchor = switch (target) {
+        DropEnd() => null,
+        DropInto(:final space) => space,
+        DropBefore(:final id) => id,
+      };
+      var at = anchor == null ? -1 : items.indexWhere((i) => i['id'] == anchor);
+      if (anchor != null && at < 0) at = spaceWith(anchor);
+      items.insert(at < 0 ? items.length : at, entry);
+    } else {
+      for (final item in items) {
+        (item['channels'] as List<String>?)?.remove(moving.id);
+      }
+      items.removeWhere((i) => i['kind'] == 'channel' && i['id'] == moving.id);
+      final entry = <String, dynamic>{'kind': 'channel', 'id': moving.id};
+      switch (target) {
+        case DropEnd():
+          items.add(entry);
+        case DropInto(:final space):
+          final holder = items.where((i) => i['id'] == space).firstOrNull;
+          (holder?['channels'] as List<String>?)?.add(moving.id);
+        case DropBefore(:final id):
+          final at = items.indexWhere((i) => i['id'] == id);
+          final holder = spaceWith(id);
+          if (at >= 0) {
+            items.insert(at, entry);
+          } else if (holder >= 0) {
+            final channels = items[holder]['channels'] as List<String>;
+            channels.insert(channels.indexOf(id), moving.id);
+          }
+      }
+    }
+    await _save(items);
   }
 
   // --- Inviting ------------------------------------------------------------
@@ -412,6 +468,31 @@ class Manager {
     await Clipboard.setData(ClipboardData(text: url));
     toast(message);
   }
+}
+
+/// A channel or a space being dragged.
+typedef Dragged = ({String id, bool space, String name});
+
+/// Where a dragged channel or space lands.
+sealed class DropTarget {
+  const DropTarget();
+}
+
+/// Before a channel, or for a space, before another space.
+class DropBefore extends DropTarget {
+  const DropBefore(this.id);
+  final String id;
+}
+
+/// At the end of a space's channels.
+class DropInto extends DropTarget {
+  const DropInto(this.space);
+  final String space;
+}
+
+/// At the end of the list.
+class DropEnd extends DropTarget {
+  const DropEnd();
 }
 
 /// One entry of the channel list's top level: a space or a channel outside

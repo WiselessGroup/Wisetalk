@@ -130,6 +130,25 @@ void main() {
       await tester.tap(find.text('Save'));
       await tester.pump(const Duration(seconds: 1));
       await shot(tester, '9-moved');
+
+      // Dragged by its handle onto a space's name: into that space, a step in.
+      final leftBefore = tester.getTopLeft(find.text('Test Room').first).dx;
+      final grip = find.byTooltip('Drag Test Room');
+      final drag = await tester.startGesture(tester.getCenter(grip));
+      await tester.pump(const Duration(milliseconds: 100));
+      final target = tester.getCenter(find.text('DOTA 2').first);
+      for (var i = 1; i <= 10; i++) {
+        await drag.moveTo(Offset.lerp(tester.getCenter(grip), target, i / 10)!);
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await shot(tester, '10-dragging');
+      await drag.up();
+      await tester.pump(const Duration(seconds: 2));
+      await shot(tester, '11-dropped');
+      expect(
+        tester.getTopLeft(find.text('Test Room').first).dx,
+        greaterThan(leftBefore),
+      );
       await tester.tap(find.text('Test Room'), buttons: kSecondaryButton);
       await waitFor(tester, find.text('Channel Settings…'));
       await tester.tap(find.text('Channel Settings…'));

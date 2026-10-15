@@ -77,3 +77,8 @@ RUN ln -s "$RUSTUP_HOME" /root/.rustup && ln -s "$CARGO_HOME" /root/.cargo
 
 # jni compiles against android-35; without it Gradle downloads it every run.
 RUN sdkmanager --install "platforms;android-35" >/dev/null
+
+# audioplayers plays the owl cues through GStreamer on Linux.
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+ && rm -rf /var/lib/apt/lists/*
