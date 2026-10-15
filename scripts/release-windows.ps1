@@ -81,6 +81,13 @@ if ($dirty -ne 0 -or $LASTEXITCODE -ne 0) { Fail 'commit or stash your changes f
 $null = Run { git ls-remote --exit-code --tags origin $Tag }
 if ($LASTEXITCODE -ne 0) { Fail "push $Tag first" }
 
+# Where crash reports go (lib/data/crash_reports.dart); without it the
+# build can't send any.
+$sentryFile = Join-Path $env:APPDATA 'wisetalk\sentry-dsn'
+$sentryDsn = ''
+if (Test-Path $sentryFile) { $sentryDsn = (Get-Content $sentryFile -Raw).Trim() }
+if (-not $sentryDsn) { Write-Host "No $sentryFile`: this release can't send crash reports." }
+
 $token = $env:WISETALK_FORGEJO_TOKEN
 $tokenFile = Join-Path $env:APPDATA 'wisetalk\forgejo-token'
 if (-not $token -and (Test-Path $tokenFile)) { $token = (Get-Content $tokenFile -Raw).Trim() }
@@ -158,7 +165,8 @@ $buildNumber = [int]$parts[0] * 1000000 + [int]$parts[1] * 1000 + [int]$parts[2]
 Step 'prepare' 'Packages' 'flutter pub get --enforce-lockfile'
 
 Step 'build' 'Building for Windows' ("flutter build windows --release --build-name=$base " +
-    "--build-number=$buildNumber --dart-define=WISETALK_VERSION=$version")
+    "--build-number=$buildNumber --dart-define=WISETALK_VERSION=$version " +
+    "--dart-define=WISETALK_SENTRY_DSN=$sentryDsn")
 
 # The release before, so updates from it are a small delta; then the
 # installer, the update package and the feed.

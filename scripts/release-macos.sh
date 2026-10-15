@@ -21,6 +21,9 @@ case $tag in v[0-9]*) ;; *) fail "usage: scripts/release-macos.sh vX.Y.Z" ;; esa
 version=${tag#v}
 base=${version%%-*}
 token_file=$HOME/.config/wisetalk/forgejo-token
+# Where crash reports go (lib/data/crash_reports.dart); without it the
+# build can't send any.
+sentry_dsn=$(cat "$HOME/.config/wisetalk/sentry-dsn" 2>/dev/null || true)
 repo=https://git.wiseless.net/Wisetalk/client
 flutter_version=$(sed -n 's/^ARG FLUTTER_VERSION=//p' ci/Dockerfile)
 vpk_version=$(sed -n 's/^ARG VPK_VERSION=//p' ci/Dockerfile)
@@ -62,6 +65,7 @@ export DOTNET_ROLL_FORWARD=Major
 
 times=$HOME/.cache/wisetalk/release-times-macos
 steps=4
+[ -n "$sentry_dsn" ] || echo "No ~/.config/wisetalk/sentry-dsn: this release can't send crash reports."
 rm -rf dist
 # shellcheck source=scripts/lib/steps.sh
 . scripts/lib/steps.sh
@@ -83,7 +87,8 @@ step prepare "Packages" flutter pub get --enforce-lockfile
 
 step build "Building for macOS" flutter build macos --release \
     --build-name="$base" --build-number="$build_number" \
-    --dart-define=WISETALK_VERSION="$version"
+    --dart-define=WISETALK_VERSION="$version" \
+    --dart-define=WISETALK_SENTRY_DSN="$sentry_dsn"
 
 pack() {
     # The release before, so updates from it are a small delta.

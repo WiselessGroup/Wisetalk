@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import '../data/api.dart';
+import '../data/crash_reports.dart';
 import '../data/gateway.dart';
 import '../data/preferences.dart';
 import '../src/rust/api/picture.dart';
@@ -311,6 +312,24 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ],
                   ),
                   const _Footer('Shown while Wisetalk is in the background.'),
+                  if (crashReports.available) ...[
+                    const _Header('Privacy'),
+                    _Group(
+                      children: [
+                        _SwitchRow(
+                          label: 'Send Crash Reports',
+                          value: _prefs.crashReports,
+                          onChanged: (on) =>
+                              _change(() => _prefs.crashReports = on),
+                        ),
+                      ],
+                    ),
+                    const _Footer(
+                      'When something in Wisetalk breaks, tell its developers '
+                      'what broke and where in the code. Never your messages, '
+                      'names, keys or servers.',
+                    ),
+                  ],
                 ],
               ),
             ),

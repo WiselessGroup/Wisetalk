@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'crash_reports.dart' as reports;
 import 'protocol.dart';
 import 'secrets.dart';
 import 'servers.dart';
@@ -45,6 +46,9 @@ class Preferences extends ChangeNotifier {
   bool notifyMessages = true;
   bool notifySummons = true;
 
+  /// Send crash reports to the developers; off unless turned on.
+  bool crashReports = false;
+
   /// Spaces folded in the channel list.
   Set<String> collapsed = {};
 
@@ -70,6 +74,7 @@ class Preferences extends ChangeNotifier {
           key as String,
       };
       cues = json['cues'] as bool? ?? true;
+      crashReports = json['crash_reports'] as bool? ?? false;
       notifyMessages = json['notify_messages'] as bool? ?? true;
       notifySummons = json['notify_summons'] as bool? ?? true;
       collapsed = {
@@ -96,6 +101,7 @@ class Preferences extends ChangeNotifier {
           'volumes': volumes,
           'silenced': silenced.toList(),
           'cues': cues,
+          'crash_reports': crashReports,
           'notify_messages': notifyMessages,
           'notify_summons': notifySummons,
           'collapsed': collapsed.toList(),
@@ -107,6 +113,10 @@ class Preferences extends ChangeNotifier {
 
 final preferencesProvider = Provider<Preferences>((ref) {
   final preferences = Preferences(ref.read(secretsProvider));
+  // Reports start once the saved choice is read, and follow it.
+  preferences.addListener(
+    () => unawaited(reports.crashReports.setEnabled(preferences.crashReports)),
+  );
   unawaited(preferences.load());
   ref.onDispose(preferences.dispose);
   return preferences;

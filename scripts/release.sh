@@ -24,6 +24,9 @@ case $tag in v[0-9]*) ;; *) fail "usage: scripts/release.sh vX.Y.Z" ;; esac
 version=${tag#v}
 base=${version%%-*}
 token_file=$HOME/.config/wisetalk/forgejo-token
+# Where crash reports go (lib/data/crash_reports.dart); without it the
+# builds can't send any.
+sentry_dsn=$(cat "$HOME/.config/wisetalk/sentry-dsn" 2>/dev/null || true)
 repo=https://git.wiseless.net/Wisetalk/client
 
 [ "$(git rev-parse HEAD)" = "$(git rev-parse -q --verify "$tag^{commit}")" ] \
@@ -63,6 +66,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
+[ -n "$sentry_dsn" ] || echo "No ~/.config/wisetalk/sentry-dsn: this release can't send crash reports."
 rm -rf dist
 # shellcheck source=scripts/lib/steps.sh
 . scripts/lib/steps.sh
@@ -95,7 +99,7 @@ docker run -d --name "$container" \
     -v wisetalk-gradle:/root/.gradle \
     -v wisetalk-dart-tool:/src/.dart_tool \
     -v wisetalk-build:/src/build \
-    -e VERSION="$version" -e BASE="$base" -e REPO="$repo" \
+    -e VERSION="$version" -e BASE="$base" -e REPO="$repo" -e SENTRY_DSN="$sentry_dsn" \
     "$image" sleep infinity >/dev/null
 inside() { docker exec "$container" sh -euc "$1"; }
 
@@ -114,7 +118,10 @@ step prepare "Signing key and packages" inside '
     flutter pub get --enforce-lockfile
 '
 
-step linux "Building for Linux" inside 'flutter build linux --release --build-name="$BASE"'
+step linux "Building for Linux" inside '
+    flutter build linux --release --build-name="$BASE" \
+        --dart-define=WISETALK_SENTRY_DSN="$SENTRY_DSN"
+'
 
 step appimage "Packing the AppImage and updates" inside '
     # The release before, so updates from it are a small delta.
@@ -132,7 +139,8 @@ step android "Building for Android" inside '
     # One APK for every phone: arm64, arm and x86_64 in one file.
     flutter build apk --release --build-name="$BASE" \
         --build-number=$((major * 1000000 + minor * 1000 + patch)) \
-        --dart-define=WISETALK_VERSION="$VERSION"
+        --dart-define=WISETALK_VERSION="$VERSION" \
+        --dart-define=WISETALK_SENTRY_DSN="$SENTRY_DSN"
     cp build/app/outputs/flutter-apk/app-release.apk "/out/Wisetalk-$VERSION.apk"
 '
 
