@@ -3,6 +3,30 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
+## 0.4.0
+
+- Away, next to the microphone in a call: one press turns your microphone
+  and everyone's sound off, and the owl stays quiet. Press it again to hear
+  everyone, with the microphone back as it was. On servers from 1.7.0
+  others see a crossed-out headset next to your name.
+- Keyboard shortcuts while Wisetalk's window is in front: Ctrl+Shift+M
+  turns the microphone on and off, Ctrl+Shift+A steps away (⌘ on a Mac).
+  Change them in Settings › Shortcuts; a short tick says what happened.
+- Signal bars next to "End-to-end encrypted" show how good your connection
+  is; point at them or tap them for ping, loss, jitter and what your
+  microphone sends. Settings › Show Ping and Loss keeps the numbers there.
+  Someone else's bars show next to their name when their connection is
+  poor or lost.
+- On a phone, Settings, channel and space settings, creating, Summon and
+  adding a server open full screen, with Cancel and Save at the top, and
+  ask before throwing changes away. Sharing a screen rises from the bottom.
+- Stereo channels: with voice processing off, Linux and Windows send your
+  microphone in stereo, and everyone's stereo now plays as stereo.
+- Windows: a shared window brings its app's sound along, a shared screen
+  everything you hear except the call. Share Sound turns it off.
+- Linux: notifications show whenever Wisetalk is in the background or
+  minimized, and clicking one brings its window forward.
+
 ## 0.3.2
 
 - Linux: installed with Gear Lever or AppImageLauncher, Wisetalk shows up
