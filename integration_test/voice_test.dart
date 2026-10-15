@@ -1,6 +1,7 @@
 // A guest joins a voice channel on a real server: the gateway lists the
 // channels, the call key is made (first one in), LiveKit connects with
-// end-to-end encryption and the microphone is published. Needs the local
+// end-to-end encryption and the microphone is published, then steps away
+// and back. Needs the local
 // server and its LiveKit (`docker compose up -d` in server/) and a channel
 // open to guests named in WISETALK_TEST_CHANNEL (Welcome by default).
 
@@ -55,6 +56,23 @@ void main() {
     // In the channel list and on the call stage.
     await waitFor(tester, find.text('Voice Owl'));
     expect(find.byIcon(Icons.call_end), findsOneWidget);
+
+    // Away turns the microphone off and back on as it was, without a word
+    // from servers that predate it.
+    final away = find.byWidgetPredicate(
+      (w) =>
+          w is Semantics &&
+          w.properties.label == 'Away: microphone and sound off',
+    );
+    await waitFor(tester, find.byIcon(Icons.mic));
+    await tester.tap(away);
+    await waitFor(tester, find.byIcon(Icons.mic_off));
+    expect(find.byIcon(Icons.mic), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(SnackBar), findsNothing);
+    await tester.tap(away);
+    await waitFor(tester, find.byIcon(Icons.mic));
+    expect(find.byType(SnackBar), findsNothing);
 
     await tester.tap(find.byIcon(Icons.call_end));
     await waitFor(tester, find.text('Pick a Voice Channel'));

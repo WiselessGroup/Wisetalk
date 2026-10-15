@@ -1,17 +1,20 @@
 // Settings: the account's picture, which microphone, camera and speakers,
-// voice processing, summons and notifications. The web client's Settings
-// dialog, plus the app's own notification switches.
+// voice processing, summons, notifications and, on desktops, keyboard
+// shortcuts. The web client's Settings dialog, plus the app's own
+// notification switches and shortcuts.
 
 import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import '../data/api.dart';
 import '../data/crash_reports.dart';
 import '../data/gateway.dart';
 import '../data/preferences.dart';
+import '../data/shortcuts.dart';
 import '../src/rust/api/picture.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -274,12 +277,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     children: [
                       _SwitchRow(
                         label: 'Join and Leave Sounds',
-                        detail: 'An owl hoots when someone comes or goes',
+                        detail:
+                            'An owl hoots when someone comes or goes, and '
+                            'shortcuts tick',
                         value: _prefs.cues,
                         onChanged: (on) => _change(() => _prefs.cues = on),
                       ),
                     ],
                   ),
+                  if (hasShortcuts) ...[
+                    const _Header('Shortcuts'),
+                    _ShortcutsGroup(preferences: _prefs),
+                  ],
                   if (_account && _allowSummons != null) ...[
                     const _Header('Summons'),
                     _Group(
@@ -434,6 +443,170 @@ class _SwitchRow extends StatelessWidget {
       subtitle: detail == null
           ? null
           : Text(detail!, style: TextStyle(color: palette.muted, fontSize: 13)),
+    );
+  }
+}
+
+/// One row per call action with its keys. Clicking a row records the next
+/// combination pressed; Backspace removes the shortcut, Esc keeps it.
+class _ShortcutsGroup extends StatefulWidget {
+  const _ShortcutsGroup({required this.preferences});
+
+  final Preferences preferences;
+
+  @override
+  State<_ShortcutsGroup> createState() => _ShortcutsGroupState();
+}
+
+class _ShortcutsGroupState extends State<_ShortcutsGroup> {
+  /// Takes the keys while recording, before the dialog sees Esc.
+  final _focus = FocusNode(debugLabel: 'shortcut recorder');
+  CallAction? _recording;
+  String? _refusal;
+
+  Preferences get _prefs => widget.preferences;
+
+  @override
+  void initState() {
+    super.initState();
+    // Clicking elsewhere stops recording.
+    _focus.addListener(() {
+      if (!_focus.hasFocus && _recording != null) {
+        setState(() => _recording = null);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _record(CallAction action) {
+    setState(() {
+      _recording = _recording == action ? null : action;
+      _refusal = null;
+    });
+    if (_recording != null) _focus.requestFocus();
+  }
+
+  void _done([KeyCombo? combo, bool clear = false]) {
+    final action = _recording;
+    if (action != null && (combo != null || clear)) {
+      _prefs.setShortcut(action, combo);
+    }
+    setState(() {
+      _recording = null;
+      _refusal = null;
+    });
+  }
+
+  KeyEventResult _key(FocusNode node, KeyEvent event) {
+    final action = _recording;
+    if (action == null) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent) return KeyEventResult.handled;
+    final combo = KeyCombo.fromEvent(event, HardwareKeyboard.instance);
+    // Only modifiers so far: wait for the key.
+    if (combo == null) return KeyEventResult.handled;
+    if (combo == const KeyCombo(PhysicalKeyboardKey.escape)) {
+      _done();
+    } else if (combo == const KeyCombo(PhysicalKeyboardKey.backspace)) {
+      _done(null, true);
+    } else if (_refused(combo, action) case final refusal?) {
+      setState(() => _refusal = refusal);
+    } else {
+      _done(combo);
+    }
+    return KeyEventResult.handled;
+  }
+
+  String? _refused(KeyCombo combo, CallAction action) {
+    if (combo.refusal case final refusal?) return refusal;
+    for (final other in CallAction.values) {
+      if (other != action && _prefs.shortcut(other) == combo) {
+        return '${combo.label} is already ${other.label}.';
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Focus(
+          focusNode: _focus,
+          onKeyEvent: _key,
+          child: _Group(
+            children: [
+              for (final action in CallAction.values)
+                _ShortcutRow(
+                  action: action,
+                  combo: _prefs.shortcut(action),
+                  recording: _recording == action,
+                  onTap: () => _record(action),
+                ),
+            ],
+          ),
+        ),
+        if (_refusal case final refusal?)
+          _Footer(refusal, color: palette.error)
+        else if (_recording != null)
+          const _Footer(
+            'Press the new keys. Backspace removes the shortcut, '
+            'Esc keeps it.',
+          )
+        else
+          const _Footer(
+            'They work while Wisetalk’s window is in front. Click one to '
+            'change it.',
+          ),
+      ],
+    );
+  }
+}
+
+class _ShortcutRow extends StatelessWidget {
+  const _ShortcutRow({
+    required this.action,
+    required this.combo,
+    required this.recording,
+    required this.onTap,
+  });
+
+  final CallAction action;
+  final KeyCombo? combo;
+  final bool recording;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final keys = recording ? 'Press keys…' : combo?.label ?? 'None';
+    return ListTile(
+      title: Text(action.label, style: TextStyle(color: palette.text)),
+      trailing: DecoratedBox(
+        decoration: BoxDecoration(
+          color: recording
+              ? palette.accent.withValues(alpha: 0.2)
+              : palette.fill,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          child: Text(
+            keys,
+            style: TextStyle(
+              color: recording || combo != null ? palette.text : palette.muted,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }

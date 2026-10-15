@@ -132,7 +132,7 @@ class _CallAreaState extends State<CallArea> {
   }
 }
 
-/// Mute, camera, screen and leave, under the stage.
+/// Mute, away, camera, screen and leave, under the stage.
 class CallControls extends StatelessWidget {
   const CallControls({super.key, required this.gateway, required this.voice});
 
@@ -164,53 +164,73 @@ class CallControls extends StatelessWidget {
     final canStream = connected && (view?.can('VIDEO') ?? false);
     // iOS needs a broadcast extension to share its screen; not yet.
     final canShareScreen = canStream && !Platform.isIOS;
+    final count = 3 + (canStream ? 1 : 0) + (canShareScreen ? 1 : 0);
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _RoundButton(
-            icon: voice.muted ? Icons.mic_off : Icons.mic,
-            label: voice.muted ? 'Unmute' : 'Mute',
-            background: voice.muted
-                ? palette.error.withValues(alpha: 0.25)
-                : palette.fill,
-            foreground: voice.muted ? palette.error : palette.text,
-            onPressed: connected ? voice.toggleMute : null,
-          ),
-          if (canStream) ...[
-            const SizedBox(width: 16),
-            _RoundButton(
-              icon: voice.camera ? Icons.videocam : Icons.videocam_off,
-              label: voice.camera ? 'Turn Camera Off' : 'Turn Camera On',
-              background: voice.camera
-                  ? palette.accent.withValues(alpha: 0.25)
-                  : palette.fill,
-              foreground: voice.camera ? palette.accent : palette.text,
-              onPressed: voice.toggleCamera,
-            ),
-          ],
-          if (canShareScreen) ...[
-            const SizedBox(width: 16),
-            _RoundButton(
-              icon: voice.screen ? Icons.stop_screen_share : Icons.screen_share,
-              label: voice.screen ? 'Stop Sharing' : 'Share Screen',
-              background: voice.screen
-                  ? palette.accent.withValues(alpha: 0.25)
-                  : palette.fill,
-              foreground: voice.screen ? palette.accent : palette.text,
-              onPressed: () => _toggleScreen(context),
-            ),
-          ],
-          const SizedBox(width: 16),
-          _RoundButton(
-            icon: Icons.call_end,
-            label: 'Leave',
-            background: palette.error,
-            foreground: palette.onAccent,
-            onPressed: voice.leave,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Five buttons on a 360 pt phone: the gaps give way, the 56 pt
+          // buttons don't.
+          final gap =
+              ((constraints.maxWidth - 32 - count * _RoundButton.size) /
+                      (count - 1))
+                  .clamp(8.0, 16.0);
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: gap,
+            children: [
+              _RoundButton(
+                icon: voice.muted ? Icons.mic_off : Icons.mic,
+                label: voice.muted ? 'Unmute' : 'Mute',
+                background: voice.muted
+                    ? palette.error.withValues(alpha: 0.25)
+                    : palette.fill,
+                foreground: voice.muted ? palette.error : palette.text,
+                onPressed: connected ? voice.toggleMute : null,
+              ),
+              _RoundButton(
+                icon: Icons.headset_off,
+                label: 'Away',
+                semanticLabel: 'Away: microphone and sound off',
+                toggled: voice.away,
+                background: voice.away
+                    ? palette.error.withValues(alpha: 0.25)
+                    : palette.fill,
+                foreground: voice.away ? palette.error : palette.text,
+                onPressed: connected ? voice.toggleAway : null,
+              ),
+              if (canStream)
+                _RoundButton(
+                  icon: voice.camera ? Icons.videocam : Icons.videocam_off,
+                  label: voice.camera ? 'Turn Camera Off' : 'Turn Camera On',
+                  background: voice.camera
+                      ? palette.accent.withValues(alpha: 0.25)
+                      : palette.fill,
+                  foreground: voice.camera ? palette.accent : palette.text,
+                  onPressed: voice.toggleCamera,
+                ),
+              if (canShareScreen)
+                _RoundButton(
+                  icon: voice.screen
+                      ? Icons.stop_screen_share
+                      : Icons.screen_share,
+                  label: voice.screen ? 'Stop Sharing' : 'Share Screen',
+                  background: voice.screen
+                      ? palette.accent.withValues(alpha: 0.25)
+                      : palette.fill,
+                  foreground: voice.screen ? palette.accent : palette.text,
+                  onPressed: () => _toggleScreen(context),
+                ),
+              _RoundButton(
+                icon: Icons.call_end,
+                label: 'Leave',
+                background: palette.error,
+                foreground: palette.onAccent,
+                onPressed: voice.leave,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -241,12 +261,21 @@ class _People extends StatelessWidget {
                   size: 84,
                   image: voice.gateway.avatar(p.account, p.avatar),
                   speaking: voice.speaking.contains(p.session),
+                  dimmed: voice.isAway(p),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (p.serverMuted || voice.micOff.contains(p.session)) ...[
+                    if (voice.isAway(p)) ...[
+                      Icon(
+                        Icons.headset_off,
+                        size: 14,
+                        color: palette.tertiary,
+                      ),
+                      const SizedBox(width: 4),
+                    ] else if (p.serverMuted ||
+                        voice.micOff.contains(p.session)) ...[
                       Icon(Icons.mic_off, size: 14, color: palette.tertiary),
                       const SizedBox(width: 4),
                     ],
@@ -314,6 +343,9 @@ class _VideoGrid extends StatelessWidget {
                     size: size,
                     child: _VideoTileView(
                       tile: tile,
+                      away: view.participants.any(
+                        (p) => p.session == tile.session && voice.isAway(p),
+                      ),
                       focused: tile.id == focused,
                       onTap: () => onTap(tile),
                     ),
@@ -326,6 +358,7 @@ class _VideoGrid extends StatelessWidget {
                       participant: p,
                       image: voice.gateway.avatar(p.account, p.avatar),
                       speaking: voice.speaking.contains(p.session),
+                      away: voice.isAway(p),
                       size: size,
                     ),
                   ),
@@ -341,11 +374,13 @@ class _VideoGrid extends StatelessWidget {
 class _VideoTileView extends StatelessWidget {
   const _VideoTileView({
     required this.tile,
+    required this.away,
     required this.focused,
     required this.onTap,
   });
 
   final VideoTile tile;
+  final bool away;
   final bool focused;
   final VoidCallback onTap;
 
@@ -378,6 +413,7 @@ class _VideoTileView extends StatelessWidget {
                     bottom: 6,
                     child: _Label(
                       tile.screen ? '${tile.name} · screen' : tile.name,
+                      away: away,
                     ),
                   ),
                 ],
@@ -395,12 +431,14 @@ class _PersonTile extends StatelessWidget {
     required this.participant,
     required this.image,
     required this.speaking,
+    required this.away,
     required this.size,
   });
 
   final Participant participant;
   final Uri? image;
   final bool speaking;
+  final bool away;
   final Size size;
 
   @override
@@ -420,12 +458,13 @@ class _PersonTile extends StatelessWidget {
               size: (size.width / 4).clamp(40, 112),
               image: image,
               speaking: speaking,
+              dimmed: away,
             ),
           ),
           Positioned(
             left: 8,
             bottom: 6,
-            child: _Label(participant.displayName),
+            child: _Label(participant.displayName, away: away),
           ),
         ],
       ),
@@ -434,9 +473,12 @@ class _PersonTile extends StatelessWidget {
 }
 
 class _Label extends StatelessWidget {
-  const _Label(this.text);
+  const _Label(this.text, {this.away = false});
 
   final String text;
+
+  /// Stepped away: the headset icon before the name.
+  final bool away;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -446,13 +488,22 @@ class _Label extends StatelessWidget {
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (away) ...[
+            const Icon(Icons.headset_off, size: 13, color: Colors.white),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -465,10 +516,21 @@ class _RoundButton extends StatelessWidget {
     required this.background,
     required this.foreground,
     required this.onPressed,
+    this.semanticLabel,
+    this.toggled,
   });
 
+  /// Wide enough for a finger, well above Apple's 44 pt.
+  static const size = 56.0;
+
   final IconData icon;
+
+  /// The tooltip, and what a screen reader says unless [semanticLabel].
   final String label;
+  final String? semanticLabel;
+
+  /// On or off, for a switch; `null` for a plain button.
+  final bool? toggled;
   final Color background;
   final Color foreground;
   final VoidCallback? onPressed;
@@ -476,9 +538,12 @@ class _RoundButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: label,
+    // A screen reader says the longer label alone.
+    excludeFromSemantics: semanticLabel != null,
     child: Semantics(
       button: true,
-      label: label,
+      toggled: toggled,
+      label: semanticLabel ?? label,
       child: Material(
         color: background,
         shape: const CircleBorder(),
@@ -486,8 +551,8 @@ class _RoundButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onPressed,
           child: SizedBox(
-            width: 56,
-            height: 56,
+            width: size,
+            height: size,
             child: Icon(icon, color: foreground),
           ),
         ),

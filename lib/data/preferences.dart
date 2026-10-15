@@ -1,7 +1,8 @@
 // What a person sets for themselves on this device: which microphone,
 // camera and speakers, voice processing, how loud each person in a call is
-// for them, which notifications to show and which spaces are folded. The
-// web client's Preferences, plus what only the app has.
+// for them, which notifications to show, which spaces are folded and the
+// keyboard shortcuts. The web client's Preferences, plus what only the app
+// has.
 
 import 'dart:async';
 import 'dart:convert';
@@ -13,6 +14,7 @@ import 'crash_reports.dart' as reports;
 import 'protocol.dart';
 import 'secrets.dart';
 import 'servers.dart';
+import 'shortcuts.dart';
 
 const _key = 'preferences';
 
@@ -39,8 +41,13 @@ class Preferences extends ChangeNotifier {
   /// Per person: muted only for me.
   Set<String> silenced = {};
 
-  /// Hoot when someone comes into or leaves my call.
+  /// Hoot when someone comes into or leaves my call, and tick when a
+  /// shortcut turns something on or off.
   bool cues = true;
+
+  /// Shortcuts bound to something other than their default; `null` for
+  /// none at all. See [shortcut].
+  Map<CallAction, KeyCombo?> shortcutChanges = {};
 
   /// System notifications while Wisetalk is in the background.
   bool notifyMessages = true;
@@ -51,6 +58,21 @@ class Preferences extends ChangeNotifier {
 
   /// Spaces folded in the channel list.
   Set<String> collapsed = {};
+
+  /// What [action] is bound to now, if anything.
+  KeyCombo? shortcut(CallAction action) => shortcutChanges.containsKey(action)
+      ? shortcutChanges[action]
+      : action.defaultCombo;
+
+  /// Binds [action] to [combo] (`null` for nothing), and saves.
+  void setShortcut(CallAction action, KeyCombo? combo) {
+    if (combo == action.defaultCombo) {
+      shortcutChanges.remove(action);
+    } else {
+      shortcutChanges[action] = combo;
+    }
+    changed();
+  }
 
   double volumeOf(Participant p) =>
       silenced.contains(personKey(p)) ? 0 : volumes[personKey(p)] ?? 1;
@@ -74,6 +96,14 @@ class Preferences extends ChangeNotifier {
           key as String,
       };
       cues = json['cues'] as bool? ?? true;
+      shortcutChanges = {
+        for (final MapEntry(:key, :value)
+            in (json['shortcuts'] as Map<String, dynamic>? ?? {}).entries)
+          // Actions this version doesn't know are dropped.
+          ?CallAction.values.asNameMap()[key]: value == null
+              ? null
+              : KeyCombo.parse(value as String),
+      };
       crashReports = json['crash_reports'] as bool? ?? false;
       notifyMessages = json['notify_messages'] as bool? ?? true;
       notifySummons = json['notify_summons'] as bool? ?? true;
@@ -101,6 +131,10 @@ class Preferences extends ChangeNotifier {
           'volumes': volumes,
           'silenced': silenced.toList(),
           'cues': cues,
+          'shortcuts': {
+            for (final MapEntry(:key, :value) in shortcutChanges.entries)
+              key.name: value?.toString(),
+          },
           'crash_reports': crashReports,
           'notify_messages': notifyMessages,
           'notify_summons': notifySummons,

@@ -61,6 +61,7 @@ flutter test                # widget tests load rust/target/release
 flutter test integration_test/sign_in_test.dart -d linux
 flutter test integration_test/voice_test.dart -d linux
 flutter test integration_test/chat_test.dart -d linux
+flutter test integration_test/shortcuts_test.dart -d linux
 # Needs an account's session (see the file) and a camera:
 WISETALK_TEST_TOKEN=... flutter test integration_test/video_test.dart -d linux
 cd rust && cargo test       # the bridge on its own
