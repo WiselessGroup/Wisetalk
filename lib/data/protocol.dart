@@ -127,6 +127,7 @@ class Participant {
     required this.device,
     required this.publicKey,
     required this.serverMuted,
+    this.away = false,
     this.account,
     this.avatar,
   });
@@ -137,6 +138,7 @@ class Participant {
     device: json['device'] as String,
     publicKey: json['public_key'] as String,
     serverMuted: json['server_muted'] as bool? ?? false,
+    away: json['away'] as bool? ?? false,
     account: json['account'] as String?,
     avatar: json['avatar'] as int?,
   );
@@ -146,6 +148,10 @@ class Participant {
   final String device;
   final String publicKey;
   final bool serverMuted;
+
+  /// Stepped away: microphone off, hears nobody (ADR-0026). Older servers
+  /// never set it.
+  final bool away;
 
   /// `null` for guests.
   final String? account;
