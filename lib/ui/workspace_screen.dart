@@ -23,6 +23,7 @@ import '../data/voice.dart';
 import '../theme.dart';
 import 'call_stage.dart';
 import 'chat_panel.dart';
+import 'connection_status.dart';
 import 'manage.dart';
 import 'settings_dialog.dart';
 import 'common.dart';
@@ -951,6 +952,9 @@ class _ChannelRow extends StatelessWidget {
                           style: TextStyle(color: palette.muted, fontSize: 13),
                         ),
                       ),
+                      // LiveKit rates only who is in our own call.
+                      if (here && p.session != gateway.sessionId)
+                        QualityMark(quality: voice.qualities.of(p.session)),
                       if (silenced.contains(personKey(p)))
                         Tooltip(
                           message: 'Muted for you',

@@ -3,6 +3,7 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
@@ -11,6 +12,7 @@ import '../data/protocol.dart';
 import '../data/voice.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'connection_status.dart';
 import 'grid.dart';
 import 'screen_share_dialog.dart';
 
@@ -104,10 +106,25 @@ class _CallAreaState extends State<CallArea> {
               Icon(Icons.lock_outline, size: 13, color: palette.muted),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(
-                  status,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: palette.muted),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        status,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: palette.muted),
+                      ),
+                    ),
+                    if (_voice.state == VoiceState.connected &&
+                        _voice.gateway.sessionId != null) ...[
+                      const SizedBox(width: 6),
+                      ConnectionStatus(
+                        quality: _voice.qualities.of(_voice.gateway.sessionId!),
+                        link: _voice.link,
+                        preferences: _voice.preferences,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               ...widget.actions,
@@ -251,6 +268,8 @@ class _People extends StatelessWidget {
                       const SizedBox(width: 4),
                     ],
                     Text(p.displayName, style: TextStyle(color: palette.text)),
+                    if (p.session != voice.gateway.sessionId)
+                      QualityMark(quality: voice.qualities.of(p.session)),
                   ],
                 ),
               ],
@@ -314,6 +333,9 @@ class _VideoGrid extends StatelessWidget {
                     size: size,
                     child: _VideoTileView(
                       tile: tile,
+                      quality: tile.local
+                          ? null
+                          : voice.qualities.of(tile.session),
                       focused: tile.id == focused,
                       onTap: () => onTap(tile),
                     ),
@@ -324,6 +346,9 @@ class _VideoGrid extends StatelessWidget {
                     size: size,
                     child: _PersonTile(
                       participant: p,
+                      quality: p.session == voice.gateway.sessionId
+                          ? null
+                          : voice.qualities.of(p.session),
                       image: voice.gateway.avatar(p.account, p.avatar),
                       speaking: voice.speaking.contains(p.session),
                       size: size,
@@ -341,11 +366,15 @@ class _VideoGrid extends StatelessWidget {
 class _VideoTileView extends StatelessWidget {
   const _VideoTileView({
     required this.tile,
+    required this.quality,
     required this.focused,
     required this.onTap,
   });
 
   final VideoTile tile;
+
+  /// Someone else's connection, for bars when it's poor.
+  final ValueListenable<lk.ConnectionQuality>? quality;
   final bool focused;
   final VoidCallback onTap;
 
@@ -378,6 +407,7 @@ class _VideoTileView extends StatelessWidget {
                     bottom: 6,
                     child: _Label(
                       tile.screen ? '${tile.name} · screen' : tile.name,
+                      quality: quality,
                     ),
                   ),
                 ],
@@ -393,12 +423,14 @@ class _VideoTileView extends StatelessWidget {
 class _PersonTile extends StatelessWidget {
   const _PersonTile({
     required this.participant,
+    required this.quality,
     required this.image,
     required this.speaking,
     required this.size,
   });
 
   final Participant participant;
+  final ValueListenable<lk.ConnectionQuality>? quality;
   final Uri? image;
   final bool speaking;
   final Size size;
@@ -425,7 +457,7 @@ class _PersonTile extends StatelessWidget {
           Positioned(
             left: 8,
             bottom: 6,
-            child: _Label(participant.displayName),
+            child: _Label(participant.displayName, quality: quality),
           ),
         ],
       ),
@@ -434,9 +466,12 @@ class _PersonTile extends StatelessWidget {
 }
 
 class _Label extends StatelessWidget {
-  const _Label(this.text);
+  const _Label(this.text, {this.quality});
 
   final String text;
+
+  /// Bars after the name while this connection is poor or lost.
+  final ValueListenable<lk.ConnectionQuality>? quality;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -446,13 +481,19 @@ class _Label extends StatelessWidget {
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (quality case final quality?) QualityMark(quality: quality),
+        ],
       ),
     ),
   );
