@@ -866,6 +866,7 @@ class Voice extends ChangeNotifier {
         })
         ..on<lk.TrackUnpublishedEvent>((_) => _refreshMicStates())
         ..on<lk.TrackSubscribedEvent>((e) {
+          _quietStats();
           final track = e.track;
           if (track is lk.VideoTrack && !e.publication.muted) {
             _addTile(e.publication, e.participant, track, local: false);
@@ -882,6 +883,7 @@ class Voice extends ChangeNotifier {
         })
         ..on<lk.TrackUnsubscribedEvent>((e) => _removeTile(e.publication.sid))
         ..on<lk.LocalTrackPublishedEvent>((e) {
+          _quietStats();
           final track = e.publication.track;
           if (track is lk.LocalVideoTrack) {
             _addTile(e.publication, e.participant, track, local: true);
@@ -910,6 +912,8 @@ class Voice extends ChangeNotifier {
           _refreshMicStates();
         })
         ..on<lk.TrackUnmutedEvent>((e) {
+          // Unmuting may restart the track, and with it the polling.
+          _quietStats();
           final track = e.publication.track;
           if (track is lk.VideoTrack) {
             _addTile(
@@ -1112,6 +1116,30 @@ class Voice extends ChangeNotifier {
       others: results.skip(1).toList(),
     );
   }
+
+  /// livekit_client polls `getStats()` every two seconds for every track it
+  /// starts, only to emit bitrate events nothing here listens to: in a call
+  /// of ten that is five calls a second for nothing (WLK-36, ADR-0019). The
+  /// SDK starts a track right after the events announcing it, and again
+  /// when it restarts one (unmuting, another device), so the sweep runs
+  /// once those are done and covers every track. Our own numbers come from
+  /// [LinkMonitor], which runs only while something shows them.
+  void _quietStats() => Timer.run(() {
+    final room = _room;
+    if (room == null) return;
+    final participants = <lk.Participant>[
+      ?room.localParticipant,
+      ...room.remoteParticipants.values,
+    ];
+    for (final participant in participants) {
+      for (final publication in participant.trackPublications.values) {
+        // Internal, but the only way short of a fork; check it at every
+        // livekit_client update: track.dart, startMonitor().
+        // ignore: invalid_use_of_internal_member
+        publication.track?.stopMonitor();
+      }
+    }
+  });
 
   void _refreshMicStates() {
     final room = _room;
