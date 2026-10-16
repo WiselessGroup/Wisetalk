@@ -20,8 +20,9 @@ Forgejo.
 - When someone in your call steps away, a sleepy owl hoots twice, low and
   slow; when they come back, one short bright hoot. Only the others hear
   it, and Join and Leave Sounds turns it off with the rest.
-- Linux: the owl and the shortcut ticks play on the output picked in
-  Settings, with the voices, not on the system's default one.
+- Linux, Windows and macOS: the owl and the shortcut ticks play on the
+  output picked in Settings, with the voices, not on the system's default
+  one.
 
 ## 0.4.0
 

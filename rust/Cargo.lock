@@ -2419,9 +2419,11 @@ dependencies = [
  "flutter_rust_bridge",
  "global-hotkey",
  "image",
+ "libc",
  "serde_json",
  "uuid",
  "velopack",
+ "windows",
  "windows-sys 0.59.0",
  "wisetalk-core",
 ]

@@ -6,9 +6,10 @@
 
 /// Plays 16-bit little-endian mono `pcm` at `rate` on `device`, an output
 /// id as flutter_webrtc lists it (`None` for the system's default), and
-/// returns once it has played. `false` when this system has no way here
-/// and the app should play it as before. An output that went away plays
-/// on the default one.
+/// returns once it has played: through PulseAudio on Linux, WASAPI on
+/// Windows and CoreAudio on macOS. `false` when that didn't work, or on
+/// phones, and the app should play it as before. An output that went away
+/// plays on the default one.
 pub fn play_sound(pcm: Vec<u8>, rate: u32, device: Option<String>) -> bool {
     crate::sound::play(&pcm, rate, device.as_deref())
 }

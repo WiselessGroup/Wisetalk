@@ -7,8 +7,9 @@
 // sliding down when the microphone goes off, up when it comes on, two for
 // stepping away and coming back. Android plays them in Kotlin as voice call
 // sounds. Desktops play them on the output the call uses through the Rust
-// bridge (WLK-8; Linux so far), else audioplayers plays a WAV file made
-// once per run on the system's default output.
+// bridge (WLK-8: PulseAudio, WASAPI, CoreAudio); where that fails, and on
+// iOS, audioplayers plays a WAV file made once per run on the system's
+// default output.
 
 import 'dart:io';
 import 'dart:math';
