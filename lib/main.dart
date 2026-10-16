@@ -48,7 +48,9 @@ class WisetalkApp extends ConsumerWidget {
         theme: themeFor(Brightness.light),
         darkTheme: themeFor(Brightness.dark),
         // Picked in Settings, or the system's (asked again when it changes).
-        locale: language == null ? null : Locale(language),
+        locale: language == null || !languages.containsKey(language)
+            ? null
+            : localeOf(language),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         localeListResolutionCallback: (wanted, _) => negotiateLocale(wanted),

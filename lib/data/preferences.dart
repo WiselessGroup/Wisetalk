@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'crash_reports.dart' as reports;
+import 'language.dart';
 import 'protocol.dart';
 import 'secrets.dart';
 import 'servers.dart';
@@ -22,7 +23,9 @@ const _key = 'preferences';
 String personKey(Participant p) => p.account ?? 'guest:${p.displayName}';
 
 class Preferences extends ChangeNotifier {
-  Preferences(this._secrets);
+  Preferences(this._secrets) {
+    language.addListener(() => appLanguage = language.value);
+  }
 
   final Secrets _secrets;
 
@@ -80,6 +83,7 @@ class Preferences extends ChangeNotifier {
     }
     changed();
   }
+
   /// A key of `languages` (language.dart), `null` for the system's. Its own
   /// notifier: changing it rebuilds the whole app, a volume slider must not.
   final language = ValueNotifier<String?>(null);

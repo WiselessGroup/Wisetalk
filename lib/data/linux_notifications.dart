@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:dbus/dbus.dart';
 
 import 'desktop_entry.dart';
+import 'language.dart';
 
 const _name = 'org.freedesktop.Notifications';
 const _interface = 'org.freedesktop.Notifications';
@@ -61,10 +62,13 @@ class LinuxNotifications {
     _markup = reply.values.first.asStringArray().contains('body-markup');
   }
 
+  /// Shows a notification whose click is [action] (the label some servers
+  /// show for it), in the system's language when not given.
   Future<void> show({
     required String title,
     required String body,
     required String payload,
+    String? action,
   }) async {
     final reply = await _server.callMethod(_interface, 'Notify', [
       const DBusString('Wisetalk'),
@@ -73,7 +77,7 @@ class LinuxNotifications {
       DBusString(title),
       DBusString(_markup ? _escape(body) : body),
       // The default action is the click on the notification itself.
-      DBusArray.string(const ['default', 'Open']),
+      DBusArray.string(['default', action ?? textsFor(null).notificationOpen]),
       DBusDict.stringVariant({
         'category': const DBusString('im.received'),
         // Which app it is when no window tells (none yet, or none at all

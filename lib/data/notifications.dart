@@ -9,7 +9,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
+import 'language.dart';
 import 'linux_notifications.dart';
+import 'preferences.dart';
 
 /// Whether [state] means the person is looking at Wisetalk. Only `resumed`
 /// does: a window in the background is `inactive` (on GNOME's Wayland a
@@ -70,6 +73,9 @@ class SummonTarget extends NotificationTarget {
 const _window = MethodChannel('net.wiseless.wisetalk/window');
 
 class Notifications {
+  Notifications(this._preferences);
+
+  final Preferences _preferences;
   final _plugin = FlutterLocalNotificationsPlugin();
   // Linux has its own, for the click to bring the window forward.
   late final _linux = Platform.isLinux ? LinuxNotifications() : null;
@@ -79,6 +85,9 @@ class Notifications {
 
   /// Where clicked notifications lead.
   Stream<NotificationTarget> get clicks => _clicks.stream;
+
+  /// In the person's language, read when a notification is made.
+  AppLocalizations get _texts => textsFor(_preferences.language.value);
 
   /// Sets notifications up, and asks for the permission where the system
   /// wants that (Android), up front instead of at the first message.
@@ -121,15 +130,36 @@ class Notifications {
     }
   }
 
+  /// [caller] summoned us to [channel], named [channelName]; the same
+  /// words as the web client's push.
+  Future<void> summoned({
+    required String caller,
+    required String channel,
+    required String channelName,
+  }) {
+    final texts = _texts;
+    return show(
+      title: texts.notificationSummonTitle(caller),
+      body: texts.notificationSummonBody(channelName),
+      target: SummonTarget(channel),
+    );
+  }
+
   Future<void> show({
     required String title,
     required String body,
     required NotificationTarget target,
   }) async {
     if (!await prepare()) return;
+    final texts = _texts;
     try {
       if (_linux case final linux?) {
-        await linux.show(title: title, body: body, payload: target.payload);
+        await linux.show(
+          title: title,
+          body: body,
+          payload: target.payload,
+          action: texts.notificationOpen,
+        );
         return;
       }
       await _plugin.show(
@@ -137,14 +167,14 @@ class Notifications {
         title: title,
         body: body,
         payload: target.payload,
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             'messages',
-            'Messages and summons',
+            texts.notificationChannel,
             importance: Importance.high,
             priority: Priority.high,
           ),
-          macOS: DarwinNotificationDetails(),
+          macOS: const DarwinNotificationDetails(),
         ),
       );
     } catch (e) {
@@ -162,4 +192,6 @@ class Notifications {
   }
 }
 
-final notificationsProvider = Provider<Notifications>((ref) => Notifications());
+final notificationsProvider = Provider<Notifications>(
+  (ref) => Notifications(ref.read(preferencesProvider)),
+);

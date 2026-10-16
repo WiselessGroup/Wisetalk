@@ -17,6 +17,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -203,12 +204,13 @@ class _SettingsSheetState extends State<SettingsSheet> {
   Future<void> _closing(bool closed, Object? result) async {
     if (closed || _asking) return;
     _asking = true;
+    final texts = AppLocalizations.of(context);
     final discard = await confirm(
       context,
-      title: 'Discard Changes?',
-      message: 'What you changed here is not saved yet.',
-      action: 'Discard',
-      cancel: 'Keep Editing',
+      title: texts.sheetDiscardTitle,
+      message: texts.sheetDiscardMessage,
+      action: texts.sheetDiscard,
+      cancel: texts.sheetKeepEditing,
     );
     _asking = false;
     if (discard && mounted) Navigator.pop(context);
@@ -277,6 +279,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
   Widget _dialog(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return Dialog(
       backgroundColor: palette.sidebar,
       insetPadding: const EdgeInsets.all(24),
@@ -313,13 +316,10 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   runSpacing: 8,
                   children: [
                     if (widget.action != null)
-                      TextButton(
-                        onPressed: _close,
-                        child: const Text('Cancel'),
-                      ),
+                      TextButton(onPressed: _close, child: Text(texts.cancel)),
                     FilledButton(
                       onPressed: _primary,
-                      child: Text(widget.action ?? 'Done'),
+                      child: Text(widget.action ?? texts.settingsDone),
                     ),
                   ],
                 ),
@@ -401,6 +401,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
     bool draggable = false,
   }) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     const most = 1.5;
     final scaler = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: most);
     final height = math.max(56.0, scaler.scale(17) + 32);
@@ -418,16 +419,19 @@ class _SettingsSheetState extends State<SettingsSheet> {
               ? null
               : TextButton(
                   onPressed: _close,
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w400),
+                  child: Text(
+                    texts.cancel,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ),
           middle: _Title(widget.title, size: 17, maxLines: 1),
           trailing: TextButton(
             onPressed: _primary,
             child: Text(
-              widget.action ?? 'Done',
+              widget.action ?? texts.settingsDone,
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
           ),
@@ -565,12 +569,18 @@ class SettingsRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.color,
+    this.valueLocale,
   });
 
   final String label;
   final String? detail;
   final Widget? leading;
   final String? value;
+
+  /// The language [value] is in, when it isn't the interface's: it picks
+  /// the right shapes for Chinese and Japanese characters.
+  final Locale? valueLocale;
+
   final Widget? trailing;
   final VoidCallback? onTap;
 
@@ -626,6 +636,7 @@ class SettingsRow extends StatelessWidget {
                   Expanded(
                     child: Text(
                       value,
+                      locale: valueLocale,
                       textAlign: TextAlign.end,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -783,11 +794,16 @@ class PickerRow<T> extends StatelessWidget {
     required this.value,
     required this.options,
     required this.onChanged,
+    this.optionLocale,
   });
 
   final String label;
   final T value;
   final List<(T, String)> options;
+
+  /// The language an option's name is in, when it isn't the interface's,
+  /// like each language's own name in the list of languages.
+  final Locale? Function(T value)? optionLocale;
 
   /// Null makes the row read-only.
   final ValueChanged<T>? onChanged;
@@ -807,11 +823,15 @@ class PickerRow<T> extends StatelessWidget {
       ),
       initialValue: current < 0 ? null : current,
       items: [
-        for (final (i, (_, name)) in options.indexed)
+        for (final (i, (option, name)) in options.indexed)
           CheckedPopupMenuItem(
             value: i,
             checked: i == current,
-            child: Text(name, overflow: TextOverflow.ellipsis),
+            child: Text(
+              name,
+              locale: optionLocale?.call(option),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
       ],
     );
@@ -827,6 +847,7 @@ class PickerRow<T> extends StatelessWidget {
       child: SettingsRow(
         label: label,
         value: chosen?.$2 ?? '',
+        valueLocale: chosen == null ? null : optionLocale?.call(chosen.$1),
         color: onChanged == null ? palette.muted : null,
         trailing: Icon(Icons.unfold_more, size: 18, color: palette.tertiary),
         onTap: onChanged == null ? null : () => _open(context),

@@ -11,9 +11,11 @@ import 'package:flutter/services.dart';
 import '../data/api.dart';
 import '../data/chat.dart';
 import '../data/gateway.dart';
+import '../data/language.dart';
 import '../data/preferences.dart';
 import '../data/protocol.dart';
 import '../data/voice.dart';
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/text.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -39,6 +41,9 @@ class Manager {
 
   Api get api => gateway.session.api;
   List<AccountSummary> _accounts = [];
+
+  /// Texts for what is said after the menu has closed, in toasts.
+  AppLocalizations get _texts => textsFor(preferences.language.value);
 
   Space? spaceOf(Channel channel) =>
       gateway.spaces.where((s) => s.id == channel.space).firstOrNull;
@@ -108,6 +113,7 @@ class Manager {
     final self = person.session == gateway.sessionId;
     if (gateway.isAdmin && !self) await _loadAccounts();
     if (!context.mounted) return;
+    final texts = AppLocalizations.of(context);
     final key = personKey(person);
     final channel = view.channel;
     final space = spaceOf(channel);
@@ -115,14 +121,16 @@ class Manager {
     final myRank = roleRank[gateway.role] ?? 0;
     final name = person.displayName;
     final items = <PopupMenuEntry<VoidCallback>>[
-      _header(self ? '$name (you)' : name),
+      _header(self ? texts.personYou(name) : name),
       if (self)
-        _item(context, 'Audio and Video Settings…', openSettings)
+        _item(context, texts.personAudioVideoSettings, openSettings)
       else ...[
         _VolumeEntry(preferences: preferences, person: person),
         _item(
           context,
-          preferences.silenced.contains(key) ? 'Unmute for Me' : 'Mute for Me',
+          preferences.silenced.contains(key)
+              ? texts.personUnmuteForMe
+              : texts.personMuteForMe,
           () {
             if (!preferences.silenced.remove(key)) {
               preferences.silenced.add(key);
@@ -135,12 +143,14 @@ class Manager {
         const PopupMenuDivider(),
         _item(
           context,
-          person.serverMuted ? 'Lift Server Mute' : 'Server Mute',
+          person.serverMuted
+              ? texts.moderationLiftServerMute
+              : texts.moderationServerMute,
           () => voice.serverMute(person.session, muted: !person.serverMuted),
         ),
         _item(
           context,
-          'Kick from Channel',
+          texts.moderationKick,
           () => voice.kick(person.session),
           danger: true,
         ),
@@ -149,20 +159,24 @@ class Manager {
         const PopupMenuDivider(),
         _ownerItem(
           context,
-          name,
           person.account!,
-          channel.name,
           channel.owner,
           (owner) => api.updateChannel(channel.id, {'owner': owner}),
+          make: texts.channelMakeOwner(channel.name),
+          remove: texts.channelRemoveOwner(channel.name),
+          made: texts.channelNewOwner(name, channel.name),
+          removed: texts.channelNoOwner(channel.name),
         ),
         if (space != null)
           _ownerItem(
             context,
-            name,
             person.account!,
-            space.name,
             space.owner,
             (owner) => api.updateSpace(space.id, {'owner': owner}),
+            make: texts.spaceMakeOwner(space.name),
+            remove: texts.spaceRemoveOwner(space.name),
+            made: texts.spaceNewOwner(name, space.name),
+            removed: texts.spaceNoOwner(space.name),
           ),
         if (target != null &&
             myRank > roleRank['admin']! &&
@@ -170,74 +184,71 @@ class Manager {
           target.role == 'admin'
               ? _item(
                   context,
-                  'Remove Server Admin',
+                  texts.personRemoveServerAdmin,
                   () => _run(
                     () => api.setRole(target.id, 'member'),
-                    '$name is now a member.',
+                    texts.personNowMember(name),
                   ),
                 )
               : _item(
                   context,
-                  'Make Server Admin',
+                  texts.personMakeServerAdmin,
                   () => _run(
                     () => api.setRole(target.id, 'admin'),
-                    '$name is now a server admin.',
+                    texts.personNowAdmin(name),
                   ),
                 ),
         if (target == null || myRank > (roleRank[target.role] ?? 0))
-          _item(context, 'Ban from Server…', () async {
+          _item(context, texts.moderationBan, () async {
             if (await confirm(
               context,
-              title: 'Ban $name?',
-              message:
-                  'Ban $name from this server? Their sessions end right away.',
-              action: 'Ban',
+              title: texts.moderationBanTitle(name),
+              message: texts.moderationBanConfirm(name),
+              action: texts.moderationBanAction,
             )) {
-              await _run(() => api.ban(person.account!), '$name is banned.');
+              await _run(
+                () => api.ban(person.account!),
+                texts.moderationBanned(name),
+              );
             }
           }, danger: true),
       ],
       if (!self && gateway.isAdmin && person.account == null) ...[
         const PopupMenuDivider(),
-        _item(context, 'Ban Guest for a Day…', () async {
+        _item(context, texts.moderationBanGuest, () async {
           if (await confirm(
             context,
-            title: 'Ban $name?',
-            message:
-                'Remove $name and block guests from their address for a day?',
-            action: 'Ban',
+            title: texts.moderationBanTitle(name),
+            message: texts.moderationBanGuestConfirm(name),
+            action: texts.moderationBanAction,
           )) {
             await _run(
               () => api.banGuest(person.session),
-              '$name is out; their address is blocked for a day.',
+              texts.moderationGuestBanned(name),
             );
           }
         }, danger: true),
       ],
       const PopupMenuDivider(),
-      _header('Device key', fingerprint(publicKey: person.publicKey)),
+      _header(texts.manageDeviceKey, fingerprint(publicKey: person.publicKey)),
     ];
     await _menu(context, at, items);
   }
 
+  /// Makes [account] the owner of a channel or a space, or takes that away;
+  /// [make], [remove], [made] and [removed] say it for the place.
   PopupMenuEntry<VoidCallback> _ownerItem(
     BuildContext context,
-    String name,
     String account,
-    String place,
     String? owner,
-    Future<void> Function(String?) set,
-  ) => owner == account
-      ? _item(
-          context,
-          'Remove as Owner of $place',
-          () => _run(() => set(null), '$place has no owner now.'),
-        )
-      : _item(
-          context,
-          'Make Owner of $place',
-          () => _run(() => set(account), '$name now owns $place.'),
-        );
+    Future<void> Function(String?) set, {
+    required String make,
+    required String remove,
+    required String made,
+    required String removed,
+  }) => owner == account
+      ? _item(context, remove, () => _run(() => set(null), removed))
+      : _item(context, make, () => _run(() => set(account), made));
 
   Future<void> channelMenu(
     BuildContext context,
@@ -247,23 +258,30 @@ class Manager {
     final channel = view.channel;
     final here = voice.channel == channel.id;
     final audio = channel.audio;
+    final kbps = audio.bitrate ~/ 1000;
+    final texts = AppLocalizations.of(context);
     await _menu(context, at, [
       _header(
         channel.name,
-        'Audio up to ${audio.bitrate ~/ 1000} kbps, '
-        '${audio.stereo ? 'stereo' : 'mono'}',
+        audio.stereo
+            ? texts.channelAudioStereo(kbps)
+            : texts.channelAudioMono(kbps),
       ),
       if (here) ...[
-        _item(context, 'Leave', voice.leave),
-        _item(context, 'Copy Invite Link', () => copyInvite(view)),
+        _item(context, texts.callLeave, voice.leave),
+        _item(context, texts.inviteCopyLink, () => copyInvite(view)),
       ] else if (!view.locked)
-        _item(context, 'Join', () => voice.join(channel.id)),
+        _item(context, texts.channelJoin, () => voice.join(channel.id)),
       if (!view.locked)
-        _item(context, 'Open Chat', () => unawaited(chats.show(channel.id))),
+        _item(
+          context,
+          texts.channelOpenChat,
+          () => unawaited(chats.show(channel.id)),
+        ),
       if (view.can('MANAGE'))
         _item(
           context,
-          'Channel Settings…',
+          texts.channelOpenSettings,
           () => showSettingsSheet<void>(
             context,
             builder: (_) => ChannelSettingsDialog(manager: this, view: view),
@@ -275,11 +293,12 @@ class Manager {
 
   Future<void> spaceMenu(BuildContext context, Offset at, Space space) async {
     if (!gateway.managesSpace(space)) return;
+    final texts = AppLocalizations.of(context);
     await _menu(context, at, [
       _header(space.name),
       _item(
         context,
-        'New Channel in Space…',
+        texts.spaceNewChannel,
         () => showSettingsSheet<void>(
           context,
           builder: (_) => CreateDialog(manager: this, space: space.id),
@@ -287,7 +306,7 @@ class Manager {
       ),
       _item(
         context,
-        'Space Settings…',
+        texts.spaceOpenSettings,
         () => showSettingsSheet<void>(
           context,
           builder: (_) => SpaceSettingsDialog(manager: this, space: space),
@@ -296,13 +315,12 @@ class Manager {
       if (gateway.isAdmin) ...[
         ..._moves(context, space.id),
         const PopupMenuDivider(),
-        _item(context, 'Delete Space…', () async {
+        _item(context, texts.spaceDelete, () async {
           if (await confirm(
             context,
-            title: 'Delete ${space.name}?',
-            message:
-                'Delete the space ${space.name}? Its channels move to the top level.',
-            action: 'Delete',
+            title: texts.manageDeleteTitle(space.name),
+            message: texts.spaceDeleteConfirm(space.name),
+            action: texts.manageDelete,
           )) {
             await _run(() => api.deleteSpace(space.id));
           }
@@ -327,12 +345,13 @@ class Manager {
   }
 
   List<PopupMenuEntry<VoidCallback>> _moves(BuildContext context, String id) {
+    final texts = AppLocalizations.of(context);
     final siblings = _siblings(id);
     final at = siblings.indexOf(id);
     return [
-      if (at > 0) _item(context, 'Move Up', () => _move(id, -1)),
+      if (at > 0) _item(context, texts.workspaceMoveUp, () => _move(id, -1)),
       if (at >= 0 && at < siblings.length - 1)
-        _item(context, 'Move Down', () => _move(id, 1)),
+        _item(context, texts.workspaceMoveDown, () => _move(id, 1)),
     ];
   }
 
@@ -364,7 +383,7 @@ class Manager {
       await api.setLayout(items);
     } catch (e) {
       debugPrint('cannot reorder: $e');
-      toast('Cannot reorder.');
+      toast(_texts.workspaceCannotReorder);
     }
   }
 
@@ -453,18 +472,14 @@ class Manager {
       try {
         url += '?key=${await api.createInvite(channel.id)}';
       } on ApiException {
-        toast('Cannot create an invite.');
+        toast(_texts.inviteCannotCreate);
         return;
       }
-      message =
-          'Invite to ${channel.name} copied. Once someone uses it, it lets '
-          'anyone in for 10 minutes; unused, it lasts a day.';
+      message = _texts.inviteCopiedWithKey(channel.name);
     } else if (restricted) {
-      message =
-          'Invite link to ${channel.name} copied. It only works for people '
-          'the channel already lets in.';
+      message = _texts.inviteCopiedRestricted(channel.name);
     } else {
-      message = 'Invite link to ${channel.name} copied.';
+      message = _texts.inviteCopied(channel.name);
     }
     await Clipboard.setData(ClipboardData(text: url));
     toast(message);
@@ -575,6 +590,7 @@ class _VolumeEntryState extends State<_VolumeEntry> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return SizedBox(
       width: 240,
       child: Padding(
@@ -584,7 +600,7 @@ class _VolumeEntryState extends State<_VolumeEntry> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Volume ${(_volume * 100).round()}%',
+              texts.personVolume((_volume * 100).round()),
               style: TextStyle(fontSize: 13, color: palette.muted),
             ),
             Slider(
@@ -612,21 +628,24 @@ class _VolumeEntryState extends State<_VolumeEntry> {
 
 const _bitrates = [32, 48, 64, 96, 128, 192, 256, 320, 510];
 
-String _kbps(int value) => switch (value) {
-  64 => '64 kbps (speech)',
-  >= 256 => '$value kbps (music)',
-  _ => '$value kbps',
+String _kbps(AppLocalizations texts, int value) => switch (value) {
+  64 => texts.channelSettingsKbpsSpeech(value),
+  >= 256 => texts.channelSettingsKbpsMusic(value),
+  _ => texts.channelSettingsKbps(value),
 };
 
 /// Who may own a channel or a space, for a picker: nobody, or an account.
 /// The current owner stays listed while the accounts load.
-List<(String?, String)> _owners(List<AccountSummary> accounts, String? owner) =>
-    [
-      (null, 'Nobody'),
-      for (final a in accounts) (a.id, '${a.displayName} (@${a.username})'),
-      if (owner != null && !accounts.any((a) => a.id == owner))
-        (owner, accounts.isEmpty ? '…' : 'Someone else'),
-    ];
+List<(String?, String)> _owners(
+  AppLocalizations texts,
+  List<AccountSummary> accounts,
+  String? owner,
+) => [
+  (null, texts.manageNobody),
+  for (final a in accounts) (a.id, '${a.displayName} (@${a.username})'),
+  if (owner != null && !accounts.any((a) => a.id == owner))
+    (owner, accounts.isEmpty ? '…' : texts.manageSomeoneElse),
+];
 
 /// A new channel, or for admins a new space.
 class CreateDialog extends StatefulWidget {
@@ -677,42 +696,41 @@ class _CreateDialogState extends State<CreateDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
     final named = _name.text.trim().isNotEmpty;
     return SettingsSheet(
-      title: _space ? 'New Space' : 'New Channel',
-      action: 'Create',
+      title: _space ? texts.createNewSpace : texts.createNewChannel,
+      action: texts.createSubmit,
       dirty: named,
       onAction: named ? _create : null,
       children: [
         if (_gateway.isAdmin && widget.space == null)
           SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Channel')),
-              ButtonSegment(value: true, label: Text('Space')),
+            segments: [
+              ButtonSegment(value: false, label: Text(texts.createChannel)),
+              ButtonSegment(value: true, label: Text(texts.createSpace)),
             ],
             selected: {_space},
             showSelectedIcon: false,
             onSelectionChanged: (s) => setState(() => _space = s.first),
           ),
         SettingsGroup(
-          footer: _space
-              ? 'A folder that groups channels in the sidebar.'
-              : 'A voice room people join, with its own chat.',
+          footer: _space ? texts.createSpaceHint : texts.createChannelHint,
           error: _error,
           children: [
             TextFieldRow(
-              label: 'Name',
+              label: texts.manageName,
               controller: _name,
-              hint: _space ? 'DOTA 2' : 'Team Blue',
+              hint: _space ? 'DOTA 2' : texts.createChannelPlaceholder,
               maxLength: 64,
               autofocus: true,
             ),
             if (!_space)
               PickerRow<String?>(
-                label: 'Space',
+                label: texts.manageSpace,
                 value: _in,
                 options: [
-                  if (_gateway.isAdmin) (null, 'None'),
+                  if (_gateway.isAdmin) (null, texts.manageNone),
                   for (final s in _spaces) (s.id, s.name),
                 ],
                 onChanged: (id) => setState(() => _in = id),
@@ -822,11 +840,12 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
   }
 
   Future<void> _delete() async {
+    final texts = AppLocalizations.of(context);
     if (!await confirm(
       context,
-      title: 'Delete ${_channel.name}?',
-      message: 'Delete ${_channel.name}? Everyone inside is dropped.',
-      action: 'Delete',
+      title: texts.manageDeleteTitle(_channel.name),
+      message: texts.channelSettingsDeleteConfirm(_channel.name),
+      action: texts.manageDelete,
     )) {
       return;
     }
@@ -845,48 +864,49 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
         const AccessFlags();
     final bitrates = {..._bitrates, _bitrate}.toList()..sort();
     final changed = _changes.isNotEmpty;
+    final texts = AppLocalizations.of(context);
     return SettingsSheet(
-      title: 'Channel Settings',
-      action: 'Save',
+      title: texts.channelSettingsTitle,
+      action: texts.manageSave,
       dirty: changed,
       onAction: changed && _valid ? _save : null,
       children: [
         SettingsGroup(
-          footer: _gateway.isAdmin
-              ? 'The owner manages this channel. Only admins choose who '
-                    'owns it.'
-              : null,
+          footer: _gateway.isAdmin ? texts.channelSettingsOwnerHint : null,
           error: _error,
           children: [
-            TextFieldRow(label: 'Name', controller: _name, maxLength: 64),
+            TextFieldRow(
+              label: texts.manageName,
+              controller: _name,
+              maxLength: 64,
+            ),
             PickerRow<String?>(
-              label: 'Space',
+              label: texts.manageSpace,
               value: _space,
               options: [
-                if (_gateway.isAdmin || _channel.space == null) (null, 'None'),
+                if (_gateway.isAdmin || _channel.space == null)
+                  (null, texts.manageNone),
                 for (final s in _spaces) (s.id, s.name),
               ],
               onChanged: (id) => setState(() => _space = id),
             ),
             if (_gateway.isAdmin)
               PickerRow<String?>(
-                label: 'Owner',
+                label: texts.manageOwner,
                 value: _owner,
-                options: _owners(_accounts, _owner),
+                options: _owners(texts, _accounts, _owner),
                 onChanged: (id) => setState(() => _owner = id),
               ),
           ],
         ),
         SettingsGroup(
-          header: 'People and Sound',
-          footer:
-              'When the channel is full, only people who manage it can '
-              'still join. From 1 to 99 people, or no limit.',
+          header: texts.channelSettingsPeopleAndSound,
+          footer: texts.channelSettingsLimitHint,
           children: [
             TextFieldRow(
-              label: 'Max People',
+              label: texts.channelSettingsMaxPeople,
               controller: _limit,
-              hint: 'No limit',
+              hint: texts.channelSettingsNoLimit,
               keyboardType: TextInputType.number,
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
@@ -894,22 +914,23 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
               ],
             ),
             PickerRow<int>(
-              label: 'Audio Quality',
+              label: texts.channelSettingsAudioQuality,
               value: _bitrate,
-              options: [for (final b in bitrates) (b, _kbps(b))],
+              options: [for (final b in bitrates) (b, _kbps(texts, b))],
               onChanged: (b) => setState(() => _bitrate = b),
             ),
             SwitchRow(
-              label: 'Stereo',
+              label: texts.channelSettingsStereo,
               value: _stereo,
               onChanged: (on) => setState(() => _stereo = on),
             ),
           ],
         ),
         SettingsGroup(
-          header: 'Access',
-          footer: 'Edit the whitelist in the web client for now.',
+          header: texts.manageAccess,
+          footer: texts.manageWhitelistInWeb,
           children: _accessRows(
+            texts,
             flags: _flags,
             inherited: inherited,
             onChanged: (flags) => setState(() => _flags = flags),
@@ -918,7 +939,7 @@ class _ChannelSettingsDialogState extends State<ChannelSettingsDialog> {
         SettingsGroup(
           children: [
             ButtonRow(
-              label: 'Delete Channel…',
+              label: texts.channelSettingsDelete,
               destructive: true,
               onTap: _delete,
             ),
@@ -994,36 +1015,36 @@ class _SpaceSettingsDialogState extends State<SpaceSettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final changed = _changes.isNotEmpty;
+    final texts = AppLocalizations.of(context);
     return SettingsSheet(
-      title: 'Space Settings',
-      action: 'Save',
+      title: texts.spaceSettingsTitle,
+      action: texts.manageSave,
       dirty: changed,
       onAction: changed && _name.text.trim().isNotEmpty ? _save : null,
       children: [
         SettingsGroup(
-          footer: _admin
-              ? 'The owner manages the space and every channel in it. Only '
-                    'admins choose who owns it.'
-              : null,
+          footer: _admin ? texts.spaceSettingsOwnerHint : null,
           error: _error,
           children: [
-            TextFieldRow(label: 'Name', controller: _name, maxLength: 64),
+            TextFieldRow(
+              label: texts.manageName,
+              controller: _name,
+              maxLength: 64,
+            ),
             if (_admin)
               PickerRow<String?>(
-                label: 'Owner',
+                label: texts.manageOwner,
                 value: _owner,
-                options: _owners(_accounts, _owner),
+                options: _owners(texts, _accounts, _owner),
                 onChanged: (id) => setState(() => _owner = id),
               ),
           ],
         ),
         SettingsGroup(
-          header: 'Access',
-          footer:
-              'These limits apply to every channel in the space; a channel '
-              'can only add its own. Edit the whitelist in the web client '
-              'for now.',
+          header: texts.manageAccess,
+          footer: texts.spaceSettingsAccessHint,
           children: _accessRows(
+            texts,
             flags: _flags,
             inherited: const AccessFlags(),
             onChanged: (flags) => setState(() => _flags = flags),
@@ -1036,7 +1057,8 @@ class _SpaceSettingsDialogState extends State<SpaceSettingsDialog> {
 
 /// Accounts Only, Whitelist Only and Hidden; those its space already sets
 /// show on and can't be turned off here.
-List<Widget> _accessRows({
+List<Widget> _accessRows(
+  AppLocalizations texts, {
   required AccessFlags flags,
   required AccessFlags inherited,
   required ValueChanged<AccessFlags> onChanged,
@@ -1049,28 +1071,28 @@ List<Widget> _accessRows({
     AccessFlags Function(bool) set,
   ) => SwitchRow(
     label: label,
-    detail: fromSpace ? 'Set by the space' : detail,
+    detail: fromSpace ? texts.accessFromSpace : detail,
     value: on || fromSpace,
     onChanged: fromSpace ? null : (value) => onChanged(set(value)),
   );
   return [
     row(
-      'Accounts Only',
-      'No guests',
+      texts.accessAccountsOnly,
+      texts.accessAccountsOnlyDetail,
       flags.authRequired,
       inherited.authRequired,
       (v) => flags.copyWith(authRequired: v),
     ),
     row(
-      'Whitelist Only',
-      'Only the people and roles on its list',
+      texts.accessWhitelistOnly,
+      texts.accessWhitelistOnlyListDetail,
       flags.whitelist,
       inherited.whitelist,
       (v) => flags.copyWith(whitelist: v),
     ),
     row(
-      'Hidden',
-      'Invisible to those who may not enter',
+      texts.accessHidden,
+      texts.accessHiddenDetail,
       flags.hidden,
       inherited.hidden,
       (v) => flags.copyWith(hidden: v),
@@ -1117,6 +1139,7 @@ class _SummonDialogState extends State<SummonDialog> {
 
   Future<void> _search(String query) async {
     final ticket = ++_ticket;
+    final texts = AppLocalizations.of(context);
     if (query.isEmpty) {
       setState(() {
         _found = [];
@@ -1138,12 +1161,12 @@ class _SummonDialogState extends State<SummonDialog> {
         _chosen =
             found.where((a) => a.username.toLowerCase() == bare).firstOrNull ??
             found.firstOrNull;
-        _note = found.isEmpty ? 'Nobody matching who could come here.' : null;
+        _note = found.isEmpty ? texts.summonsNoMatch : null;
         _error = null;
       });
     } on ApiException {
       if (mounted && ticket == _ticket) {
-        setState(() => _error = 'Cannot search.');
+        setState(() => _error = texts.summonsSearchFailed);
       }
     }
   }
@@ -1152,24 +1175,22 @@ class _SummonDialogState extends State<SummonDialog> {
   Widget build(BuildContext context) {
     final gateway = widget.manager.gateway;
     final chosen = _chosen;
+    final texts = AppLocalizations.of(context);
     return SettingsSheet(
-      title: 'Summon to ${widget.view.channel.name}',
-      action: 'Summon',
+      title: texts.summonsTitle(widget.view.channel.name),
+      action: texts.summonsSummon,
       onAction: chosen == null
           ? null
           : () async => Navigator.pop(context, chosen),
       children: [
         SettingsGroup(
-          footer:
-              _note ??
-              'They get a notification that you are waiting. Once per '
-                  '5 minutes per person.',
+          footer: _note ?? texts.summonsHint,
           error: _error,
           children: [
             TextFieldRow(
-              label: 'Nickname',
+              label: texts.summonsNickname,
               controller: _query,
-              hint: 'Who?',
+              hint: texts.summonsWho,
               autofocus: true,
               autocorrect: false,
             ),

@@ -10,6 +10,8 @@
 
 import 'package:flutter_webrtc/flutter_webrtc.dart' show StatsReport;
 
+import '../l10n/app_localizations.dart';
+
 /// Packets of one incoming stream so far.
 typedef Packets = ({int lost, int received});
 
@@ -235,8 +237,9 @@ LinkStats compareStats(LinkSample now, LinkSample? before) {
   );
 }
 
-/// `42 ms`, or a dash.
-String formatMs(int? ms) => ms == null ? '—' : '$ms ms';
+/// `42 ms` in [texts]' language, or a dash.
+String formatMs(int? ms, {AppLocalizations? texts}) =>
+    ms == null ? '—' : texts?.connectionMilliseconds(ms) ?? '$ms ms';
 
 /// `0.3%` under ten percent, `12%` above, or a dash.
 String formatLoss(double? percent) => switch (percent) {

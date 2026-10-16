@@ -9,6 +9,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_localizations.dart';
+
 /// Whether keys are labelled the Apple way: ⌘ for Command, and so on.
 bool get _apple =>
     defaultTargetPlatform == TargetPlatform.macOS ||
@@ -16,15 +18,22 @@ bool get _apple =>
 
 /// What a shortcut can do in a call.
 enum CallAction {
-  toggleMute('Microphone On or Off', 0x00070010), // M
-  toggleAway('Away or Back', 0x00070004), // A
-  mute('Microphone Off', null),
-  unmute('Microphone On', null);
+  toggleMute(0x00070010), // M
+  toggleAway(0x00070004), // A
+  mute(null),
+  unmute(null);
 
-  const CallAction(this.label, this._defaultKey);
+  const CallAction(this._defaultKey);
 
-  final String label;
   final int? _defaultKey;
+
+  /// What Settings calls it, in [texts].
+  String label(AppLocalizations texts) => switch (this) {
+    CallAction.toggleMute => texts.shortcutToggleMute,
+    CallAction.toggleAway => texts.shortcutToggleAway,
+    CallAction.mute => texts.shortcutMute,
+    CallAction.unmute => texts.shortcutUnmute,
+  };
 
   /// Ctrl+Shift+M and Ctrl+Shift+A, with Command for Ctrl on a Mac; the
   /// one-way actions start unbound.
@@ -138,24 +147,29 @@ class KeyCombo {
 
   /// Why this can't be a shortcut, or `null` when it can. Refuses what the
   /// system or every app already uses, and plain keys that type text.
-  String? get refusal {
+  ShortcutRefusal? get refusal {
     if (_keyNames[key.usbHidUsage] == null) {
-      return 'That key can’t be used for a shortcut.';
+      return ShortcutRefusal.unusableKey;
     }
     // Shift alone, or Option on a Mac, still types: the chat would lose
     // the letter.
     final typing = _apple ? !control && !meta : !control && !alt && !meta;
-    if (typing && !_functionKey) {
-      return _apple
-          ? 'Add ⌘ or ⌃, or use F1 to F24.'
-          : 'Add Ctrl or Alt, or use F1 to F24.';
-    }
+    if (typing && !_functionKey) return ShortcutRefusal.typing;
     final reserved = _apple ? _reservedApple : _reservedElsewhere;
-    if (reserved.contains(toString())) {
-      return '$label belongs to the system or to every app.';
-    }
+    if (reserved.contains(toString())) return ShortcutRefusal.reserved;
     return null;
   }
+
+  /// [refusal] said in [texts], or `null` when this can be a shortcut.
+  String? refusalText(AppLocalizations texts) => switch (refusal) {
+    null => null,
+    ShortcutRefusal.unusableKey => texts.shortcutUnusableKey,
+    ShortcutRefusal.typing => texts.shortcutTyping(
+      _apple ? '⌘' : 'Ctrl',
+      _apple ? '⌃' : 'Alt',
+    ),
+    ShortcutRefusal.reserved => texts.shortcutReserved(label),
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -168,6 +182,19 @@ class KeyCombo {
 
   @override
   int get hashCode => Object.hash(key, control, alt, shift, meta);
+}
+
+/// Why a combination can't be a shortcut, see [KeyCombo.refusal].
+enum ShortcutRefusal {
+  /// A key shortcuts don't use, like a media key.
+  unusableKey,
+
+  /// It types text: without Ctrl, Alt or Command only function keys will
+  /// do.
+  typing,
+
+  /// The system or every app has it already.
+  reserved,
 }
 
 const _modifierNames = {'control', 'alt', 'shift', 'meta'};

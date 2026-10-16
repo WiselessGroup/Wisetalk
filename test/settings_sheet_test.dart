@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wisetalk/l10n/app_localizations.dart';
 import 'package:wisetalk/theme.dart';
 import 'package:wisetalk/ui/settings_sheet.dart';
 
@@ -94,6 +95,8 @@ Future<void> _pump(
   await tester.pumpWidget(
     MaterialApp(
       theme: themeFor(Brightness.dark),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context)
             .copyWith(textScaler: TextScaler.linear(textScale)),

@@ -9,6 +9,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:wisetalk/data/link.dart';
 import 'package:wisetalk/data/link_stats.dart';
 import 'package:wisetalk/data/preferences.dart';
+import 'package:wisetalk/l10n/app_localizations.dart';
 import 'package:wisetalk/data/secrets.dart';
 import 'package:wisetalk/theme.dart';
 import 'package:wisetalk/ui/connection_status.dart';
@@ -38,6 +39,8 @@ void main() {
 
   Future<void> show(WidgetTester tester) => tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: themeFor(Brightness.dark),
       home: Scaffold(
         body: Center(
@@ -123,7 +126,7 @@ void main() {
     await show(tester);
     await tester.pump();
     expect(link.running, isTrue);
-    expect(find.text('42 ms · —'), findsOneWidget);
+    expect(find.text('42 ms · — loss'), findsOneWidget);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
@@ -171,6 +174,8 @@ void main() {
   testWidgets('others get bars only when poor or lost', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: themeFor(Brightness.dark),
         home: QualityMark(quality: qualities.of('them')),
       ),

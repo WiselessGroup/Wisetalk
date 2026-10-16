@@ -1,8 +1,8 @@
-// Settings: the account's picture, which microphone, camera and speakers,
-// voice processing, summons, notifications and, on desktops, keyboard
-// shortcuts. The web client's Settings dialog, plus the app's own
-// notification switches and shortcuts. Everything applies as it changes,
-// so the sheet has Done only.
+// Settings: the account's picture, the interface's language, which
+// microphone, camera and speakers, voice processing, summons, notifications
+// and, on desktops, keyboard shortcuts. The web client's Settings dialog,
+// plus the app's own notification switches and shortcuts. Everything
+// applies as it changes, so the sheet has Done only.
 
 import 'dart:async';
 
@@ -16,8 +16,10 @@ import '../data/crash_reports.dart';
 import '../data/gateway.dart';
 import '../data/global_shortcuts.dart';
 import '../data/input_filters.dart';
+import '../data/language.dart';
 import '../data/preferences.dart';
 import '../data/shortcuts.dart';
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/picture.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -82,13 +84,19 @@ class _SettingsDialogState extends State<SettingsDialog> {
       _devices.where((d) => d.kind == kind && d.deviceId.isNotEmpty).toList();
 
   Future<void> _pickPicture() async {
+    final texts = AppLocalizations.of(context);
     final file = await openFile(
-      acceptedTypeGroups: const [
+      acceptedTypeGroups: [
         XTypeGroup(
-          label: 'Pictures',
-          extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
-          mimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
-          uniformTypeIdentifiers: ['public.image'],
+          label: texts.settingsPictures,
+          extensions: const ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+          mimeTypes: const [
+            'image/png',
+            'image/jpeg',
+            'image/webp',
+            'image/gif',
+          ],
+          uniformTypeIdentifiers: const ['public.image'],
         ),
       ],
     );
@@ -104,14 +112,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
       final version = await _api.setAvatar(bytes, kind);
       _gateway.avatarChanged(version);
     } catch (e) {
-      _profileError = e is ApiException
-          ? e.message
-          : 'Cannot upload the picture.';
+      _profileError = e is ApiException ? e.message : texts.profileUploadFailed;
     }
     if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _removePicture() async {
+    final texts = AppLocalizations.of(context);
     setState(() {
       _busy = true;
       _profileError = null;
@@ -120,12 +127,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
       await _api.removeAvatar();
       _gateway.avatarChanged(null);
     } catch (e) {
-      _profileError = 'Cannot remove the picture.';
+      _profileError = texts.profileRemoveFailed;
     }
     if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _setAllowSummons(bool allow) async {
+    final texts = AppLocalizations.of(context);
     setState(() {
       _allowSummons = allow;
       _summonsError = null;
@@ -136,7 +144,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       if (mounted) {
         setState(() {
           _allowSummons = !allow;
-          _summonsError = 'Cannot save.';
+          _summonsError = texts.saveFailed;
         });
       }
     }
@@ -161,7 +169,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       label: label,
       value: devices.any((d) => d.deviceId == value) ? value : null,
       options: [
-        (null, 'System Default'),
+        (null, AppLocalizations.of(context).settingsSystemDefault),
         for (final d in devices)
           (d.deviceId, d.label.isEmpty ? label : d.label),
       ],
@@ -173,8 +181,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Widget build(BuildContext context) {
     final me = _gateway.session.me;
     final picture = _gateway.myAvatar;
+    final texts = AppLocalizations.of(context);
+    final language = _prefs.language.value;
     return SettingsSheet(
-      title: 'Settings',
+      title: texts.settingsTitle,
       children: [
         if (_account)
           SettingsGroup(
@@ -190,34 +200,53 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 detail: me.username == null ? null : '@${me.username}',
               ),
               ButtonRow(
-                label: picture == null ? 'Add Picture…' : 'Change Picture…',
+                label: picture == null
+                    ? texts.profileAddPicture
+                    : texts.profileChangePicture,
                 onTap: _busy ? null : _pickPicture,
               ),
               if (picture != null)
                 ButtonRow(
-                  label: 'Remove Picture',
+                  label: texts.profileRemovePicture,
                   destructive: true,
                   onTap: _busy ? null : _removePicture,
                 ),
             ],
           ),
+        // Each language's name is written in that language, to be found by
+        // whoever reads it. Picking one turns the whole app at once.
         SettingsGroup(
-          header: 'Audio and Video',
+          children: [
+            PickerRow<String?>(
+              label: texts.settingsLanguage,
+              value: languages.containsKey(language) ? language : null,
+              options: [
+                (null, texts.settingsSystemDefault),
+                for (final MapEntry(:key, :value) in languages.entries)
+                  (key, value),
+              ],
+              optionLocale: (tag) => tag == null ? null : localeOf(tag),
+              onChanged: (tag) => _change(() => _prefs.language.value = tag),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          header: texts.settingsAudioVideo,
           children: [
             _device(
-              'Microphone',
+              texts.settingsMicrophone,
               'audioinput',
               _prefs.microphone,
               (id) => _prefs.microphone = id,
             ),
             _device(
-              'Camera',
+              texts.settingsCamera,
               'videoinput',
               _prefs.camera,
               (id) => _prefs.camera = id,
             ),
             _device(
-              'Output',
+              texts.settingsOutput,
               'audiooutput',
               _prefs.speaker,
               (id) => _prefs.speaker = id,
@@ -228,14 +257,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
         // nothing to choose (WLK-2).
         if (!inputFilters.byDevice)
           SettingsGroup(
-            footer:
-                'Turn it off for the best sound, and wear headphones then: '
-                'without echo cancellation others hear themselves through '
-                'your speakers.',
+            footer: texts.settingsVoiceProcessingHint,
             children: [
               SwitchRow(
-                label: 'Voice Processing',
-                detail: 'Noise suppression and echo cancellation',
+                label: texts.settingsVoiceProcessing,
+                detail: texts.settingsVoiceProcessingDetail,
                 value: _prefs.processing,
                 onChanged: (on) => _change(() => _prefs.processing = on),
               ),
@@ -244,16 +270,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
         SettingsGroup(
           children: [
             SwitchRow(
-              label: 'Join and Leave Sounds',
-              detail:
-                  'An owl hoots when someone comes or goes, and shortcuts '
-                  'tick',
+              label: texts.settingsCues,
+              detail: texts.settingsCuesDetail,
               value: _prefs.cues,
               onChanged: (on) => _change(() => _prefs.cues = on),
             ),
             SwitchRow(
-              label: 'Show Ping and Loss',
-              detail: 'Next to the connection icon in a call',
+              label: texts.settingsPingAndLoss,
+              detail: texts.settingsPingAndLossDetail,
               value: _prefs.showPingAndLoss,
               onChanged: (on) => _change(() => _prefs.showPingAndLoss = on),
             ),
@@ -262,29 +286,29 @@ class _SettingsDialogState extends State<SettingsDialog> {
         if (hasShortcuts) _ShortcutsGroup(preferences: _prefs),
         if (_account && _allowSummons != null)
           SettingsGroup(
-            header: 'Summons',
+            header: texts.summonsHeader,
             error: _summonsError,
             children: [
               SwitchRow(
-                label: 'Others May Summon Me',
+                label: texts.summonsAllow,
                 value: _allowSummons!,
                 onChanged: _setAllowSummons,
               ),
             ],
           ),
         SettingsGroup(
-          header: 'Notifications on This Device',
-          footer: 'Shown while Wisetalk is in the background.',
+          header: texts.settingsNotificationsHere,
+          footer: texts.settingsNotificationsHint,
           children: [
             SwitchRow(
-              label: 'New Messages',
-              detail: 'In your call’s chat and chats you opened',
+              label: texts.settingsNotifyMessages,
+              detail: texts.settingsNotifyMessagesDetail,
               value: _prefs.notifyMessages,
               onChanged: (on) => _change(() => _prefs.notifyMessages = on),
             ),
             SwitchRow(
-              label: 'Summons',
-              detail: 'When someone calls you into a channel',
+              label: texts.settingsNotifySummons,
+              detail: texts.settingsNotifySummonsDetail,
               value: _prefs.notifySummons,
               onChanged: (on) => _change(() => _prefs.notifySummons = on),
             ),
@@ -292,14 +316,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
         ),
         if (crashReports.available)
           SettingsGroup(
-            header: 'Privacy',
-            footer:
-                'When something in Wisetalk breaks, tell its developers '
-                'what broke and where in the code. Never your messages, '
-                'names, keys or servers.',
+            header: texts.settingsPrivacy,
+            footer: texts.settingsCrashReportsHint,
             children: [
               SwitchRow(
-                label: 'Send Crash Reports',
+                label: texts.settingsCrashReports,
                 value: _prefs.crashReports,
                 onChanged: (on) => _change(() => _prefs.crashReports = on),
               ),
@@ -385,10 +406,11 @@ class _ShortcutsGroupState extends State<_ShortcutsGroup> {
   }
 
   String? _refused(KeyCombo combo, CallAction action) {
-    if (combo.refusal case final refusal?) return refusal;
+    final texts = AppLocalizations.of(context);
+    if (combo.refusalText(texts) case final refusal?) return refusal;
     for (final other in CallAction.values) {
       if (other != action && _prefs.shortcut(other) == combo) {
-        return '${combo.label} is already ${other.label}.';
+        return texts.settingsShortcutTaken(combo.label, other.label(texts));
       }
     }
     return null;
@@ -396,24 +418,22 @@ class _ShortcutsGroupState extends State<_ShortcutsGroup> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
     return Focus(
       focusNode: _focus,
       onKeyEvent: _key,
       child: SettingsGroup(
-        header: 'Shortcuts',
+        header: texts.settingsShortcuts,
         error: _refusal,
         footer: _recording != null
-            ? 'Press the new keys. Backspace removes the shortcut, '
-                  'Esc keeps it.'
+            ? texts.settingsShortcutsRecording
             : globalShortcutsAvailable
-            ? 'In a call they work whatever app is in front, otherwise in '
-                  'Wisetalk’s window. Click one to change it.'
-            : 'On Wayland they work only while Wisetalk’s window is in '
-                  'front. Click one to change it.',
+            ? texts.settingsShortcutsGlobal
+            : texts.settingsShortcutsWayland,
         children: [
           for (final action in CallAction.values)
             SettingsRow(
-              label: action.label,
+              label: action.label(texts),
               trailing: _Keys(
                 recording: _recording == action,
                 combo: _prefs.shortcut(action),
@@ -436,6 +456,7 @@ class _Keys extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: recording ? palette.accent.withValues(alpha: 0.2) : palette.fill,
@@ -444,7 +465,9 @@ class _Keys extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          recording ? 'Press keys…' : combo?.label ?? 'None',
+          recording
+              ? texts.settingsShortcutPressKeys
+              : combo?.label ?? texts.settingsShortcutNone,
           style: TextStyle(
             color: recording || combo != null ? palette.text : palette.muted,
             fontSize: 13,

@@ -93,7 +93,7 @@ void main() {
       const KeyCombo(PhysicalKeyboardKey.escape, alt: true, meta: true),
       const KeyCombo(PhysicalKeyboardKey.keyQ, control: true, meta: true),
     ]) {
-      expect(combo.refusal, contains('system'), reason: combo.label);
+      expect(combo.refusal, ShortcutRefusal.reserved, reason: combo.label);
     }
     // Free on a Mac, where Command does the work of Ctrl.
     expect(
@@ -116,7 +116,7 @@ void main() {
         const KeyCombo(PhysicalKeyboardKey.keyL, meta: true),
         const KeyCombo(PhysicalKeyboardKey.escape, control: true, shift: true),
       ]) {
-        expect(combo.refusal, contains('system'), reason: combo.label);
+        expect(combo.refusal, ShortcutRefusal.reserved, reason: combo.label);
       }
       expect(
         const KeyCombo(PhysicalKeyboardKey.keyQ, meta: true).refusal,

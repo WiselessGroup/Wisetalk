@@ -20,6 +20,7 @@ import '../data/servers.dart';
 import '../data/session.dart';
 import '../data/updates.dart';
 import '../data/voice.dart';
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import 'call_shortcuts.dart';
 import 'call_stage.dart';
@@ -123,8 +124,10 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     super.dispose();
   }
 
+  AppLocalizations get _texts => AppLocalizations.of(context);
+
   String _channelName(String id) =>
-      _gateway.channel(id)?.channel.name ?? 'a channel';
+      _gateway.channel(id)?.channel.name ?? _texts.channelSomeChannel;
 
   /// Someone else wrote in a chat we follow (ours, or the call's) while
   /// Wisetalk is in the background.
@@ -139,16 +142,20 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     if (ours || !followed || appInFront) return;
     if (!ref.read(preferencesProvider).notifyMessages) return;
     final text = message.text;
+    final texts = _texts;
     unawaited(
       ref
           .read(notificationsProvider)
           .show(
-            title: '${message.authorName} in ${_channelName(message.channel)}',
+            title: texts.workspaceMessageTitle(
+              message.authorName,
+              _channelName(message.channel),
+            ),
             body: text == null
-                ? 'Wrote an encrypted message.'
+                ? texts.workspaceMessageEncrypted
                 : text.isNotEmpty
                 ? text
-                : 'Sent a picture.',
+                : texts.workspaceMessagePicture,
             target: ChatTarget(message.channel),
           ),
     );
@@ -156,26 +163,35 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
 
   void _event(GatewayEvent event) {
     if (!mounted) return;
+    final texts = _texts;
     if (event.type == 'summon_sent') {
       final data = event.data as Map<String, dynamic>;
-      final name = _summoned[data['account']] ?? 'They';
-      _toast(
-        (data['pushed'] as int? ?? 0) > 0
-            ? '$name got a notification.'
-            : 'Summoned $name. They have notifications off, so only an open '
-                  'Wisetalk shows it.',
-      );
+      final pushed = (data['pushed'] as int? ?? 0) > 0;
+      final answer = switch (_summoned[data['account']]) {
+        final name? when pushed => texts.summonPushed(name),
+        final name? => texts.summonNotPushed(name),
+        null when pushed => texts.summonPushedSomeone,
+        null => texts.summonNotPushedSomeone,
+      };
+      _toast(answer);
       return;
     }
     if (event.type == 'role_changed') {
-      _toast('Your server role is now ${_gateway.role ?? 'guest'}.');
+      final now = switch (_gateway.role) {
+        'owner' => texts.workspaceRoleChangedOwner,
+        'admin' => texts.workspaceRoleChangedAdmin,
+        'moderator' => texts.workspaceRoleChangedModerator,
+        'member' => texts.workspaceRoleChangedMember,
+        _ => texts.workspaceRoleChangedGuest,
+      };
+      _toast(now);
       return;
     }
     if (event.type != 'summoned') return;
     final data = event.data as Map<String, dynamic>;
     final channel = data['channel'] as String;
     final from = data['from'] as String;
-    final text = '$from summons you to ${_channelName(channel)}.';
+    final text = texts.summonReceived(from, _channelName(channel));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
@@ -183,7 +199,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         margin: const EdgeInsets.fromLTRB(24, 0, 24, 100),
         duration: const Duration(seconds: 10),
         action: SnackBarAction(
-          label: 'Join',
+          label: texts.channelJoin,
           onPressed: () => _voice.join(channel),
         ),
       ),
@@ -192,7 +208,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
       unawaited(
         ref
             .read(notificationsProvider)
-            .show(title: 'Summoned', body: text, target: SummonTarget(channel)),
+            .show(
+              title: texts.workspaceSummoned,
+              body: text,
+              target: SummonTarget(channel),
+            ),
       );
     }
   }
@@ -256,24 +276,27 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   }
 
   Future<void> _askTakeOver(String here, String there) async {
-    final hereName = _gateway.channel(here)?.channel.name ?? 'this channel';
-    final thereName =
-        _gateway.channel(there)?.channel.name ?? 'another channel';
+    final texts = _texts;
+    final hereName = _gateway.channel(here)?.channel.name;
+    final thereName = _gateway.channel(there)?.channel.name;
+    final question = hereName == null || thereName == null
+        ? texts.takeOverElsewhere
+        : here == there
+        ? texts.takeOverSameChannel(hereName)
+        : texts.takeOverOtherChannel(hereName, thereName);
     final yes = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Join from This Device?'),
-        content: Text(
-          "You're in $thereName on another device or tab. Joining $hereName here takes you out of the call there.",
-        ),
+        title: Text(texts.takeOverTitle),
+        content: Text(question),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(texts.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Join Here'),
+            child: Text(texts.takeOverJoinHere),
           ),
         ],
       ),
@@ -338,15 +361,16 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
   List<Widget> _callActions(ChannelView? view) {
     if (view == null) return const [];
     final palette = context.palette;
+    final texts = _texts;
     return [
       IconButton(
-        tooltip: 'Copy Invite Link',
+        tooltip: texts.inviteCopyLink,
         icon: Icon(Icons.link, color: palette.muted),
         onPressed: () => _manager.copyInvite(view),
       ),
       if (!widget.session.me.isGuest)
         IconButton(
-          tooltip: 'Summon',
+          tooltip: texts.summonsSummon,
           icon: Icon(Icons.person_add_alt, color: palette.muted),
           onPressed: _voice.state == VoiceState.joining
               ? null
@@ -462,10 +486,11 @@ class _NowRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return Semantics(
       button: true,
       expanded: open,
-      label: open ? 'Hide channels' : 'Show channels',
+      label: open ? texts.workspaceHideChannels : texts.workspaceShowChannels,
       child: InkWell(
         onTap: onPressed,
         child: ConstrainedBox(
@@ -490,7 +515,7 @@ class _NowRow extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${view.participants.length} in voice',
+                        texts.workspaceInVoice(view.participants.length),
                         style: TextStyle(color: palette.muted, fontSize: 13),
                       ),
                     ],
@@ -555,6 +580,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final collapsed = manager.preferences.collapsed;
     final rows = <Widget>[];
     for (final entry in topLevel(gateway)) {
@@ -623,7 +649,7 @@ class _Sidebar extends ConsumerWidget {
                 ),
                 if (gateway.isAdmin)
                   IconButton(
-                    tooltip: 'New Channel or Space',
+                    tooltip: texts.workspaceCreateTitle,
                     icon: Icon(Icons.add, color: palette.muted),
                     onPressed: () => showSettingsSheet<void>(
                       context,
@@ -639,8 +665,8 @@ class _Sidebar extends ConsumerWidget {
               child: Text(
                 gateway.ended ??
                     (gateway.status == GatewayStatus.offline
-                        ? 'Offline, reconnecting…'
-                        : 'Connecting…'),
+                        ? texts.workspaceStatusOffline
+                        : texts.workspaceStatusConnecting),
                 style: TextStyle(color: palette.muted, fontSize: 13),
               ),
             ),
@@ -650,8 +676,8 @@ class _Sidebar extends ConsumerWidget {
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       gateway.isAdmin
-                          ? 'No channels yet. Create one with the + button.'
-                          : 'No channels yet. An admin can add some.',
+                          ? texts.workspaceEmptyAdmin
+                          : texts.workspaceEmpty,
                       style: TextStyle(color: palette.muted, fontSize: 13),
                     ),
                   )
@@ -694,12 +720,12 @@ class _Sidebar extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  tooltip: 'Settings',
+                  tooltip: texts.settingsTitle,
                   icon: Icon(Icons.settings_outlined, color: palette.muted),
                   onPressed: manager.openSettings,
                 ),
                 PopupMenuButton<void>(
-                  tooltip: 'More',
+                  tooltip: texts.workspaceMore,
                   icon: Icon(Icons.more_horiz, color: palette.muted),
                   itemBuilder: (context) => [
                     PopupMenuItem(
@@ -709,7 +735,7 @@ class _Sidebar extends ConsumerWidget {
                     PopupMenuItem(
                       onTap: () async =>
                           manager.toast(await updates.checkNow()),
-                      child: const Text('Check for Updates'),
+                      child: Text(texts.workspaceCheckForUpdates),
                     ),
                     const PopupMenuDivider(),
                     PopupMenuItem(
@@ -718,7 +744,7 @@ class _Sidebar extends ConsumerWidget {
                         await ref.read(serversProvider.notifier).leave();
                         if (context.mounted) context.go('/servers');
                       },
-                      child: const Text('Change Server'),
+                      child: Text(texts.workspaceChangeServer),
                     ),
                     PopupMenuItem(
                       onTap: () {
@@ -726,7 +752,7 @@ class _Sidebar extends ConsumerWidget {
                         ref.read(sessionProvider.notifier).signOut();
                       },
                       child: Text(
-                        'Sign Out',
+                        texts.workspaceSignOut,
                         style: TextStyle(color: palette.error),
                       ),
                     ),
@@ -765,6 +791,7 @@ class _SpaceHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final dragged = (id: space.id, space: true, name: space.name);
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -802,7 +829,7 @@ class _SpaceHeader extends StatelessWidget {
                     ),
                     if (folded && people > 0)
                       Tooltip(
-                        message: '$people in voice',
+                        message: texts.workspaceInVoice(people),
                         child: Text(
                           '$people',
                           style: TextStyle(fontSize: 12, color: palette.accent),
@@ -846,6 +873,7 @@ class _ChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final voice = manager.voice;
     final chats = manager.chats;
     final gateway = manager.gateway;
@@ -957,7 +985,7 @@ class _ChannelRow extends StatelessWidget {
                         QualityMark(quality: voice.qualities.of(p.session)),
                       if (here && voice.keyChanged(p))
                         Tooltip(
-                          message: 'Careful: their device key has changed.',
+                          message: texts.personKeyChanged,
                           child: Icon(
                             Icons.key_outlined,
                             size: 14,
@@ -966,7 +994,7 @@ class _ChannelRow extends StatelessWidget {
                         ),
                       if (silenced.contains(personKey(p)))
                         Tooltip(
-                          message: 'Muted for you',
+                          message: texts.personMutedForYou,
                           child: Icon(
                             Icons.volume_off,
                             size: 14,
@@ -975,7 +1003,7 @@ class _ChannelRow extends StatelessWidget {
                         ),
                       if (voice.isAway(p))
                         Tooltip(
-                          message: 'Away',
+                          message: texts.awayTitle,
                           child: Icon(
                             Icons.headset_off,
                             size: 14,
@@ -984,7 +1012,7 @@ class _ChannelRow extends StatelessWidget {
                         ),
                       if (p.serverMuted)
                         Tooltip(
-                          message: 'Muted by a moderator',
+                          message: texts.callMutedByModerator,
                           child: Icon(
                             Icons.shield_outlined,
                             size: 14,
@@ -1032,7 +1060,7 @@ class _Grip extends StatelessWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.grab,
         child: Tooltip(
-          message: 'Drag ${dragged.name}',
+          message: AppLocalizations.of(context).workspaceDrag(dragged.name),
           child: Padding(
             padding: const EdgeInsets.only(right: 4),
             child: Icon(
@@ -1112,7 +1140,7 @@ class _EndDrop extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Drop here for the end of the list',
+                  AppLocalizations.of(context).workspaceDropEndHint,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.muted, fontSize: 13),
                 ),
@@ -1137,8 +1165,9 @@ class _ChatButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return Tooltip(
-      message: open ? 'Close Chat' : 'Open Chat',
+      message: open ? texts.chatClose : texts.channelOpenChat,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onPressed,
@@ -1170,20 +1199,23 @@ class _UpdateButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
     final ready = updates.ready;
     final available = updates.available;
+    // Shown only when one of them is there.
+    final version = ready ?? available?.version ?? '';
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
       child: Tooltip(
         message: ready != null
-            ? 'Wisetalk $ready is downloaded'
-            : 'Wisetalk ${available?.version} is out',
+            ? texts.workspaceUpdateDownloaded(version)
+            : texts.workspaceUpdateOut(version),
         child: FilledButton.icon(
           icon: const Icon(Icons.system_update_alt, size: 18),
           label: Text(
             ready != null
-                ? 'Restart to Update'
-                : 'Update to ${available?.version}',
+                ? texts.workspaceRestartToUpdate
+                : texts.workspaceUpdateTo(version),
           ),
           onPressed: ready != null
               ? updates.restart

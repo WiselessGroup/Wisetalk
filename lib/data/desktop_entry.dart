@@ -12,6 +12,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'language.dart';
+
 const _id = 'net.wiseless.wisetalk';
 
 /// The desktop entry that starts this Wisetalk, for notifications to name
@@ -56,7 +58,7 @@ Future<void> registerDesktopEntry() async {
         '''[Desktop Entry]
 Type=Application
 Name=Wisetalk
-Comment=Voice and video chat for one community
+${_comments()}
 Exec=${_quote(image)} %u
 Icon=$_id
 Categories=Network;InstantMessaging;
@@ -78,6 +80,20 @@ ${hidden ? 'NoDisplay=true\n' : ''}''';
 }
 
 const _scheme = 'x-scheme-handler/wisetalk';
+
+/// The entry's comment in every language the app speaks, English the
+/// default. By language alone, as the app's texts are: any Portuguese reads
+/// Brazilian, any Chinese Traditional.
+String _comments() {
+  final lines = <String>[];
+  for (final language in languages.keys) {
+    final key = language == 'en'
+        ? 'Comment'
+        : 'Comment[${localeOf(language).languageCode}]';
+    lines.add('$key=${textsFor(language).desktopComment}');
+  }
+  return lines.join('\n');
+}
 
 /// Makes [entry] the one that opens wisetalk: links.
 Future<void> _handleLinksWith(File entry) async {

@@ -7,6 +7,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../l10n/app_localizations.dart';
+import 'language.dart';
+import 'problem.dart';
 import 'protocol.dart';
 
 /// Who a session belongs to (`GET /api/me`).
@@ -208,10 +210,7 @@ class Api {
         await _client.send(request).timeout(const Duration(seconds: 15)),
       );
     } on Exception {
-      throw const ApiException(
-        0,
-        "Can't reach the server. Check the address and your connection.",
-      );
+      throw ApiException(0, appTexts.apiUnreachableCheck);
     }
     if (response.statusCode >= 400) {
       throw ApiException(response.statusCode, _message(response));
@@ -221,27 +220,33 @@ class Api {
     try {
       return jsonDecode(text);
     } on FormatException {
-      throw const ApiException(0, "That doesn't look like a Wisetalk server.");
+      throw ApiException(0, appTexts.apiNotWisetalk);
     }
   }
 
-  /// What the server said went wrong, for people.
+  /// What the server said went wrong, for people, in their language when
+  /// it names the problem (WLK-14).
   String _message(http.Response response) {
     try {
       final json = jsonDecode(utf8.decode(response.bodyBytes));
       if (json is Map<String, dynamic> && json['message'] is String) {
-        return json['message'] as String;
+        return problemText(
+          appTexts,
+          json['problem'],
+          json['message'] as String,
+          code: json['error'] as String?,
+        );
       }
     } on FormatException {
       // Not one of our errors: a proxy's page, say.
     }
-    return 'The server said no (${response.statusCode}).';
+    return appTexts.apiRefused(response.statusCode);
   }
 
   Future<ServerInfo> server() async {
     final json = await _send('GET', '/server');
     if (json is! Map<String, dynamic> || !json.containsKey('guests_open')) {
-      throw const ApiException(0, "That doesn't look like a Wisetalk server.");
+      throw ApiException(0, appTexts.apiNotWisetalk);
     }
     return ServerInfo.fromJson(json);
   }
@@ -338,7 +343,7 @@ class Api {
           )
           .timeout(const Duration(minutes: 2));
     } on Exception {
-      throw const ApiException(0, "Can't reach the server.");
+      throw ApiException(0, appTexts.apiUnreachable);
     }
     if (response.statusCode >= 400) {
       throw ApiException(response.statusCode, _message(response));
@@ -355,7 +360,7 @@ class Api {
           )
           .timeout(const Duration(minutes: 2));
     } on Exception {
-      throw const ApiException(0, "Can't reach the server.");
+      throw ApiException(0, appTexts.apiUnreachable);
     }
     if (response.statusCode >= 400) {
       throw ApiException(response.statusCode, _message(response));
@@ -419,7 +424,7 @@ class Api {
         await _client.send(request).timeout(const Duration(seconds: 30)),
       );
     } on Exception {
-      throw const ApiException(0, "Can't reach the server.");
+      throw ApiException(0, appTexts.apiUnreachable);
     }
     if (response.statusCode >= 400) {
       throw ApiException(response.statusCode, _message(response));

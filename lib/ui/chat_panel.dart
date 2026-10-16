@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/chat.dart';
 import '../data/gateway.dart';
 import '../data/protocol.dart';
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/picture.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -84,17 +85,19 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 
   Future<void> _paste() async {
+    final texts = AppLocalizations.of(context);
     try {
       final picture = await clipboardPicture();
       if (picture != null && mounted) setState(() => _picture = picture);
     } catch (e) {
-      _chats.report(_unreadable(e));
+      _chats.report(_unreadable(e, texts));
     }
   }
 
-  static String _unreadable(Object error) => error.toString().contains('large')
-      ? 'This picture is too large.'
-      : "This picture can't be read.";
+  static String _unreadable(Object error, AppLocalizations texts) {
+    if (error.toString().contains('large')) return texts.pictureTooLarge;
+    return texts.pictureUnreadable;
+  }
 
   void _send() {
     final body = _draft.text.trim();
@@ -106,12 +109,18 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 
   Future<void> _attach() async {
+    final texts = AppLocalizations.of(context);
     final file = await openFile(
-      acceptedTypeGroups: const [
+      acceptedTypeGroups: [
         XTypeGroup(
-          label: 'Pictures',
-          extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-          mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+          label: texts.chatPictures,
+          extensions: const ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+          mimeTypes: const [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+          ],
         ),
       ],
     );
@@ -122,18 +131,19 @@ class _ChatPanelState extends State<ChatPanel> {
       if (mounted) setState(() => _picture = prepared);
       _input.requestFocus();
     } catch (e) {
-      _chats.report(_unreadable(e));
+      _chats.report(_unreadable(e, texts));
     } finally {
       if (mounted) setState(() => _preparing = false);
     }
   }
 
-  String _clearsIn(DateTime? at) {
-    if (at == null) return 'Messages vanish 4 h after the last one';
+  static String _clearsIn(DateTime? at, AppLocalizations texts) {
+    if (at == null) return texts.chatVanishes;
     final minutes = at.difference(DateTime.now()).inMinutes.clamp(1, 1 << 20);
     final hours = minutes ~/ 60;
-    final left = hours > 0 ? '$hours h ${minutes % 60} min' : '$minutes min';
-    return 'Clears in $left unless someone writes';
+    return hours > 0
+        ? texts.chatClearsInHours(hours, minutes % 60)
+        : texts.chatClearsInMinutes(minutes);
   }
 
   /// A message continues the previous one: same author within 5 minutes.
@@ -148,6 +158,7 @@ class _ChatPanelState extends State<ChatPanel> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final room = _chats.room(_channel);
     final messages = room.messages;
     final moderator = widget.view.can('MODERATE');
@@ -165,7 +176,7 @@ class _ChatPanelState extends State<ChatPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Chat',
+                      texts.chatTitle,
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
@@ -182,7 +193,7 @@ class _ChatPanelState extends State<ChatPanel> {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            _clearsIn(room.expiresAt),
+                            _clearsIn(room.expiresAt, texts),
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
@@ -196,7 +207,7 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
               ),
               IconButton(
-                tooltip: 'Close Chat',
+                tooltip: texts.chatClose,
                 icon: Icon(Icons.close, color: palette.muted, size: 20),
                 onPressed: widget.onClose,
               ),
@@ -208,7 +219,7 @@ class _ChatPanelState extends State<ChatPanel> {
           child: messages.isEmpty
               ? Center(
                   child: Text(
-                    room.loaded ? 'No messages yet. Say hi!' : 'Loading…',
+                    room.loaded ? texts.chatEmpty : texts.chatLoading,
                     style: TextStyle(color: palette.muted),
                   ),
                 )
@@ -232,15 +243,15 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
         ),
         if (_chats.waiting.contains(_channel))
-          _Status('Getting the chat key…')
+          _Status(texts.chatGettingKey)
         else if ((_chats.uploading[_channel] ?? 0) > 0)
-          _Status('Sending the picture…'),
+          _Status(texts.chatSendingPicture),
         if (_picture != null || _preparing)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
             child: _picture == null
                 ? Text(
-                    'Preparing the picture…',
+                    texts.chatPreparingPicture,
                     style: TextStyle(color: palette.muted, fontSize: 13),
                   )
                 : Align(
@@ -257,7 +268,7 @@ class _ChatPanelState extends State<ChatPanel> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               IconButton(
-                tooltip: 'Add Picture',
+                tooltip: texts.chatAddPicture,
                 icon: Icon(
                   Icons.add_photo_alternate_outlined,
                   color: palette.muted,
@@ -273,7 +284,7 @@ class _ChatPanelState extends State<ChatPanel> {
                   maxLength: _maxChars,
                   keyboardType: TextInputType.multiline,
                   decoration: InputDecoration(
-                    hintText: 'Message ${widget.view.channel.name}',
+                    hintText: texts.chatMessageTo(widget.view.channel.name),
                     counterText: '',
                     isDense: true,
                   ),
@@ -281,7 +292,7 @@ class _ChatPanelState extends State<ChatPanel> {
               ),
               const SizedBox(width: 6),
               IconButton.filled(
-                tooltip: 'Send',
+                tooltip: texts.chatSend,
                 icon: const Icon(Icons.arrow_upward, size: 20),
                 onPressed: _send,
               ),
@@ -376,12 +387,12 @@ class _MessageTileState extends State<_MessageTile> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final m = widget.message;
     final body = <Widget>[
       if (m.text == null)
         Text(
-          "Encrypted with a key this device doesn't have: sent before it "
-          'joined the chat.',
+          texts.chatLocked,
           style: TextStyle(
             color: palette.tertiary,
             fontStyle: FontStyle.italic,
@@ -433,7 +444,7 @@ class _MessageTileState extends State<_MessageTile> {
                         if (m.author == null) ...[
                           const SizedBox(width: 6),
                           Text(
-                            'guest',
+                            texts.chatGuest,
                             style: TextStyle(
                               fontSize: 12,
                               color: palette.muted,
@@ -455,7 +466,7 @@ class _MessageTileState extends State<_MessageTile> {
               width: 28,
               child: widget.canDelete && _hovered
                   ? IconButton(
-                      tooltip: 'Delete',
+                      tooltip: texts.chatDeleteMessage,
                       padding: EdgeInsets.zero,
                       iconSize: 16,
                       constraints: const BoxConstraints.tightFor(
@@ -586,7 +597,7 @@ class _ChatPictureState extends State<_ChatPicture> {
         color: palette.fill,
         child: Center(
           child: Text(
-            "The picture didn't load.",
+            AppLocalizations.of(context).pictureFailed,
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.muted, fontSize: 12),
           ),

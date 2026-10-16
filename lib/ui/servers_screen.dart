@@ -12,6 +12,7 @@ import '../data/address.dart';
 import '../data/api.dart';
 import '../data/links.dart';
 import '../data/servers.dart';
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/text.dart';
 import '../theme.dart';
 import 'common.dart';
@@ -37,11 +38,12 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
 
   /// The first run's form: on to signing in once the server checks out.
   Future<void> _connect() async {
+    final texts = AppLocalizations.of(context);
     setState(() {
       _busy = true;
       _error = null;
     });
-    final error = await _addServer(ref, _address.text);
+    final error = await _addServer(ref, texts, _address.text);
     if (!mounted) return;
     if (error == null) {
       context.go('/');
@@ -68,13 +70,12 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
   }
 
   Future<void> _remove(SavedServer server) async {
+    final texts = AppLocalizations.of(context);
     final sure = await confirm(
       context,
-      title: 'Remove ${server.name}?',
-      message:
-          'This device signs out of it and forgets it. You can add it again '
-          'with its address.',
-      action: 'Remove',
+      title: texts.serversRemoveTitle(server.name),
+      message: texts.serversRemoveMessage,
+      action: texts.serversRemove,
     );
     if (sure) {
       await ref.read(serversProvider.notifier).remove(server.origin);
@@ -103,6 +104,7 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
       }
     }
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
 
     final form = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -115,18 +117,19 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
           autocorrect: false,
           textInputAction: TextInputAction.go,
           onSubmitted: (_) => _connect(),
+          // An example, the same in every language.
           decoration: const InputDecoration(hintText: 'talk.example.com'),
         ),
         const SizedBox(height: 8),
         Text(
-          'Ask whoever runs your community for its address.',
+          texts.serversAddressHelp,
           style: TextStyle(fontSize: 13, color: palette.muted),
         ),
         if (_error != null) ...[const SizedBox(height: 12), ErrorBox(_error!)],
         const SizedBox(height: 16),
         FilledButton(
           onPressed: _busy ? null : _connect,
-          child: Text(_busy ? 'Connecting…' : 'Connect'),
+          child: Text(_busy ? texts.serversConnecting : texts.serversConnect),
         ),
       ],
     );
@@ -135,14 +138,10 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Masthead(
-            subtitle: saved.isEmpty
-                ? 'Which server is your community on?'
-                : null,
-          ),
+          Masthead(subtitle: saved.isEmpty ? texts.serversWhich : null),
           const SizedBox(height: 24),
           if (saved.isNotEmpty) ...[
-            _Header('Your Servers'),
+            _Header(texts.serversYours),
             _ServerList(
               servers: saved,
               current: servers?.current,
@@ -152,7 +151,10 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
             const SizedBox(height: 16),
             SettingsGroup(
               children: [
-                ButtonRow(label: 'Add a Server…', onTap: () => _addAnother()),
+                ButtonRow(
+                  label: texts.serversAddMenu,
+                  onTap: () => _addAnother(),
+                ),
               ],
             ),
           ] else
@@ -165,19 +167,22 @@ class _ServersScreenState extends ConsumerState<ServersScreen> {
 
 /// Checks that [text] is the address of a Wisetalk server this app can
 /// talk to, then keeps it as the one to go to. Null when that worked;
-/// otherwise what went wrong.
-Future<String?> _addServer(WidgetRef ref, String text) async {
+/// otherwise what went wrong, in [texts].
+Future<String?> _addServer(
+  WidgetRef ref,
+  AppLocalizations texts,
+  String text,
+) async {
   final origin = parseServerAddress(text);
-  if (origin == null) {
-    return 'Type the address of a server, like talk.example.com.';
-  }
+  if (origin == null) return texts.serversBadAddress;
   try {
     final info = await Api(origin).server();
     final ours = protocolVersion();
     if (info.protocol != ours) {
-      return info.protocol > ours
-          ? 'This server is newer than this app. Update Wisetalk to join it.'
-          : 'This server runs an older Wisetalk${info.version.isEmpty ? '' : ' (${info.version})'}. Ask its admins to update it.';
+      if (info.protocol > ours) return texts.serversTooNew;
+      return info.version.isEmpty
+          ? texts.serversTooOld
+          : texts.serversTooOldVersion(info.version);
     }
     await ref
         .read(serversProvider.notifier)
@@ -217,8 +222,9 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   }
 
   Future<void> _connect() async {
+    final texts = AppLocalizations.of(context);
     setState(() => _error = null);
-    final error = await _addServer(ref, _address.text);
+    final error = await _addServer(ref, texts, _address.text);
     if (!mounted) return;
     if (error == null) {
       Navigator.pop(context, true);
@@ -230,18 +236,19 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   @override
   Widget build(BuildContext context) {
     final typed = _address.text.trim();
+    final texts = AppLocalizations.of(context);
     return SettingsSheet(
-      title: 'Add a Server',
-      action: 'Connect',
+      title: texts.serversAddTitle,
+      action: texts.serversConnect,
       dirty: typed.isNotEmpty && typed != widget.address,
       onAction: typed.isEmpty ? null : _connect,
       children: [
         SettingsGroup(
-          footer: 'Ask whoever runs your community for its address.',
+          footer: texts.serversAddressHelp,
           error: _error,
           children: [
             TextFieldRow(
-              label: 'Address',
+              label: texts.serversAddress,
               controller: _address,
               hint: 'talk.example.com',
               keyboardType: TextInputType.url,
@@ -291,6 +298,7 @@ class _ServerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Material(
@@ -329,13 +337,13 @@ class _ServerList extends StatelessWidget {
                   style: TextStyle(color: palette.muted, fontSize: 13),
                 ),
                 trailing: PopupMenuButton<void>(
-                  tooltip: 'More',
+                  tooltip: texts.serversMore,
                   icon: Icon(Icons.more_horiz, color: palette.muted),
                   itemBuilder: (context) => [
                     PopupMenuItem(
                       onTap: () => onRemove(server),
                       child: Text(
-                        'Remove Server',
+                        texts.serversRemoveServer,
                         style: TextStyle(color: palette.error),
                       ),
                     ),

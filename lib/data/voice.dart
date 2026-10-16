@@ -27,10 +27,11 @@ import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
 import 'input_filters.dart';
+import 'language.dart';
 import 'link.dart';
 import 'link_stats.dart';
-import 'language.dart';
 import 'preferences.dart';
+import 'problem.dart';
 import 'protocol.dart';
 import 'shortcuts.dart';
 import 'sounds.dart';
@@ -288,7 +289,7 @@ class Voice extends ChangeNotifier {
       await _unpublish(lk.TrackSource.microphone);
       muted = true;
     } else if (serverMuted) {
-      error = 'A moderator muted you; only they can lift it.';
+      error = _texts.voiceMutedByModerator;
     } else {
       muted = false;
       await _publishMicrophone();
@@ -374,7 +375,7 @@ class Voice extends ChangeNotifier {
       muted = false;
       await _publishMicrophone();
     } else if (unmute && serverMuted) {
-      error = 'A moderator muted you; only they can lift it.';
+      error = _texts.voiceMutedByModerator;
     }
     _refreshMicStates();
   }
@@ -426,7 +427,7 @@ class Voice extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('camera unavailable: $e');
-      error = 'Camera unavailable.';
+      error = _texts.voiceCameraUnavailable;
     }
     // Read the state back: unpublish events fire while the call above runs.
     camera = _room?.localParticipant?.isCameraEnabled() ?? false;
@@ -521,7 +522,7 @@ class Voice extends ChangeNotifier {
         await room.setVideoInputDevice(camera);
       } catch (e) {
         debugPrint('cannot switch the camera: $e');
-        error = 'Cannot switch to that camera.';
+        error = _texts.voiceCannotSwitchCamera;
         notifyListeners();
       }
     }
@@ -583,7 +584,7 @@ class Voice extends ChangeNotifier {
       if (!await rtc.Helper.requestCapturePermission()) return;
       final name = gateway.channel(channel ?? '')?.channel.name ?? 'Wisetalk';
       if (!await _service.update(channel: name, sharing: true, texts: _texts)) {
-        error = 'Screen sharing unavailable.';
+        error = _texts.voiceScreenUnavailable;
         notifyListeners();
         return;
       }
@@ -716,7 +717,8 @@ class Voice extends ChangeNotifier {
     );
   }
 
-  /// For what is shown outside the app's windows.
+  /// For what is shown outside the app's windows, and the errors and names
+  /// this makes itself.
   AppLocalizations get _texts => textsFor(preferences.language.value);
 
   void _addTile(
@@ -729,7 +731,7 @@ class Voice extends ChangeNotifier {
       id: publication.sid,
       session: participant.identity,
       name: local
-          ? 'You'
+          ? _texts.videoYou
           : (participant.name.isEmpty
                 ? participant.identity
                 : participant.name),
@@ -813,9 +815,9 @@ class Voice extends ChangeNotifier {
         serverMuted = participant.serverMuted;
         if (serverMuted) {
           muted = true;
-          error = 'A moderator muted you.';
+          error = _texts.voiceServerMuted;
         } else {
-          error = 'A moderator lifted your mute. Unmute when you are ready.';
+          error = _texts.voiceServerUnmuted;
         }
         _refreshMicStates();
       case 'channel_updated':
@@ -841,7 +843,10 @@ class Voice extends ChangeNotifier {
       case 'kicked':
         final kicked = data as Map<String, dynamic>;
         if (kicked['channel'] == channel) _reset();
-        error = 'You left the channel: ${kicked['reason']}.';
+        // A known reason is a whole sentence; an older server's English
+        // gets a lead-in.
+        final reason = _texts.voiceKicked(kicked['reason'] as String? ?? '');
+        error = problemText(_texts, kicked['problem'], reason);
         notifyListeners();
       case 'ready':
         // Maybe a newer server after a reconnect: ask again.
@@ -856,7 +861,11 @@ class Voice extends ChangeNotifier {
           _awayUnsupported = true;
           return;
         }
-        error = failure['message'] as String?;
+        error = problemText(
+          _texts,
+          failure['problem'],
+          failure['message'] as String? ?? '',
+        );
         if (state == VoiceState.joining) _reset();
         notifyListeners();
     }
@@ -999,7 +1008,7 @@ class Voice extends ChangeNotifier {
       // Left while connecting: the room closed under us, nothing went wrong.
       if (attempt != _attempt) return;
       debugPrint('cannot join voice: $e');
-      error = 'Cannot connect to voice.';
+      error = _texts.voiceCannotConnect;
       leave();
     }
   }
@@ -1047,7 +1056,7 @@ class Voice extends ChangeNotifier {
     } catch (e) {
       debugPrint('microphone unavailable: $e');
       muted = true;
-      error = 'Microphone unavailable: you can listen, but not speak.';
+      error = _texts.voiceMicrophoneUnavailable;
     }
     // After the microphone permission: the service needs it.
     unawaited(_syncService());

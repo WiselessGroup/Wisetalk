@@ -23,6 +23,7 @@ import '../src/rust/api/text.dart';
 import 'api.dart';
 import 'device.dart';
 import 'gateway.dart';
+import 'language.dart';
 import 'protocol.dart';
 import 'trust.dart';
 
@@ -150,7 +151,7 @@ class Chats extends ChangeNotifier {
         ? normalizeChatBody(raw: raw)
         : '';
     if (body == null || (body.isEmpty && picture == null)) {
-      error = 'A message is 1 to 2000 characters, without control characters.';
+      error = appTexts.chatInvalidMessage;
       notifyListeners();
       return;
     }
@@ -321,7 +322,7 @@ class Chats extends ChangeNotifier {
           // Our own picture shows at once, without a round trip.
           pictures[id] = picture.bytes;
         } on ApiException catch (e) {
-          error = "The picture didn't go out: ${e.message}";
+          error = appTexts.chatPictureNotSent(e.message);
           continue;
         } finally {
           uploading[channel] = uploading[channel]! - 1;

@@ -5,12 +5,14 @@
 // session together with its PKCE verifier.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:url_launcher/url_launcher.dart';
 
 import '../src/rust/api/auth.dart';
 import 'api.dart';
+import 'language.dart';
 
 /// How long to wait for the browser before giving up.
 const _patience = Duration(minutes: 5);
@@ -68,9 +70,7 @@ class BrowserSignIn {
 
     Timer(_patience, () {
       if (!flow._done.isCompleted) {
-        flow._done.completeError(
-          const ApiException(0, 'Signing in took too long. Try again.'),
-        );
+        flow._done.completeError(ApiException(0, appTexts.signInErrorExpired));
         unawaited(server.close(force: true));
       }
     });
@@ -82,7 +82,7 @@ class BrowserSignIn {
     );
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       flow.cancel();
-      throw const ApiException(0, "Can't open the browser to sign in.");
+      throw ApiException(0, appTexts.signInNoBrowser);
     }
     return flow;
   }
@@ -93,22 +93,28 @@ class SignInCancelled implements Exception {
 }
 
 /// The same reasons the web client shows for `?login_error=`.
-String _reason(String? error) => switch (error) {
-  'refused' => 'Signing in was cancelled.',
-  'banned' => 'This account is banned from the server.',
-  'expired' => 'Signing in took too long. Try again.',
-  'unavailable' => "This server can't sign in accounts right now.",
-  _ => 'Signing in failed. Try again.',
-};
+String _reason(String? error) {
+  final texts = appTexts;
+  return switch (error) {
+    'refused' => texts.signInErrorRefused,
+    'banned' => texts.signInErrorBanned,
+    'expired' => texts.signInErrorExpired,
+    'unavailable' => texts.signInErrorUnavailable,
+    _ => texts.signInErrorFailed,
+  };
+}
 
-/// What the browser tab shows once the app has its code.
+/// What the browser tab shows once the app has its code, in the app's
+/// language.
 Future<void> _answer(HttpResponse response, {required bool signedIn}) async {
-  final message = signedIn
-      ? "You're signed in. You can close this tab and go back to Wisetalk."
-      : 'Signing in did not work. Go back to Wisetalk to try again.';
+  final texts = appTexts;
+  final message = const HtmlEscape().convert(
+    signedIn ? texts.signInBrowserDone : texts.signInBrowserFailed,
+  );
+  final language = texts.localeName.replaceAll('_', '-');
   response.headers.contentType = ContentType.html;
   response.write('''<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<html lang="$language"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Wisetalk</title>
 <style>
   :root { color-scheme: light dark; }

@@ -71,5 +71,1169 @@
   "settingsTitle": "Settings",
   "settingsLanguage": "Language",
   "settingsSystemDefault": "System Default",
-  "settingsDone": "Done"
+  "settingsDone": "Done",
+  "chatTitle": "Chat",
+  "chatVanishes": "Messages vanish 4 h after the last one",
+  "@chatVanishes": {
+    "description": "Under the chat title while the chat is empty."
+  },
+  "chatClearsInHours": "Clears in {hours} h {minutes} min unless someone writes",
+  "@chatClearsInHours": {
+    "description": "Under the chat title: when the chat clears itself.",
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "chatClearsInMinutes": "Clears in {minutes} min unless someone writes",
+  "@chatClearsInMinutes": {
+    "description": "Under the chat title: when the chat clears itself.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "chatClose": "Close Chat",
+  "chatEmpty": "No messages yet. Say hi!",
+  "chatLoading": "Loading…",
+  "@chatLoading": {
+    "description": "While the chat history loads."
+  },
+  "chatGettingKey": "Getting the chat key…",
+  "chatSendingPicture": "Sending the picture…",
+  "chatPreparingPicture": "Preparing the picture…",
+  "chatAddPicture": "Add Picture",
+  "chatMessageTo": "Message {channel}",
+  "@chatMessageTo": {
+    "description": "Hint in the chat composer.",
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "chatSend": "Send",
+  "chatLocked": "Encrypted with a key this device doesn't have: sent before it joined the chat.",
+  "@chatLocked": {
+    "description": "In place of a message this device cannot decrypt."
+  },
+  "chatGuest": "guest",
+  "@chatGuest": {
+    "description": "Next to the name of a guest who wrote a message."
+  },
+  "chatDeleteMessage": "Delete Message",
+  "chatPictures": "Pictures",
+  "@chatPictures": {
+    "description": "The file type filter in the dialog for picking a picture to send."
+  },
+  "chatInvalidMessage": "A message is 1 to 2000 characters, without control characters.",
+  "chatPictureNotSent": "The picture didn't go out: {reason}",
+  "@chatPictureNotSent": {
+    "description": "The reason is the server's message.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "pictureFailed": "Picture didn't load",
+  "@pictureFailed": {
+    "description": "In place of a chat picture that did not load."
+  },
+  "pictureTooLarge": "This picture is too large.",
+  "pictureUnreadable": "This picture can't be read.",
+  "trustNewDevice": "{name} joined from a new device.",
+  "@trustNewDevice": {
+    "description": "Toast: someone I met before is in my call from a device I have not seen.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "trustMineAdded": "{count, plural, one{A new device signed in to your account.} other{{count} new devices signed in to your account.}}",
+  "@trustMineAdded": {
+    "description": "Toast: devices added to my own account since I last looked.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trustMineChanged": "Careful: a device of your account came with another key.",
+  "personKeyChanged": "Careful: their device key has changed.",
+  "@personKeyChanged": {
+    "description": "Tooltip of the key mark next to someone in my call whose device key changed."
+  },
+  "notificationOpen": "Open",
+  "@notificationOpen": {
+    "description": "Linux: the action of a system notification, which opens what it is about."
+  },
+  "notificationChannel": "Messages and summons",
+  "@notificationChannel": {
+    "description": "Android: the name of the notification channel in the system settings."
+  },
+  "notificationSummonTitle": "{caller} is calling you",
+  "@notificationSummonTitle": {
+    "description": "System notification title: someone summons me into their channel.",
+    "placeholders": {
+      "caller": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationSummonBody": "Join {channel}",
+  "@notificationSummonBody": {
+    "description": "System notification text under notificationSummonTitle.",
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "signInErrorRefused": "Sign-in was cancelled.",
+  "signInErrorExpired": "Sign-in took too long. Try again.",
+  "signInErrorBanned": "This account is banned on this server.",
+  "signInErrorUnavailable": "Account sign-in is not available right now.",
+  "signInErrorFailed": "Sign-in failed. Try again.",
+  "signInNoBrowser": "Can't open the browser to sign in.",
+  "signInBrowserDone": "You're signed in. You can close this tab and go back to Wisetalk.",
+  "@signInBrowserDone": {
+    "description": "The page the browser shows after signing in for the app."
+  },
+  "signInBrowserFailed": "Signing in did not work. Go back to Wisetalk to try again.",
+  "@signInBrowserFailed": {
+    "description": "The page the browser shows when signing in for the app failed."
+  },
+  "updatesNotSelfUpdating": "This build of Wisetalk doesn’t update itself.",
+  "updatesCannotCheck": "Cannot check for updates. Try again later.",
+  "updatesReady": "Wisetalk {version} is ready: Restart to Update.",
+  "@updatesReady": {
+    "description": "After Check for Updates: a new version is downloaded; Restart to Update is the button that applies it.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updatesAvailable": "Wisetalk {version} is out: Update to {version}.",
+  "@updatesAvailable": {
+    "description": "After Check for Updates: a newer version the browser downloads; Update to … is the button for it.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updatesLatest": "Wisetalk {version} is the latest.",
+  "@updatesLatest": {
+    "description": "After Check for Updates: nothing newer.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceMutedByModerator": "A moderator muted you; only they can lift it.",
+  "voiceCameraUnavailable": "Camera unavailable.",
+  "voiceCannotSwitchCamera": "Cannot switch to that camera.",
+  "voiceScreenUnavailable": "Screen sharing unavailable.",
+  "voiceServerMuted": "A moderator muted you.",
+  "voiceServerUnmuted": "A moderator lifted your mute. Unmute when you are ready.",
+  "voiceKicked": "You left the channel: {reason}.",
+  "@voiceKicked": {
+    "description": "The reason is the server's message.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "voiceCannotConnect": "Cannot connect to voice.",
+  "voiceMicrophoneUnavailable": "Microphone unavailable: you can listen, but not speak.",
+  "videoYou": "You",
+  "@videoYou": {
+    "description": "The name on my own video tile."
+  },
+  "connectionMilliseconds": "{value} ms",
+  "@connectionMilliseconds": {
+    "description": "Ping or jitter in milliseconds.",
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "connectionSignedOut": "You were signed out.",
+  "apiUnreachable": "Can't reach the server.",
+  "apiUnreachableCheck": "Can't reach the server. Check the address and your connection.",
+  "apiNotWisetalk": "That doesn't look like a Wisetalk server.",
+  "apiRefused": "The server said no ({status}).",
+  "@apiRefused": {
+    "description": "A refusal without a message of the server's own; status is the HTTP status code.",
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
+  "desktopComment": "Voice and video chat for one community",
+  "@desktopComment": {
+    "description": "Linux: the app menu entry's comment."
+  },
+  "personYou": "{name} (you)",
+  "@personYou": {
+    "description": "Menu header for yourself.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personAudioVideoSettings": "Audio and Video Settings…",
+  "personVolume": "Volume {percent}%",
+  "@personVolume": {
+    "description": "How loud someone is for me, in their menu.",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "personMuteForMe": "Mute for Me",
+  "personUnmuteForMe": "Unmute for Me",
+  "moderationServerMute": "Server Mute",
+  "moderationLiftServerMute": "Lift Server Mute",
+  "moderationKick": "Kick from Channel",
+  "personMakeServerAdmin": "Make Server Admin",
+  "personRemoveServerAdmin": "Remove Server Admin",
+  "personNowAdmin": "{name} is now a server admin.",
+  "@personNowAdmin": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personNowMember": "{name} is now a member.",
+  "@personNowMember": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBan": "Ban from Server…",
+  "moderationBanTitle": "Ban {name}?",
+  "@moderationBanTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBanConfirm": "Ban {name} from this server? Their sessions end right away.",
+  "@moderationBanConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBanAction": "Ban",
+  "@moderationBanAction": {
+    "description": "The button that confirms a ban."
+  },
+  "moderationBanned": "{name} is banned.",
+  "@moderationBanned": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBanGuest": "Ban Guest for a Day…",
+  "moderationBanGuestConfirm": "Remove {name} and block guests from their address for a day?",
+  "@moderationBanGuestConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationGuestBanned": "{name} is out; their address is blocked for a day.",
+  "@moderationGuestBanned": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "channelMakeOwner": "Make Owner of {channel}",
+  "@channelMakeOwner": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "channelRemoveOwner": "Remove as Owner of {channel}",
+  "@channelRemoveOwner": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "channelNewOwner": "{name} now owns {channel}.",
+  "@channelNewOwner": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "channelNoOwner": "{channel} has no owner now.",
+  "@channelNoOwner": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "spaceMakeOwner": "Make Owner of {space}",
+  "@spaceMakeOwner": {
+    "placeholders": {
+      "space": {
+        "type": "String"
+      }
+    }
+  },
+  "spaceRemoveOwner": "Remove as Owner of {space}",
+  "@spaceRemoveOwner": {
+    "placeholders": {
+      "space": {
+        "type": "String"
+      }
+    }
+  },
+  "spaceNewOwner": "{name} now owns {space}.",
+  "@spaceNewOwner": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "space": {
+        "type": "String"
+      }
+    }
+  },
+  "spaceNoOwner": "{space} has no owner now.",
+  "@spaceNoOwner": {
+    "placeholders": {
+      "space": {
+        "type": "String"
+      }
+    }
+  },
+  "channelAudioStereo": "Audio up to {kbps} kbps, stereo",
+  "@channelAudioStereo": {
+    "description": "Under the channel name in its menu.",
+    "placeholders": {
+      "kbps": {
+        "type": "int"
+      }
+    }
+  },
+  "channelAudioMono": "Audio up to {kbps} kbps, mono",
+  "@channelAudioMono": {
+    "description": "Under the channel name in its menu.",
+    "placeholders": {
+      "kbps": {
+        "type": "int"
+      }
+    }
+  },
+  "channelJoin": "Join",
+  "channelOpenChat": "Open Chat",
+  "channelOpenSettings": "Channel Settings…",
+  "inviteCopyLink": "Copy Invite Link",
+  "inviteCopied": "Invite link to {channel} copied.",
+  "@inviteCopied": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteCopiedWithKey": "Invite to {channel} copied. Once someone uses it, it lets anyone in for 10 minutes; unused, it lasts a day.",
+  "@inviteCopiedWithKey": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteCopiedRestricted": "Invite link to {channel} copied. It only works for people the channel already lets in.",
+  "@inviteCopiedRestricted": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteCannotCreate": "Cannot create an invite.",
+  "spaceNewChannel": "New Channel in Space…",
+  "spaceOpenSettings": "Space Settings…",
+  "spaceDelete": "Delete Space…",
+  "spaceDeleteConfirm": "Delete the space {space}? Its channels move to the top level.",
+  "@spaceDeleteConfirm": {
+    "placeholders": {
+      "space": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceMoveUp": "Move Up",
+  "workspaceMoveDown": "Move Down",
+  "workspaceCannotReorder": "Cannot reorder.",
+  "channelSettingsKbps": "{kbps} kbps",
+  "@channelSettingsKbps": {
+    "placeholders": {
+      "kbps": {
+        "type": "int"
+      }
+    }
+  },
+  "channelSettingsKbpsSpeech": "{kbps} kbps (speech)",
+  "@channelSettingsKbpsSpeech": {
+    "placeholders": {
+      "kbps": {
+        "type": "int"
+      }
+    }
+  },
+  "channelSettingsKbpsMusic": "{kbps} kbps (music)",
+  "@channelSettingsKbpsMusic": {
+    "placeholders": {
+      "kbps": {
+        "type": "int"
+      }
+    }
+  },
+  "createNewChannel": "New Channel",
+  "createNewSpace": "New Space",
+  "createSubmit": "Create",
+  "createChannel": "Channel",
+  "@createChannel": {
+    "description": "A choice: create a channel."
+  },
+  "createSpace": "Space",
+  "@createSpace": {
+    "description": "A choice: create a space."
+  },
+  "createChannelHint": "A voice room people join, with its own chat.",
+  "createSpaceHint": "A folder that groups channels in the sidebar.",
+  "createChannelPlaceholder": "Team Blue",
+  "@createChannelPlaceholder": {
+    "description": "An example name for a new channel."
+  },
+  "channelSettingsTitle": "Channel Settings",
+  "channelSettingsOwnerHint": "The owner manages this channel. Only admins choose who owns it.",
+  "channelSettingsDeleteConfirm": "Delete {name}? Everyone inside is dropped.",
+  "@channelSettingsDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "channelSettingsPeopleAndSound": "People and Sound",
+  "channelSettingsMaxPeople": "Max People",
+  "channelSettingsNoLimit": "No limit",
+  "channelSettingsAudioQuality": "Audio Quality",
+  "channelSettingsStereo": "Stereo",
+  "channelSettingsDelete": "Delete Channel…",
+  "manageSpace": "Space",
+  "@manageSpace": {
+    "description": "Which space a channel is in."
+  },
+  "manageOwner": "Owner",
+  "@manageOwner": {
+    "description": "Who owns a channel or a space."
+  },
+  "manageAccess": "Access",
+  "spaceSettingsTitle": "Space Settings",
+  "spaceSettingsOwnerHint": "The owner manages the space and every channel in it. Only admins choose who owns it.",
+  "accessAccountsOnly": "Accounts Only",
+  "accessAccountsOnlyDetail": "No guests",
+  "accessWhitelistOnly": "Whitelist Only",
+  "accessHidden": "Hidden",
+  "accessHiddenDetail": "Invisible to those who may not enter",
+  "accessFromSpace": "Set by the space",
+  "summonsTitle": "Summon to {channel}",
+  "@summonsTitle": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "summonsSummon": "Summon",
+  "summonsNickname": "Nickname",
+  "summonsNoMatch": "Nobody matching who could come here.",
+  "summonsHint": "They get a notification that you are waiting. Once per 5 minutes per person.",
+  "summonsSearchFailed": "Cannot search.",
+  "manageDeviceKey": "Device Key",
+  "@manageDeviceKey": {
+    "description": "Menu header over someone's device key fingerprint."
+  },
+  "manageDeleteTitle": "Delete {name}?",
+  "@manageDeleteTitle": {
+    "description": "Title of the dialog that confirms deleting a channel or a space.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "manageDelete": "Delete",
+  "@manageDelete": {
+    "description": "The button that confirms deleting a channel or a space."
+  },
+  "manageSave": "Save",
+  "manageName": "Name",
+  "@manageName": {
+    "description": "The name of a channel or a space."
+  },
+  "manageNone": "None",
+  "@manageNone": {
+    "description": "A channel in no space, at the top level of the list."
+  },
+  "manageNobody": "Nobody",
+  "@manageNobody": {
+    "description": "A channel or a space owned by nobody."
+  },
+  "manageSomeoneElse": "Someone else",
+  "@manageSomeoneElse": {
+    "description": "The owner picker: the current owner is not among the accounts listed."
+  },
+  "manageWhitelistInWeb": "Edit the whitelist in the web client for now.",
+  "@manageWhitelistInWeb": {
+    "description": "The app cannot edit the whitelist of a channel yet."
+  },
+  "channelSettingsLimitHint": "When the channel is full, only people who manage it can still join. From 1 to 99 people, or no limit.",
+  "spaceSettingsAccessHint": "These limits apply to every channel in the space; a channel can only add its own. Edit the whitelist in the web client for now.",
+  "accessWhitelistOnlyListDetail": "Only the people and roles on its list",
+  "@accessWhitelistOnlyListDetail": {
+    "description": "Under Whitelist Only; the list itself is edited in the web client."
+  },
+  "summonsWho": "Who?",
+  "@summonsWho": {
+    "description": "Hint in the empty nickname field of the summon dialog."
+  },
+  "settingsPictures": "Pictures",
+  "@settingsPictures": {
+    "description": "The file type filter in the system dialog that picks a profile picture."
+  },
+  "profileAddPicture": "Add Picture…",
+  "profileChangePicture": "Change Picture…",
+  "profileRemovePicture": "Remove Picture",
+  "@profileRemovePicture": {
+    "description": "Removes your profile picture."
+  },
+  "profileUploadFailed": "Cannot upload the picture.",
+  "profileRemoveFailed": "Cannot remove the picture.",
+  "saveFailed": "Cannot save.",
+  "settingsAudioVideo": "Audio and Video",
+  "settingsMicrophone": "Microphone",
+  "settingsCamera": "Camera",
+  "settingsOutput": "Output",
+  "@settingsOutput": {
+    "description": "Which speakers or headphones the sound goes to."
+  },
+  "settingsVoiceProcessing": "Voice Processing",
+  "settingsVoiceProcessingDetail": "Noise suppression and echo cancellation",
+  "settingsVoiceProcessingHint": "Turn it off for the best sound, and wear headphones then: without echo cancellation others hear themselves through your speakers.",
+  "settingsCues": "Join and Leave Sounds",
+  "settingsCuesDetail": "An owl hoots when someone comes or goes, and shortcuts tick",
+  "@settingsCuesDetail": {
+    "description": "Under Join and Leave Sounds: keyboard shortcuts also make a short tick when they turn something on or off."
+  },
+  "settingsPingAndLoss": "Show Ping and Loss",
+  "settingsPingAndLossDetail": "Next to the connection icon in a call",
+  "summonsHeader": "Summons",
+  "@summonsHeader": {
+    "description": "Settings group: whether others may ask you by a notification to join their voice channel."
+  },
+  "summonsAllow": "Others May Summon Me",
+  "settingsNotificationsHere": "Notifications on This Device",
+  "settingsNotificationsHint": "Shown while Wisetalk is in the background.",
+  "settingsNotifyMessages": "New Messages",
+  "settingsNotifyMessagesDetail": "In your call’s chat and chats you opened",
+  "settingsNotifySummons": "Summons",
+  "@settingsNotifySummons": {
+    "description": "Notification switch: a notification when someone summons you into their voice channel."
+  },
+  "settingsNotifySummonsDetail": "When someone calls you into a channel",
+  "settingsPrivacy": "Privacy",
+  "settingsCrashReports": "Send Crash Reports",
+  "settingsCrashReportsHint": "When something in Wisetalk breaks, tell its developers what broke and where in the code. Never your messages, names, keys or servers.",
+  "settingsShortcuts": "Shortcuts",
+  "@settingsShortcuts": {
+    "description": "Keyboard shortcuts, desktop only."
+  },
+  "settingsShortcutsRecording": "Press the new keys. Backspace removes the shortcut, Esc keeps it.",
+  "@settingsShortcutsRecording": {
+    "description": "While recording a new keyboard shortcut. Backspace and Esc are key names."
+  },
+  "settingsShortcutsGlobal": "In a call they work whatever app is in front, otherwise in Wisetalk’s window. Click one to change it.",
+  "settingsShortcutsWayland": "On Wayland they work only while Wisetalk’s window is in front. Click one to change it.",
+  "settingsShortcutPressKeys": "Press keys…",
+  "@settingsShortcutPressKeys": {
+    "description": "In place of a shortcut while waiting for the new keys."
+  },
+  "settingsShortcutNone": "None",
+  "@settingsShortcutNone": {
+    "description": "A shortcut bound to no keys."
+  },
+  "settingsShortcutTaken": "{keys} is already {action}.",
+  "@settingsShortcutTaken": {
+    "description": "The keys just pressed are bound to another action.",
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "Ctrl+Shift+M"
+      },
+      "action": {
+        "type": "String",
+        "example": "Microphone On or Off"
+      }
+    }
+  },
+  "shortcutToggleMute": "Microphone On or Off",
+  "@shortcutToggleMute": {
+    "description": "A keyboard shortcut action."
+  },
+  "shortcutToggleAway": "Away or Back",
+  "@shortcutToggleAway": {
+    "description": "A keyboard shortcut action: step away from the call, or come back."
+  },
+  "shortcutMute": "Microphone Off",
+  "@shortcutMute": {
+    "description": "A keyboard shortcut action."
+  },
+  "shortcutUnmute": "Microphone On",
+  "@shortcutUnmute": {
+    "description": "A keyboard shortcut action."
+  },
+  "shortcutUnusableKey": "That key can’t be used for a shortcut.",
+  "shortcutTyping": "Add {first} or {second}, or use F1 to F24.",
+  "@shortcutTyping": {
+    "description": "A key that types text was pressed alone. The placeholders are modifier keys: Ctrl and Alt, or ⌘ and ⌃ on a Mac.",
+    "placeholders": {
+      "first": {
+        "type": "String",
+        "example": "Ctrl"
+      },
+      "second": {
+        "type": "String",
+        "example": "Alt"
+      }
+    }
+  },
+  "shortcutReserved": "{keys} belongs to the system or to every app.",
+  "@shortcutReserved": {
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "Ctrl+Q"
+      }
+    }
+  },
+  "sheetDiscardTitle": "Discard Changes?",
+  "sheetDiscardMessage": "What you changed here is not saved yet.",
+  "sheetDiscard": "Discard",
+  "sheetKeepEditing": "Keep Editing",
+  "serversRemoveTitle": "Remove {server}?",
+  "@serversRemoveTitle": {
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "example": "Wiseless"
+      }
+    }
+  },
+  "serversRemoveMessage": "This device signs out of it and forgets it. You can add it again with its address.",
+  "serversRemove": "Remove",
+  "serversAddressHelp": "Ask whoever runs your community for its address.",
+  "serversConnecting": "Connecting…",
+  "serversConnect": "Connect",
+  "serversWhich": "Which server is your community on?",
+  "serversYours": "Your Servers",
+  "serversAddMenu": "Add a Server…",
+  "serversAddTitle": "Add a Server",
+  "serversBadAddress": "Type the address of a server, like talk.example.com.",
+  "serversTooNew": "This server is newer than this app. Update Wisetalk to join it.",
+  "serversTooOld": "This server runs an older Wisetalk. Ask its admins to update it.",
+  "serversTooOldVersion": "This server runs an older Wisetalk ({version}). Ask its admins to update it.",
+  "@serversTooOldVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "0.4.1"
+      }
+    }
+  },
+  "serversAddress": "Address",
+  "@serversAddress": {
+    "description": "The server address field."
+  },
+  "serversMore": "More",
+  "@serversMore": {
+    "description": "Tooltip of the ⋯ button next to a saved server."
+  },
+  "serversRemoveServer": "Remove Server",
+  "channelSomeChannel": "a channel",
+  "@channelSomeChannel": {
+    "description": "Stands in for a channel name we cannot see, inside sentences."
+  },
+  "workspaceMessageTitle": "{name} in {channel}",
+  "@workspaceMessageTitle": {
+    "description": "System notification title for a new chat message: who wrote, in which channel.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceMessageEncrypted": "Wrote an encrypted message.",
+  "@workspaceMessageEncrypted": {
+    "description": "System notification body for a chat message this device cannot read; the title names the author."
+  },
+  "workspaceMessagePicture": "Sent a picture.",
+  "@workspaceMessagePicture": {
+    "description": "System notification body for a chat message with only a picture; the title names the author."
+  },
+  "summonPushed": "{name} got a notification.",
+  "@summonPushed": {
+    "description": "After summoning someone whose device got a push notification.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "summonPushedSomeone": "They got a notification.",
+  "@summonPushedSomeone": {
+    "description": "As summonPushed, when the name is unknown."
+  },
+  "summonNotPushed": "Summoned {name}. They have notifications off, so only an open Wisetalk shows it.",
+  "@summonNotPushed": {
+    "description": "After summoning someone who gets no push notifications: only a running Wisetalk (app or tab) shows the summons.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "summonNotPushedSomeone": "Summoned. They have notifications off, so only an open Wisetalk shows it.",
+  "@summonNotPushedSomeone": {
+    "description": "As summonNotPushed, when the name is unknown."
+  },
+  "summonReceived": "{from} summons you to {channel}.",
+  "@summonReceived": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceSummoned": "Summoned",
+  "@workspaceSummoned": {
+    "description": "System notification title when someone summons me; the body says who and where."
+  },
+  "workspaceRoleChangedOwner": "Your server role is now owner.",
+  "workspaceRoleChangedAdmin": "Your server role is now admin.",
+  "workspaceRoleChangedModerator": "Your server role is now moderator.",
+  "workspaceRoleChangedMember": "Your server role is now member.",
+  "workspaceRoleChangedGuest": "Your server role is now guest.",
+  "takeOverTitle": "Join from This Device?",
+  "takeOverSameChannel": "You’re already in {channel} on another device or tab. Joining {channel} here takes you out of the call there.",
+  "@takeOverSameChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "takeOverOtherChannel": "You’re in {there} on another device or tab. Joining {here} here takes you out of the call there.",
+  "@takeOverOtherChannel": {
+    "description": "{there}: the channel my account is in elsewhere; {here}: the one I am joining.",
+    "placeholders": {
+      "there": {
+        "type": "String"
+      },
+      "here": {
+        "type": "String"
+      }
+    }
+  },
+  "takeOverElsewhere": "You’re in a call on another device or tab. Joining here takes you out of the call there.",
+  "@takeOverElsewhere": {
+    "description": "As takeOverOtherChannel, when a channel name is unknown."
+  },
+  "takeOverJoinHere": "Join Here",
+  "workspaceShowChannels": "Show channels",
+  "@workspaceShowChannels": {
+    "description": "Screen reader: phones in a call, the row that unfolds the channel list."
+  },
+  "workspaceHideChannels": "Hide channels",
+  "@workspaceHideChannels": {
+    "description": "Screen reader: phones in a call, the row that folds the channel list."
+  },
+  "workspaceInVoice": "{count} in voice",
+  "@workspaceInVoice": {
+    "description": "How many people are in a voice channel, or in all channels of a folded space.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceCreateTitle": "New Channel or Space",
+  "workspaceStatusConnecting": "Connecting…",
+  "workspaceStatusOffline": "Offline…",
+  "@workspaceStatusOffline": {
+    "description": "Under the server name while the connection is down and being retried."
+  },
+  "workspaceEmptyAdmin": "No channels yet. Create one with the + button.",
+  "workspaceEmpty": "No channels yet. An admin can add some.",
+  "workspaceMore": "More",
+  "@workspaceMore": {
+    "description": "Tooltip of the ⋯ menu next to my name."
+  },
+  "workspaceCheckForUpdates": "Check for Updates",
+  "workspaceChangeServer": "Change Server",
+  "workspaceSignOut": "Sign Out",
+  "personMutedForYou": "Muted for you",
+  "awayTitle": "Away",
+  "@awayTitle": {
+    "description": "Status and button: microphone and sound off, stepped away."
+  },
+  "awayDescription": "Away: microphone and sound off",
+  "@awayDescription": {
+    "description": "Screen reader label of the Away button."
+  },
+  "callMutedByModerator": "Muted by a moderator",
+  "workspaceDrag": "Drag {name}",
+  "@workspaceDrag": {
+    "description": "Tooltip of the handle that moves a channel or space; {name} is its name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceDropEndHint": "Drop here for the end of the list",
+  "workspaceUpdateDownloaded": "Wisetalk {version} is downloaded",
+  "@workspaceUpdateDownloaded": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceUpdateOut": "Wisetalk {version} is out",
+  "@workspaceUpdateOut": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceRestartToUpdate": "Restart to Update",
+  "workspaceUpdateTo": "Update to {version}",
+  "@workspaceUpdateTo": {
+    "description": "Opens the download of the new version, where the app cannot update itself.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceWelcomeTitle": "Pick a Voice Channel",
+  "workspaceWelcomeHint": "Click a channel to join.",
+  "@workspaceWelcomeHint": {
+    "description": "Under workspaceWelcomeTitle while in no call."
+  },
+  "callJoining": "Joining…",
+  "@callJoining": {
+    "description": "Above the stage while joining a voice channel."
+  },
+  "callWaitingForKey": "Waiting for the call key…",
+  "callEncrypted": "End-to-end encrypted",
+  "videoScreen": "{name} · screen",
+  "@videoScreen": {
+    "description": "Name on a shared screen tile.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "connectionExcellent": "Excellent",
+  "@connectionExcellent": {
+    "description": "Connection quality, alone in the details and inside connectionStatus."
+  },
+  "connectionGood": "Good",
+  "@connectionGood": {
+    "description": "Connection quality, alone in the details and inside connectionStatus."
+  },
+  "connectionPoor": "Poor",
+  "@connectionPoor": {
+    "description": "Connection quality, alone in the details and inside connectionStatus."
+  },
+  "connectionLost": "Lost",
+  "@connectionLost": {
+    "description": "Connection quality, alone in the details and inside connectionStatus."
+  },
+  "connectionChecking": "Checking",
+  "@connectionChecking": {
+    "description": "Connection quality, alone in the details and inside connectionStatus."
+  },
+  "connectionStatus": "Connection: {quality}",
+  "@connectionStatus": {
+    "description": "{quality} is one of connectionExcellent, connectionGood, connectionPoor, connectionLost, connectionChecking.",
+    "placeholders": {
+      "quality": {
+        "type": "String"
+      }
+    }
+  },
+  "connectionLabel": "Connection",
+  "@connectionLabel": {
+    "description": "Connection details: the row with the quality word."
+  },
+  "connectionShort": "{ping} · {loss} loss",
+  "@connectionShort": {
+    "description": "Next to the signal bars: {ping} like \"42 ms\", {loss} like \"0.5%\".",
+    "placeholders": {
+      "ping": {
+        "type": "String"
+      },
+      "loss": {
+        "type": "String"
+      }
+    }
+  },
+  "connectionPingLoss": "Ping {ping}, loss {loss}",
+  "@connectionPingLoss": {
+    "description": "Screen reader version of connectionShort.",
+    "placeholders": {
+      "ping": {
+        "type": "String"
+      },
+      "loss": {
+        "type": "String"
+      }
+    }
+  },
+  "connectionPing": "Ping",
+  "connectionOutgoingLoss": "Outgoing Loss",
+  "connectionIncomingLoss": "Incoming Loss",
+  "connectionJitter": "Jitter",
+  "connectionMicrophone": "Microphone",
+  "connectionNotSending": "Not sending",
+  "@connectionNotSending": {
+    "description": "Connection details, Microphone row: no audio goes out."
+  },
+  "connectionKilobits": "{value} kbps",
+  "@connectionKilobits": {
+    "description": "Microphone bitrate in the connection details.",
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "screenShareTitle": "Share Your Screen",
+  "screenShareAction": "Share",
+  "@screenShareAction": {
+    "description": "Button that starts sharing the screen."
+  },
+  "screenShareBestFor": "Best For",
+  "@screenShareBestFor": {
+    "description": "Header over the choice between text and motion."
+  },
+  "screenShareAndroidHint": "Android asks next whether to share the entire screen or one app. Without sound, for now.",
+  "screenShareWaylandHint": "The first time, your system asks which screen to share. Later shares reuse that screen until Wisetalk restarts. Whole screens only, without sound, for now.",
+  "@screenShareWaylandHint": {
+    "description": "Linux on Wayland, where the system picks the screen."
+  },
+  "screenShareText": "Text and Slides",
+  "screenShareTextDetail": "Sharp and light: a few frames a second.",
+  "screenShareMotion": "Video and Games",
+  "screenShareMotionDetail": "Smooth: 30 frames a second, heavier on both ends.",
+  "screenShareSource": "Screen or Window",
+  "screenShareSound": "Share Sound",
+  "@screenShareSound": {
+    "description": "Switch: send the shared window or screen's sound too (Windows)."
+  },
+  "screenShareSoundWindow": "Only this window's app.",
+  "@screenShareSoundWindow": {
+    "description": "Under Share Sound with a window picked: whose sound goes."
+  },
+  "screenShareSoundScreen": "Everything you hear, without the call.",
+  "@screenShareSoundScreen": {
+    "description": "Under Share Sound with a screen picked."
+  },
+  "screenShareSoundAny": "A window's app, or for a screen everything you hear, without the call.",
+  "@screenShareSoundAny": {
+    "description": "Under Share Sound before anything is picked."
+  },
+  "screenShareListFailed": "Can't list screens and windows.",
+  "screenShareChooseTitle": "Choose a Screen",
+  "@screenShareChooseTitle": {
+    "description": "Linux on Wayland: waiting while the system asks which screen to share."
+  },
+  "screenShareChooseHint": "Pick the screen to share in your system's window.",
+  "problemNotSignedIn": "You’re not signed in.",
+  "problemAccountRequired": "Sign in with an account first.",
+  "problemAccountBanned": "This account is banned.",
+  "problemSignInCodeInvalid": "This sign-in code is no longer valid. Sign in again.",
+  "problemBrowserCheckMissing": "The browser check is missing. Reload and try again.",
+  "problemBrowserCheckFailed": "The browser check failed. Reload and try again.",
+  "problemBrowserCheckExpired": "The browser check expired. Try again.",
+  "problemGuestSignInClosed": "Guest sign-in is closed right now. Sign in with an account.",
+  "problemGuestAddressBlocked": "Guests from this address are blocked for a while.",
+  "problemTooManyGuests": "Too many guests right now. Try again later or sign in with an account.",
+  "problemTooManyGuestSignIns": "Too many guest sign-ins from this address. Try again later.",
+  "problemNameBelongsToAccount": "This name belongs to an account.",
+  "problemAccountsCantBeGuests": "Accounts can’t be guests.",
+  "problemNoSuchAccount": "This account doesn’t exist.",
+  "problemNoSuchChannel": "This channel doesn’t exist any more.",
+  "problemNoSuchSpace": "This space doesn’t exist any more.",
+  "problemNoSuchEmoji": "This emoji doesn’t exist.",
+  "problemNoSuchGuest": "This guest isn’t online any more.",
+  "problemNoSuchPicture": "This picture is gone.",
+  "problemNoSuchMessage": "This message is gone.",
+  "problemNoAvatar": "There’s no avatar.",
+  "problemNotBanned": "This account isn’t banned.",
+  "problemDisplayNameLength": "A name is 1 to 32 characters.",
+  "problemChannelNameLength": "A channel name is 1 to 64 characters.",
+  "problemSpaceNameLength": "A space name is 1 to 64 characters.",
+  "problemEmojiNameInvalid": "An emoji name is 2 to 32 of a–z, 0–9 and _.",
+  "problemIconInvalid": "An icon is one emoji or a :custom_emoji:.",
+  "problemBrandingInvalid": "Names are up to 40 characters, the tagline up to 120, without control characters.",
+  "problemChannelLimitInvalid": "A channel holds 1 to 99 people, or has no limit.",
+  "problemBitrateInvalid": "The audio bitrate must be 6 to 510 kbit/s.",
+  "problemPictureType": "The picture must be PNG, JPEG or WebP.",
+  "problemAvatarTooLarge": "The picture is larger than 256 KB.",
+  "problemEmojiTooLarge": "The picture is larger than 128 KB.",
+  "problemChatPictureTooLarge": "A picture can be up to 20 MB.",
+  "problemPictureIdTaken": "This picture is already there.",
+  "problemChatFullOfPictures": "This chat holds too many pictures until it clears.",
+  "problemTooManyPictures": "That’s a lot of pictures. Wait a little.",
+  "problemManageNotPerRole": "Managing can’t be given per role.",
+  "problemOwnersHaveEveryPermission": "Owners and admins always have every permission.",
+  "problemOneOverridePerRole": "Only one rule per role.",
+  "problemWhitelistUnknownAccount": "The whitelist names an account that doesn’t exist.",
+  "problemGuestsNeverWhitelisted": "Guests can never pass a whitelist.",
+  "problemPushSubscriptionInvalid": "The browser sent a broken notification subscription.",
+  "problemPushEndpointNotPublic": "The notification address must be a public HTTPS address.",
+  "problemNotAllowedInChannel": "You may not do this in this channel.",
+  "problemMayNotEnter": "You may not enter this channel.",
+  "problemTheyMayNotEnter": "They may not enter this channel.",
+  "problemMayNotModerate": "You may not moderate this channel.",
+  "problemCantModerateYourself": "You can’t moderate yourself.",
+  "problemModerateRank": "You may not moderate someone of your rank or above.",
+  "problemBanRank": "You may not ban someone of your rank or above.",
+  "problemRoleRank": "You may only give roles below yours to people below you.",
+  "problemOnlyAdminsManageServer": "Only server owners and admins manage the server.",
+  "problemOnlyAdminsManageBans": "Only server owners and admins manage bans.",
+  "problemOnlyAdminsManageEmoji": "Only server owners and admins manage custom emoji.",
+  "problemOnlyAdminsManageSpaces": "Only server owners and admins manage spaces.",
+  "problemOnlyAdminsChooseChannelOwners": "Only server owners and admins choose channel owners.",
+  "problemOnlyAdminsChooseSpaceOwners": "Only server owners and admins choose space owners.",
+  "problemOnlySpaceManagersManageSpace": "Only admins and the space’s owner manage it.",
+  "problemOnlySpaceManagersCreateChannels": "Only admins, and space owners in their space, may create channels.",
+  "problemMoveIntoOwnSpace": "You may only move channels into a space you manage.",
+  "problemOnlyModeratorsInvite": "Only people who may moderate the channel hand out invites.",
+  "problemGuestsCantCreateChannels": "Guests may not create channels.",
+  "problemGuestsCantInvite": "Guests can’t invite.",
+  "problemGuestsCantBan": "Guests can’t ban.",
+  "problemGuestsCantGetNotifications": "Guests can’t get notifications.",
+  "problemGuestsHaveNoAvatar": "Guests have no avatar.",
+  "problemNotYourDevice": "That isn’t your device.",
+  "problemDeviceOfAnotherAccount": "This device belongs to another account.",
+  "problemOwnMessagesOnly": "You may only delete your own messages.",
+  "problemChannelFull": "This channel is full.",
+  "problemInviteUsed": "This invite was already used or has expired.",
+  "problemTooManyInvites": "Too many unused invites. Wait until some expire.",
+  "problemJoinChannelFirst": "Join the channel first.",
+  "problemNotInVoice": "You’re not in a voice channel.",
+  "problemNotInThatChannel": "You’re not in that channel.",
+  "problemPersonNotInYourChannel": "That person isn’t in your channel.",
+  "problemDeviceNotInChannel": "That device isn’t in the channel.",
+  "problemDeviceNotOnline": "That device isn’t online or may not enter.",
+  "problemVoiceNotConfigured": "Voice isn’t set up on this server.",
+  "problemSummonNeedsAccount": "Sign in with an account to summon.",
+  "problemCantSummonYourself": "You can’t summon yourself.",
+  "problemAlreadyHere": "They’re already here.",
+  "problemSummonsOff": "They turned summons off.",
+  "problemSummonedRecently": "You summoned them less than 5 minutes ago.",
+  "problemMessageLength": "A message is 1 to 2000 characters.",
+  "problemUploadPictureFirst": "The picture didn’t upload.",
+  "problemPictureNotAccepted": "This chat doesn’t take this picture.",
+  "problemChatHasNoKey": "This chat has no key yet.",
+  "problemNobodyHasChatKey": "Nobody online has this chat’s key.",
+  "problemNotCurrentChatKey": "That isn’t the chat’s current key.",
+  "problemChatKeyChanged": "The chat’s key changed. Try again.",
+  "problemEnvelopesForAnotherKey": "The keys were sealed for another chat key.",
+  "problemSealForYourself": "Seal the key for yourself too.",
+  "problemSealDeviceCount": "A key is sealed for 1 to 1000 devices.",
+  "problemNoLongerAllowed": "You no longer have access to this channel.",
+  "problemJoinedElsewhere": "You joined from another device.",
+  "problemKickedBy": "{by} removed you from the channel.",
+  "@problemKickedBy": {
+    "placeholders": {
+      "by": {
+        "type": "String"
+      }
+    }
+  },
+  "problemGuestRemovedBy": "{by} removed you. Guests from your address are blocked for a day.",
+  "@problemGuestRemovedBy": {
+    "placeholders": {
+      "by": {
+        "type": "String"
+      }
+    }
+  },
+  "problemBannedFromServer": "You’re banned from this server.",
+  "problemGuestSignInClosedByAdmin": "An admin closed guest sign-in.",
+  "problemHelloFirst": "The connection wasn’t ready. Reload the page.",
+  "problemUnreadableCommand": "The server couldn’t read that. Reload the page.",
+  "problemUnsupportedProtocol": "This version of Wisetalk is too old for the server. Reload the page.",
+  "problemSlowDown": "Slow down a little.",
+  "problemTooManyCommands": "Too many actions at once. Slow down a little.",
+  "problemGone": "That’s gone.",
+  "problemInternal": "Something went wrong on the server.",
+  "problemTooLarge": "That’s too big to send.",
+  "problemUnavailable": "The server isn’t answering. Try again in a minute."
 }

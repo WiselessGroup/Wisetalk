@@ -10,6 +10,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../data/gateway.dart';
 import '../data/protocol.dart';
 import '../data/voice.dart';
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import 'common.dart';
 import 'connection_status.dart';
@@ -51,6 +52,7 @@ class _CallAreaState extends State<CallArea> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final id = _voice.channel;
     final view = id == null ? null : widget.gateway.channel(id);
     if (view == null) {
@@ -61,7 +63,7 @@ class _CallAreaState extends State<CallArea> {
             Icon(Icons.headphones, size: 40, color: palette.accent),
             const SizedBox(height: 12),
             Text(
-              'Pick a Voice Channel',
+              texts.workspaceWelcomeTitle,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -70,7 +72,7 @@ class _CallAreaState extends State<CallArea> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Click a channel to join.',
+              texts.workspaceWelcomeHint,
               style: TextStyle(color: palette.muted),
             ),
           ],
@@ -78,9 +80,9 @@ class _CallAreaState extends State<CallArea> {
       );
     }
     final status = switch (_voice.state) {
-      VoiceState.joining => 'Joining…',
-      VoiceState.waitingForKey => 'Waiting for the call key…',
-      _ => 'End-to-end encrypted',
+      VoiceState.joining => texts.callJoining,
+      VoiceState.waitingForKey => texts.callWaitingForKey,
+      _ => texts.callEncrypted,
     };
     if (_focused != null && !_voice.tiles.any((t) => t.id == _focused)) {
       _focused = null;
@@ -181,6 +183,7 @@ class CallControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final id = voice.channel;
     final view = id == null ? null : gateway.channel(id);
     final connected = voice.state == VoiceState.connected;
@@ -204,7 +207,7 @@ class CallControls extends StatelessWidget {
             children: [
               _RoundButton(
                 icon: voice.muted ? Icons.mic_off : Icons.mic,
-                label: voice.muted ? 'Unmute' : 'Mute',
+                label: voice.muted ? texts.callUnmute : texts.callMute,
                 background: voice.muted
                     ? palette.error.withValues(alpha: 0.25)
                     : palette.fill,
@@ -213,8 +216,8 @@ class CallControls extends StatelessWidget {
               ),
               _RoundButton(
                 icon: Icons.headset_off,
-                label: 'Away',
-                semanticLabel: 'Away: microphone and sound off',
+                label: texts.awayTitle,
+                semanticLabel: texts.awayDescription,
                 toggled: voice.away,
                 background: voice.away
                     ? palette.error.withValues(alpha: 0.25)
@@ -225,7 +228,9 @@ class CallControls extends StatelessWidget {
               if (canStream)
                 _RoundButton(
                   icon: voice.camera ? Icons.videocam : Icons.videocam_off,
-                  label: voice.camera ? 'Turn Camera Off' : 'Turn Camera On',
+                  label: voice.camera
+                      ? texts.callCameraOff
+                      : texts.callCameraOn,
                   background: voice.camera
                       ? palette.accent.withValues(alpha: 0.25)
                       : palette.fill,
@@ -237,7 +242,9 @@ class CallControls extends StatelessWidget {
                   icon: voice.screen
                       ? Icons.stop_screen_share
                       : Icons.screen_share,
-                  label: voice.screen ? 'Stop Sharing' : 'Share Screen',
+                  label: voice.screen
+                      ? texts.callStopSharing
+                      : texts.callShareScreen,
                   background: voice.screen
                       ? palette.accent.withValues(alpha: 0.25)
                       : palette.fill,
@@ -246,7 +253,7 @@ class CallControls extends StatelessWidget {
                 ),
               _RoundButton(
                 icon: Icons.call_end,
-                label: 'Leave',
+                label: texts.callLeave,
                 background: palette.error,
                 foreground: palette.onAccent,
                 onPressed: voice.leave,
@@ -421,6 +428,9 @@ class _VideoTileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
+    // Our own tiles read You, in the interface's language.
+    final name = tile.local ? texts.videoYou : tile.name;
     // Video repaints on its own every frame; keep that from the rest.
     return RepaintBoundary(
       child: MouseRegion(
@@ -447,7 +457,7 @@ class _VideoTileView extends StatelessWidget {
                     left: 8,
                     bottom: 6,
                     child: _Label(
-                      tile.screen ? '${tile.name} · screen' : tile.name,
+                      tile.screen ? texts.videoScreen(name) : name,
                       away: away,
                       quality: quality,
                     ),

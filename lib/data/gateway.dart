@@ -11,6 +11,8 @@ import 'package:flutter/foundation.dart';
 import '../src/rust/api/text.dart';
 import 'api.dart';
 import 'device.dart';
+import 'language.dart';
+import 'problem.dart';
 import 'protocol.dart';
 import 'session.dart';
 
@@ -147,7 +149,7 @@ class Gateway extends ChangeNotifier {
       try {
         await session.api.me();
       } on ApiException catch (e) {
-        if (e.unauthorized) ended = 'You were signed out.';
+        if (e.unauthorized) ended = appTexts.connectionSignedOut;
       }
     }
     if (ended != null || _closed) {
@@ -241,11 +243,16 @@ class Gateway extends ChangeNotifier {
         role = (data as Map<String, dynamic>)['role'] as String?;
       case 'error':
         final failure = data as Map<String, dynamic>;
+        final text = problemText(
+          appTexts,
+          failure['problem'],
+          failure['message'] as String? ?? '',
+        );
         if (failure['code'] == 'banned') {
-          ended = failure['message'] as String?;
+          ended = text;
           _closed = true;
         } else if (failure['code'] != 'chat_key') {
-          error = failure['message'] as String?;
+          error = text;
         }
       default:
         return;

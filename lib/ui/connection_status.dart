@@ -16,15 +16,17 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../data/link.dart';
 import '../data/link_stats.dart';
 import '../data/preferences.dart';
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 
-String qualityWord(lk.ConnectionQuality quality) => switch (quality) {
-  lk.ConnectionQuality.excellent => 'Excellent',
-  lk.ConnectionQuality.good => 'Good',
-  lk.ConnectionQuality.poor => 'Poor',
-  lk.ConnectionQuality.lost => 'Lost',
-  lk.ConnectionQuality.unknown => 'Checking',
-};
+String qualityWord(AppLocalizations texts, lk.ConnectionQuality quality) =>
+    switch (quality) {
+      lk.ConnectionQuality.excellent => texts.connectionExcellent,
+      lk.ConnectionQuality.good => texts.connectionGood,
+      lk.ConnectionQuality.poor => texts.connectionPoor,
+      lk.ConnectionQuality.lost => texts.connectionLost,
+      lk.ConnectionQuality.unknown => texts.connectionChecking,
+    };
 
 Color _colorOf(Palette palette, lk.ConnectionQuality quality) =>
     switch (quality) {
@@ -115,7 +117,8 @@ class QualityMark extends StatelessWidget {
           quality != lk.ConnectionQuality.lost) {
         return const SizedBox.shrink();
       }
-      final word = 'Connection: ${qualityWord(quality)}';
+      final texts = AppLocalizations.of(context);
+      final word = texts.connectionStatus(qualityWord(texts, quality));
       return Tooltip(
         message: word,
         child: Semantics(
@@ -257,6 +260,7 @@ class _ConnectionStatusState extends State<ConnectionStatus> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return TapRegion(
       groupId: this,
       onTapOutside: (_) => _close(),
@@ -285,7 +289,8 @@ class _ConnectionStatusState extends State<ConnectionStatus> {
                     child: ValueListenableBuilder(
                       valueListenable: widget.quality,
                       builder: (context, quality, _) {
-                        final word = 'Connection: ${qualityWord(quality)}';
+                        final status = qualityWord(texts, quality);
+                        final word = texts.connectionStatus(status);
                         return Tooltip(
                           message: word,
                           // The popover opens below.
@@ -306,13 +311,13 @@ class _ConnectionStatusState extends State<ConnectionStatus> {
                       child: ValueListenableBuilder(
                         valueListenable: widget.link,
                         builder: (context, stats, _) {
-                          final ping = formatMs(stats?.ping);
+                          final ping = formatMs(stats?.ping, texts: texts);
                           final loss = formatLoss(stats?.loss);
                           return Semantics(
-                            label: 'Ping $ping, loss $loss',
+                            label: texts.connectionPingLoss(ping, loss),
                             excludeSemantics: true,
                             child: Text(
-                              '$ping · $loss',
+                              texts.connectionShort(ping, loss),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: palette.muted,
@@ -337,6 +342,7 @@ class _ConnectionStatusState extends State<ConnectionStatus> {
 
   Widget _popoverBuilder(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     return Positioned(
       left: 0,
       top: 0,
@@ -364,18 +370,30 @@ class _ConnectionStatusState extends State<ConnectionStatus> {
                     ValueListenableBuilder(
                       valueListenable: widget.quality,
                       builder: (context, quality, _) => _Row(
-                        'Connection',
-                        qualityWord(quality),
+                        texts.connectionLabel,
+                        qualityWord(texts, quality),
                         color: quality == lk.ConnectionQuality.unknown
                             ? null
                             : _colorOf(palette, quality),
                       ),
                     ),
-                    _Row('Ping', formatMs(stats?.ping)),
-                    _Row('Outgoing Loss', formatLoss(stats?.outgoingLoss)),
-                    _Row('Incoming Loss', formatLoss(stats?.incomingLoss)),
-                    _Row('Jitter', formatMs(stats?.jitter)),
-                    _Row('Microphone', _microphone(stats)),
+                    _Row(
+                      texts.connectionPing,
+                      formatMs(stats?.ping, texts: texts),
+                    ),
+                    _Row(
+                      texts.connectionOutgoingLoss,
+                      formatLoss(stats?.outgoingLoss),
+                    ),
+                    _Row(
+                      texts.connectionIncomingLoss,
+                      formatLoss(stats?.incomingLoss),
+                    ),
+                    _Row(
+                      texts.connectionJitter,
+                      formatMs(stats?.jitter, texts: texts),
+                    ),
+                    _Row(texts.connectionMicrophone, _microphone(texts, stats)),
                   ],
                 ),
               ),
@@ -386,10 +404,13 @@ class _ConnectionStatusState extends State<ConnectionStatus> {
     );
   }
 
-  static String _microphone(LinkStats? stats) {
+  static String _microphone(AppLocalizations texts, LinkStats? stats) {
     if (stats == null) return '—';
-    if (!stats.microphone) return 'Off';
-    final bitrate = stats.bitrate == null ? '—' : '${stats.bitrate} kbit/s';
+    if (!stats.microphone) return texts.connectionNotSending;
+    final bitrate = switch (stats.bitrate) {
+      final value? => texts.connectionKilobits(value),
+      null => '—',
+    };
     return '${stats.codec ?? '—'} · $bitrate';
   }
 }

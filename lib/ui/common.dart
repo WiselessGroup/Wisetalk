@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 
 /// A card in the middle of the window, like the web client's sign-in page.
@@ -185,14 +186,16 @@ class Avatar extends StatelessWidget {
 
 /// Asks before something that can't be undone; true to go ahead. Short,
 /// so an alert on every screen size, unlike the forms in a SettingsSheet.
+/// The way back says [cancel], Cancel when not given.
 Future<bool> confirm(
   BuildContext context, {
   required String title,
   required String message,
   required String action,
-  String cancel = 'Cancel',
+  String? cancel,
 }) async {
   final palette = context.palette;
+  final back = cancel ?? AppLocalizations.of(context).cancel;
   final yes = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -201,7 +204,7 @@ Future<bool> confirm(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: Text(cancel),
+          child: Text(back),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: palette.error),

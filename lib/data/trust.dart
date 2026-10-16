@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../src/rust/api/trust.dart';
+import 'language.dart';
 import 'protocol.dart';
 import 'secrets.dart';
 
@@ -143,7 +144,7 @@ class KeyWatch {
     final review = reviewKeys(_Bridge(keys), participants, me, now);
     if (forgot || review.save) await _store(keys);
     for (final p in review.newDevices) {
-      _notices.add('${p.displayName} joined from a new device.');
+      _notices.add(appTexts.trustNewDevice(p.displayName));
     }
     final before = changed.length;
     changed.addAll(review.changed);
@@ -156,14 +157,9 @@ class KeyWatch {
     final (keys, now, forgot) = await _record();
     final review = reviewMine(_Bridge(keys), devices, account, now);
     if (forgot || review.save) await _store(keys);
-    if (review.added == 1) {
-      _notices.add('A new device signed in to your account.');
-    } else if (review.added > 1) {
-      _notices.add('${review.added} new devices signed in to your account.');
-    }
-    if (review.changed > 0) {
-      _notices.add('Careful: a device of your account came with another key.');
-    }
+    final texts = appTexts;
+    if (review.added > 0) _notices.add(texts.trustMineAdded(review.added));
+    if (review.changed > 0) _notices.add(texts.trustMineChanged);
   }
 
   /// The record, with devices not seen for a while forgotten.

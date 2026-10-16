@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wisetalk/data/language.dart';
+import 'package:wisetalk/data/preferences.dart';
 import 'package:wisetalk/data/secrets.dart';
 import 'package:wisetalk/data/servers.dart';
 import 'package:wisetalk/l10n/app_localizations.dart';
@@ -25,30 +26,32 @@ void main() {
     ]);
     expect(pick(['nl-NL', 'de-AT', 'en']), const Locale('de'));
     expect(pick(['ru-RU']), const Locale('ru'));
-    expect(pick(['zh-CN']), const Locale('zh'));
-    expect(pick(['zh-TW', 'ja']), const Locale('ja'));
-    expect(pick(['zh-Hant-HK']), const Locale('en'));
-    expect(pick(['zh-Hans-SG']), const Locale('zh'));
+    final traditional = localeOf('zh-Hant');
+    expect(pick(['zh-TW', 'ja']), traditional);
+    expect(pick(['zh-HK']), traditional);
+    expect(pick(['zh-Hant-HK']), traditional);
+    expect(pick(['zh-CN', 'en']), const Locale('en'));
+    expect(pick(['zh-Hans-SG', 'nl']), traditional);
     expect(pick(['pt-PT']), const Locale('pt'));
     expect(pick([]), const Locale('en'));
   });
 
   test('every language has its file and the app knows them all', () {
-    expect(
-      AppLocalizations.supportedLocales.map((l) => l.languageCode).toSet(),
-      languages.keys.toSet(),
-    );
+    expect(AppLocalizations.supportedLocales.toSet(), {
+      ...languages.keys.map(localeOf),
+      const Locale('zh'),
+    });
   });
 
   test('translations keep the placeholders and the keys of English', () {
     Map<String, dynamic> read(String language) =>
         jsonDecode(File('lib/l10n/app_$language.arb').readAsStringSync())
             as Map<String, dynamic>;
-    final placeholders = RegExp(r'\{(\w+)');
+    final placeholders = RegExp(r'\{(\w+)[,}]');
     Set<String> names(String text) =>
         placeholders.allMatches(text).map((m) => m[1]!).toSet();
     final english = read('en');
-    for (final language in languages.keys) {
+    for (final language in languages.keys.map((l) => localeOf(l).toString())) {
       for (final MapEntry(:key, :value) in read(language).entries) {
         if (key.startsWith('@')) continue;
         expect(english, contains(key), reason: '$language: $key');
@@ -61,9 +64,9 @@ void main() {
     }
   });
 
-  test('untranslated messages show in English', () {
+  test('every language speaks for itself', () {
     expect(lookupAppLocalizations(const Locale('ru')).callLeave, 'Выйти');
-    expect(lookupAppLocalizations(const Locale('de')).callLeave, 'Leave');
+    expect(lookupAppLocalizations(const Locale('de')).callLeave, 'Verlassen');
     expect(
       lookupAppLocalizations(const Locale('ru')).brandingSignInWith('Wiseless'),
       'Войти через Wiseless',
@@ -93,5 +96,14 @@ void main() {
     await tester.pumpAndSettle();
     // Tests have no network: the sign-in screen can't reach the server.
     expect(find.text('Повторить'), findsOneWidget);
+
+    // Settings › Language changes the screen at once, without a restart.
+    final element = tester.element(find.byType(WisetalkApp));
+    final preferences = ProviderScope.containerOf(element)
+        .read(preferencesProvider);
+    preferences.language.value = 'de';
+    await tester.pumpAndSettle();
+    expect(find.text('Erneut versuchen'), findsOneWidget);
+    expect(find.text('Повторить'), findsNothing);
   });
 }

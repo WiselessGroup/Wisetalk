@@ -13,6 +13,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 
 import '../data/preferences.dart';
 import '../data/voice.dart';
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import 'settings_sheet.dart';
 
@@ -70,6 +71,7 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final texts = AppLocalizations.of(context);
     final ready = _systemAsks || _source != null;
     Widget quality(
       ScreenQuality value,
@@ -84,39 +86,36 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
       onTap: () => setState(() => _quality = value),
     );
     return SettingsSheet(
-      title: 'Share Your Screen',
-      action: 'Share',
+      title: texts.screenShareTitle,
+      action: texts.screenShareAction,
       wide: !_systemAsks,
       onAction: ready ? () async => _share() : null,
       children: [
         SettingsGroup(
-          header: 'Best For',
+          header: texts.screenShareBestFor,
           footer: Platform.isAndroid
-              ? 'Android asks next whether to share the entire screen or '
-                    'one app. Without sound, for now.'
+              ? texts.screenShareAndroidHint
               : systemPicksScreen
-              ? 'The first time, your system asks which screen to share. '
-                    'Later shares reuse that screen until Wisetalk restarts. '
-                    'Whole screens only, without sound, for now.'
+              ? texts.screenShareWaylandHint
               : null,
           children: [
             quality(
               ScreenQuality.text,
               Icons.article_outlined,
-              'Text and Slides',
-              'Sharp and light: a few frames a second.',
+              texts.screenShareText,
+              texts.screenShareTextDetail,
             ),
             quality(
               ScreenQuality.motion,
               Icons.sports_esports_outlined,
-              'Video and Games',
-              'Smooth: 30 frames a second, heavier on both ends.',
+              texts.screenShareMotion,
+              texts.screenShareMotionDetail,
             ),
           ],
         ),
         if (!_systemAsks)
           SettingsGroup(
-            header: 'Screen or Window',
+            header: texts.screenShareSource,
             children: [
               Padding(
                 padding: const EdgeInsets.all(12),
@@ -131,15 +130,13 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
         if (screenSoundAvailable)
           SettingsGroup(
             footer: switch (_source?.type) {
-              rtc.SourceType.Window => "Only this window's app.",
-              rtc.SourceType.Screen => 'Everything you hear, without the call.',
-              null =>
-                "A window's app, or for a screen everything you hear, "
-                    'without the call.',
+              rtc.SourceType.Window => texts.screenShareSoundWindow,
+              rtc.SourceType.Screen => texts.screenShareSoundScreen,
+              null => texts.screenShareSoundAny,
             },
             children: [
               SwitchRow(
-                label: 'Share Sound',
+                label: texts.screenShareSound,
                 value: _sound,
                 onChanged: (on) => setState(() => _sound = on),
               ),
@@ -169,7 +166,7 @@ class _SourcePicker extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Text(
-            "Can't list screens and windows.",
+            AppLocalizations.of(context).screenShareListFailed,
             style: TextStyle(color: palette.error),
           );
         }
@@ -339,17 +336,20 @@ class _SystemPickerState extends State<_SystemPicker> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Choose a Screen'),
-    content: Text(
-      "Pick the screen to share in your system's window.",
-      style: TextStyle(color: context.palette.muted),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+  Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(texts.screenShareChooseTitle),
+      content: Text(
+        texts.screenShareChooseHint,
+        style: TextStyle(color: context.palette.muted),
       ),
-    ],
-  );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(texts.cancel),
+        ),
+      ],
+    );
+  }
 }

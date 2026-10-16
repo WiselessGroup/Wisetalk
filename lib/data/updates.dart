@@ -11,8 +11,11 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../src/rust/api/update.dart';
 import 'api.dart';
+import 'language.dart';
+import 'preferences.dart';
 import 'servers.dart';
 
 /// This build's version, set by release builds (`--dart-define`); empty
@@ -23,7 +26,7 @@ const appVersion = String.fromEnvironment('WISETALK_VERSION');
 const _every = Duration(hours: 6);
 
 class Updates extends ChangeNotifier {
-  Updates(this._server) {
+  Updates(this._server, this._preferences) {
     // Not right at start: the app has better things to do then.
     _timer = Timer(const Duration(seconds: 20), () {
       unawaited(_check());
@@ -34,6 +37,9 @@ class Updates extends ChangeNotifier {
   /// The server whose download list to read, the one in use; `null` before
   /// picking one.
   final Uri? Function() _server;
+
+  /// For the language of what [checkNow] says.
+  final Preferences _preferences;
   Timer? _timer;
   bool _disposed = false;
 
@@ -68,22 +74,22 @@ class Updates extends ChangeNotifier {
   /// Looks right away, for "Check for Updates"; says what it found.
   Future<String> checkNow() async {
     if (appVersion.isEmpty && installedVersion() == null) {
-      return 'This build of Wisetalk doesn’t update itself.';
+      return _texts.updatesNotSelfUpdating;
     }
     try {
       await _lookup();
     } catch (e) {
       debugPrint('cannot check for updates: $e');
-      return 'Cannot check for updates. Try again later.';
+      return _texts.updatesCannotCheck;
     }
-    if (ready case final version?) {
-      return 'Wisetalk $version is ready: Restart to Update.';
-    }
+    if (ready case final version?) return _texts.updatesReady(version);
     if (available case (:final version, url: _)?) {
-      return 'Wisetalk $version is out: Update to $version.';
+      return _texts.updatesAvailable(version);
     }
-    return 'Wisetalk $versionName is the latest.';
+    return _texts.updatesLatest(versionName);
   }
+
+  AppLocalizations get _texts => textsFor(_preferences.language.value);
 
   Future<void> _lookup() async {
     if (Platform.isAndroid) {
@@ -127,6 +133,7 @@ String get versionName =>
 final updatesProvider = Provider<Updates>((ref) {
   final updates = Updates(
     () => ref.read(serversProvider).value?.currentServer?.origin,
+    ref.read(preferencesProvider),
   );
   ref.onDispose(updates.dispose);
   return updates;

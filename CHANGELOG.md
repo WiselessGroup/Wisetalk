@@ -3,6 +3,17 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
+## Unreleased
+
+- Wisetalk speaks eight languages: English, Russian, Traditional Chinese,
+  Japanese, Brazilian Portuguese, German, French and Spanish. It follows
+  the system, and Settings › Language picks another one, which then
+  stays and switches the app at once. Notifications, the call
+  notification on Android and the page after signing in in the browser
+  speak it too.
+- What the server says when something doesn't work, and why you left a
+  channel, show in your language too (with a server from 1.8).
+
 ## 0.4.0
 
 - Away, next to the microphone in a call: one press turns your microphone
