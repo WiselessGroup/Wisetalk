@@ -4,4 +4,5 @@ pub mod chat;
 pub mod device;
 pub mod picture;
 pub mod text;
+pub mod trust;
 pub mod update;

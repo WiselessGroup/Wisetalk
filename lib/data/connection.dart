@@ -12,6 +12,7 @@ import 'gateway.dart';
 import 'preferences.dart';
 import 'servers.dart';
 import 'session.dart';
+import 'trust.dart';
 import 'voice.dart';
 
 class Connection {
@@ -31,11 +32,17 @@ final connectionProvider = FutureProvider<Connection?>((ref) async {
     guest: session.me.isGuest,
   );
   final gateway = Gateway(session, device);
-  final voice = Voice(gateway, ref.read(preferencesProvider));
+  final trust = KeyWatch(
+    ref.read(secretsProvider),
+    session.server.origin,
+    session.api.server().then((info) => info.guestsOpen),
+  );
+  final voice = Voice(gateway, ref.read(preferencesProvider), trust: trust);
   final chats = Chats(gateway, device, account: session.me.id);
   ref.onDispose(() {
     chats.dispose();
     voice.dispose();
+    trust.dispose();
     gateway.dispose();
   });
   unawaited(gateway.connect());

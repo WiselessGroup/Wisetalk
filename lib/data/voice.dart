@@ -33,6 +33,7 @@ import 'protocol.dart';
 import 'shortcuts.dart';
 import 'sounds.dart';
 import 'stereo_audio.dart';
+import 'trust.dart';
 
 /// LiveKit keeps this many keys; our key epoch picks the slot.
 const _keyringSize = 16;
@@ -131,7 +132,7 @@ const _screenSound = lk.AudioPublishOptions(
 );
 
 class Voice extends ChangeNotifier {
-  Voice(this.gateway, this.preferences) {
+  Voice(this.gateway, this.preferences, {this.trust}) {
     _subscription = gateway.events.listen(_onEvent);
     preferences.addListener(_preferencesChanged);
     unawaited(_applyOutput());
@@ -139,6 +140,22 @@ class Voice extends ChangeNotifier {
 
   final Gateway gateway;
   final Preferences preferences;
+
+  /// Device keys of the people in my call (WLK-18); none in tests.
+  final KeyWatch? trust;
+
+  /// Whether this person's device key changed since I last met them.
+  bool keyChanged(Participant p) => trust?.changed.contains(p.session) ?? false;
+
+  void _reviewKeys(Iterable<Participant> participants) {
+    final trust = this.trust;
+    if (trust == null) return;
+    unawaited(
+      trust.review(participants, gateway.sessionId).then((changed) {
+        if (changed) notifyListeners();
+      }),
+    );
+  }
 
   /// What the microphone was published with, to notice a change.
   (String?, bool, AudioQuality)? _published;
@@ -640,6 +657,7 @@ class Voice extends ChangeNotifier {
     screen = false;
     tiles = const [];
     qualities.clear();
+    trust?.clear();
     link.reset();
     unawaited(_service.update(channel: null));
     notifyListeners();
@@ -697,6 +715,7 @@ class Voice extends ChangeNotifier {
       case 'voice_granted':
         final granted = data as Map<String, dynamic>;
         if (granted['channel'] != channel) return;
+        _reviewKeys(_participants);
         final me = _participants
             .where((p) => p.session == gateway.sessionId)
             .firstOrNull;
@@ -722,6 +741,7 @@ class Voice extends ChangeNotifier {
         final newcomer = Participant.fromJson(
           joined['participant'] as Map<String, dynamic>,
         );
+        _reviewKeys([newcomer]);
         _welcome(newcomer);
         if (newcomer.session != gateway.sessionId) _cue(Cue.join);
       case 'voice_left':

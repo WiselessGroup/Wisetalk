@@ -2331,8 +2331,8 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
 
 [[package]]
 name = "wisetalk-core"
-version = "1.6.0"
-source = "git+https://git.wiseless.net/Wisetalk/core.git?branch=master#2d4ff9da1ed98cc8b5944038ac15480b8e62ec87"
+version = "1.7.0"
+source = "git+https://git.wiseless.net/Wisetalk/core.git?branch=master#0f01898623500a9cbbe0eb59d5269207838ee496"
 dependencies = [
  "base64",
  "bitflags",

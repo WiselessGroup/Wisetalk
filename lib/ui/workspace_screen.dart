@@ -109,6 +109,10 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
       _chats.incoming.listen(_message),
       _gateway.events.listen(_event),
       notifications.clicks.listen(_clicked),
+      if (_voice.trust case final trust?)
+        trust.newDevices.listen(
+          (p) => _toast('${p.displayName} joined from a new device.'),
+        ),
     ]);
   }
 
@@ -954,6 +958,15 @@ class _ChannelRow extends StatelessWidget {
                       // LiveKit rates only who is in our own call.
                       if (here && p.session != gateway.sessionId)
                         QualityMark(quality: voice.qualities.of(p.session)),
+                      if (here && voice.keyChanged(p))
+                        Tooltip(
+                          message: 'Careful: their device key has changed.',
+                          child: Icon(
+                            Icons.key_outlined,
+                            size: 14,
+                            color: palette.tertiary,
+                          ),
+                        ),
                       if (silenced.contains(personKey(p)))
                         Tooltip(
                           message: 'Muted for you',
