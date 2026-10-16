@@ -286,7 +286,7 @@ class Voice extends ChangeNotifier {
   /// the call ourselves and listening.
   void _cue(Cue cue) {
     if (state != VoiceState.connected || away || !preferences.cues) return;
-    unawaited(sounds.play(cue));
+    unawaited(sounds.play(cue, output: preferences.speaker));
   }
 
   /// Moderators: turns someone's microphone off for everyone, or lets
@@ -347,7 +347,9 @@ class Voice extends ChangeNotifier {
       muted: muted,
       serverMuted: serverMuted,
     );
-    if (preferences.cues) unawaited(sounds.play(expected));
+    if (preferences.cues) {
+      unawaited(sounds.play(expected, output: preferences.speaker));
+    }
     switch (action) {
       case CallAction.toggleMute:
         await toggleMute();
@@ -361,7 +363,9 @@ class Voice extends ChangeNotifier {
     final cue = away != wasAway
         ? (away ? Cue.away : Cue.back)
         : (muted ? Cue.mute : Cue.unmute);
-    if (preferences.cues && cue != expected) unawaited(sounds.play(cue));
+    if (preferences.cues && cue != expected) {
+      unawaited(sounds.play(cue, output: preferences.speaker));
+    }
   }
 
   /// The last shortcut's action and when, see [perform].

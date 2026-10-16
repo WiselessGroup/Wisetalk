@@ -6,7 +6,9 @@
 // (WLK-42). Shortcuts answer with ticks of the same make (ADR-0027): one
 // sliding down when the microphone goes off, up when it comes on, two for
 // stepping away and coming back. Android plays them in Kotlin as voice call
-// sounds; elsewhere audioplayers plays a WAV file made once per run.
+// sounds. Desktops play them on the output the call uses through the Rust
+// bridge (WLK-8; Linux so far), else audioplayers plays a WAV file made
+// once per run on the system's default output.
 
 import 'dart:io';
 import 'dart:math';
@@ -15,6 +17,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+
+import '../src/rust/api/sound.dart';
 
 enum Cue {
   join(392, 523.25, 0.112),
@@ -58,14 +62,23 @@ class Sounds {
   final _files = <Cue, String>{};
   final _players = <Cue, AudioPlayer>{};
 
-  /// Plays [cue]; a cue is never worth an error.
-  Future<void> play(Cue cue) async {
+  /// Whether the Rust bridge can play on a chosen output here.
+  bool _native = true;
+
+  /// Plays [cue] on [output], the device id the call plays on (`null` for
+  /// the system's default); a cue is never worth an error.
+  Future<void> play(Cue cue, {String? output}) async {
     try {
       final pcm = _pcm[cue] ??= _synthesize(cue);
       if (Platform.isAndroid) {
         await _android.invokeMethod<void>('play', {'pcm': pcm, 'rate': _rate});
         return;
       }
+      if (_native && await playSound(pcm: pcm, rate: _rate, device: output)) {
+        return;
+      }
+      // Nothing to play it on here: audioplayers from now on.
+      _native = false;
       final path = _files[cue] ??= await _write(cue, pcm);
       final player = _players[cue] ??= AudioPlayer()
         ..setReleaseMode(ReleaseMode.stop);
