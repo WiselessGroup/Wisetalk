@@ -16,10 +16,13 @@ mod imp {
 }
 
 /// PulseAudio's simple API, which PipeWire speaks too (pipewire-pulse),
-/// and which libwebrtc's own audio device module plays the call through:
-/// the output ids the app gets from flutter_webrtc are sink names. Loaded
-/// at run time, so neither building nor running needs PulseAudio's
-/// development files, and a system without it plays as before.
+/// and which libwebrtc's own audio device module plays the call through.
+/// That module names an output by its sink's description ("FiiO BTR7"),
+/// or "default: …" for the default, and flutter_webrtc hands that on as
+/// the id; pa_simple wants the sink's name, so the sink list from libpulse
+/// translates. Both libraries are loaded at run time, so neither building
+/// nor running needs PulseAudio's development files, and a system without
+/// them plays as before.
 #[cfg(target_os = "linux")]
 mod imp {
     use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -55,52 +58,218 @@ mod imp {
     type Drain = unsafe extern "C" fn(s: *mut c_void, error: *mut c_int) -> c_int;
     type Free = unsafe extern "C" fn(s: *mut c_void);
 
+    type MainloopNew = unsafe extern "C" fn() -> *mut c_void;
+    type MainloopGetApi = unsafe extern "C" fn(mainloop: *mut c_void) -> *mut c_void;
+    type MainloopIterate =
+        unsafe extern "C" fn(mainloop: *mut c_void, block: c_int, retval: *mut c_int) -> c_int;
+    type MainloopFree = unsafe extern "C" fn(mainloop: *mut c_void);
+    type ContextNew = unsafe extern "C" fn(api: *mut c_void, name: *const c_char) -> *mut c_void;
+    type ContextConnect = unsafe extern "C" fn(
+        context: *mut c_void,
+        server: *const c_char,
+        flags: c_int,
+        spawn: *const c_void,
+    ) -> c_int;
+    type ContextGetState = unsafe extern "C" fn(context: *mut c_void) -> c_int;
+    type ContextDisconnect = unsafe extern "C" fn(context: *mut c_void);
+    type ContextUnref = unsafe extern "C" fn(context: *mut c_void);
+    type SinkInfoCallback = unsafe extern "C" fn(
+        context: *mut c_void,
+        info: *const SinkInfo,
+        eol: c_int,
+        data: *mut c_void,
+    );
+    type GetSinkInfoList = unsafe extern "C" fn(
+        context: *mut c_void,
+        callback: SinkInfoCallback,
+        data: *mut c_void,
+    ) -> *mut c_void;
+    type OperationGetState = unsafe extern "C" fn(operation: *mut c_void) -> c_int;
+    type OperationUnref = unsafe extern "C" fn(operation: *mut c_void);
+
+    // pa_context_state_t and pa_operation_state_t (pulse/def.h).
+    const CONTEXT_READY: c_int = 4;
+    const CONTEXT_FAILED: c_int = 5;
+    const CONTEXT_TERMINATED: c_int = 6;
+    const OPERATION_RUNNING: c_int = 0;
+
+    /// The start of pa_sink_info (pulse/introspect.h), all that is read.
+    #[repr(C)]
+    struct SinkInfo {
+        name: *const c_char,
+        index: u32,
+        description: *const c_char,
+    }
+
     struct Pulse {
         new: New,
         write: Write,
         drain: Drain,
         free: Free,
+        sinks: Option<Sinks>,
+    }
+
+    /// libpulse itself, for the list of sinks.
+    struct Sinks {
+        mainloop_new: MainloopNew,
+        mainloop_get_api: MainloopGetApi,
+        mainloop_iterate: MainloopIterate,
+        mainloop_free: MainloopFree,
+        context_new: ContextNew,
+        context_connect: ContextConnect,
+        context_get_state: ContextGetState,
+        context_disconnect: ContextDisconnect,
+        context_unref: ContextUnref,
+        get_sink_info_list: GetSinkInfoList,
+        operation_get_state: OperationGetState,
+        operation_unref: OperationUnref,
+    }
+
+    /// The address of `name` in `library`, as a function of type `F`.
+    ///
+    /// # Safety
+    ///
+    /// `F` must be the function's real type.
+    unsafe fn symbol<F: Copy>(library: *mut c_void, name: &CStr) -> Option<F> {
+        // SAFETY: dlsym with a live handle and a C string.
+        let found = unsafe { libc::dlsym(library, name.as_ptr()) };
+        // SAFETY: a function pointer is as big as a data pointer on every
+        // platform with dlsym, and the caller vouches for the type.
+        (!found.is_null()).then(|| unsafe { std::mem::transmute_copy::<*mut c_void, F>(&found) })
+    }
+
+    fn open_library(name: &CStr) -> Option<*mut c_void> {
+        // SAFETY: dlopen with a C string; the library stays loaded for the
+        // life of the process, so its function pointers stay valid.
+        let library = unsafe { libc::dlopen(name.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
+        (!library.is_null()).then_some(library)
     }
 
     fn pulse() -> Option<&'static Pulse> {
         static PULSE: OnceLock<Option<Pulse>> = OnceLock::new();
         PULSE
             .get_or_init(|| {
-                // SAFETY: dlopen and dlsym with valid C strings; the library
-                // stays loaded for the life of the process, so the
-                // function pointers stay valid.
+                let simple = open_library(c"libpulse-simple.so.0")?;
+                // SAFETY: each type is the C function's, from pulse/simple.h
+                // and pulse/*.h of libpulse.
                 unsafe {
-                    let library = libc::dlopen(
-                        c"libpulse-simple.so.0".as_ptr(),
-                        libc::RTLD_NOW | libc::RTLD_LOCAL,
-                    );
-                    if library.is_null() {
-                        return None;
-                    }
-                    let symbol = |name: &CStr| {
-                        let found = libc::dlsym(library, name.as_ptr());
-                        (!found.is_null()).then_some(found)
-                    };
+                    let sinks = open_library(c"libpulse.so.0").and_then(|l| {
+                        Some(Sinks {
+                            mainloop_new: symbol(l, c"pa_mainloop_new")?,
+                            mainloop_get_api: symbol(l, c"pa_mainloop_get_api")?,
+                            mainloop_iterate: symbol(l, c"pa_mainloop_iterate")?,
+                            mainloop_free: symbol(l, c"pa_mainloop_free")?,
+                            context_new: symbol(l, c"pa_context_new")?,
+                            context_connect: symbol(l, c"pa_context_connect")?,
+                            context_get_state: symbol(l, c"pa_context_get_state")?,
+                            context_disconnect: symbol(l, c"pa_context_disconnect")?,
+                            context_unref: symbol(l, c"pa_context_unref")?,
+                            get_sink_info_list: symbol(l, c"pa_context_get_sink_info_list")?,
+                            operation_get_state: symbol(l, c"pa_operation_get_state")?,
+                            operation_unref: symbol(l, c"pa_operation_unref")?,
+                        })
+                    });
                     Some(Pulse {
-                        new: std::mem::transmute::<*mut c_void, New>(symbol(c"pa_simple_new")?),
-                        write: std::mem::transmute::<*mut c_void, Write>(symbol(
-                            c"pa_simple_write",
-                        )?),
-                        drain: std::mem::transmute::<*mut c_void, Drain>(symbol(
-                            c"pa_simple_drain",
-                        )?),
-                        free: std::mem::transmute::<*mut c_void, Free>(symbol(c"pa_simple_free")?),
+                        new: symbol(simple, c"pa_simple_new")?,
+                        write: symbol(simple, c"pa_simple_write")?,
+                        drain: symbol(simple, c"pa_simple_drain")?,
+                        free: symbol(simple, c"pa_simple_free")?,
+                        sinks,
                     })
                 }
             })
             .as_ref()
     }
 
+    /// The name of the sink libwebrtc calls `output`; `None` for the
+    /// default one, or when no sink goes by it any more.
+    fn sink_name(pulse: &Pulse, output: &str) -> Option<CString> {
+        if output.starts_with("default:") {
+            return None;
+        }
+        let sinks = pulse.sinks.as_ref()?;
+        let mut found: Vec<(CString, String)> = Vec::new();
+
+        unsafe extern "C" fn collect(
+            _context: *mut c_void,
+            info: *const SinkInfo,
+            eol: c_int,
+            data: *mut c_void,
+        ) {
+            if eol != 0 || info.is_null() {
+                return;
+            }
+            // SAFETY: libpulse passes a live pa_sink_info for the call, and
+            // `data` is the Vec below, alive until the operation is done.
+            unsafe {
+                let info = &*info;
+                if info.name.is_null() || info.description.is_null() {
+                    return;
+                }
+                let found = &mut *data.cast::<Vec<(CString, String)>>();
+                found.push((
+                    CStr::from_ptr(info.name).to_owned(),
+                    CStr::from_ptr(info.description)
+                        .to_string_lossy()
+                        .into_owned(),
+                ));
+            }
+        }
+
+        // SAFETY: the usual libpulse sequence on a private main loop, every
+        // object freed before returning; `found` outlives the operation.
+        unsafe {
+            let mainloop = (sinks.mainloop_new)();
+            if mainloop.is_null() {
+                return None;
+            }
+            let context =
+                (sinks.context_new)((sinks.mainloop_get_api)(mainloop), c"Wisetalk".as_ptr());
+            if !context.is_null()
+                && (sinks.context_connect)(context, std::ptr::null(), 0, std::ptr::null()) >= 0
+            {
+                let mut state = (sinks.context_get_state)(context);
+                while state != CONTEXT_READY
+                    && state != CONTEXT_FAILED
+                    && state != CONTEXT_TERMINATED
+                {
+                    if (sinks.mainloop_iterate)(mainloop, 1, std::ptr::null_mut()) < 0 {
+                        break;
+                    }
+                    state = (sinks.context_get_state)(context);
+                }
+                if state == CONTEXT_READY {
+                    let operation =
+                        (sinks.get_sink_info_list)(context, collect, (&raw mut found).cast());
+                    if !operation.is_null() {
+                        while (sinks.operation_get_state)(operation) == OPERATION_RUNNING {
+                            if (sinks.mainloop_iterate)(mainloop, 1, std::ptr::null_mut()) < 0 {
+                                break;
+                            }
+                        }
+                        (sinks.operation_unref)(operation);
+                    }
+                }
+                (sinks.context_disconnect)(context);
+            }
+            if !context.is_null() {
+                (sinks.context_unref)(context);
+            }
+            (sinks.mainloop_free)(mainloop);
+        }
+        found
+            .into_iter()
+            .find(|(name, description)| {
+                description == output || name.to_bytes() == output.as_bytes()
+            })
+            .map(|(name, _)| name)
+    }
+
     pub fn play(pcm: &[u8], rate: u32, device: Option<&str>) -> bool {
         let Some(pulse) = pulse() else {
             return false;
         };
-        let device = device.and_then(|d| CString::new(d).ok());
+        let device = device.and_then(|d| sink_name(pulse, d));
         // The chosen output, or the default when it went away.
         let stream = open(pulse, rate, device.as_deref())
             .or_else(|| device.as_ref().and_then(|_| open(pulse, rate, None)));
