@@ -12,6 +12,7 @@ import 'api/chat.dart';
 import 'api/device.dart';
 import 'api/hotkeys.dart';
 import 'api/picture.dart';
+import 'api/sound.dart';
 import 'api/text.dart';
 import 'api/trust.dart';
 import 'api/update.dart';

@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1826535172;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2080689881;
 
 // Section: executor
 
@@ -1542,6 +1542,42 @@ fn wire__crate__api__auth__pkce_impl(
         },
     )
 }
+fn wire__crate__api__sound__play_sound_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "play_sound",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_pcm = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_rate = <u32>::sse_decode(&mut deserializer);
+            let api_device = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Ok::<_, ()>(crate::api::sound::play_sound(api_pcm, api_rate, api_device))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__picture__prepare_avatar_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2119,12 +2155,13 @@ fn pde_ffi_dispatcher_primary_impl(
         12 => wire__crate__api__chat__ChatKey_open_image_impl(port, ptr, rust_vec_len, data_len),
         26 => wire__crate__api__picture__clipboard_picture_impl(port, ptr, rust_vec_len, data_len),
         27 => wire__crate__api__update__download_update_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__picture__prepare_avatar_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__update__restart_to_update_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__hotkeys__set_global_hotkeys_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
-        42 => {
+        35 => wire__crate__api__sound__play_sound_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__picture__prepare_avatar_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__update__restart_to_update_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__hotkeys__set_global_hotkeys_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
+        43 => {
             wire__crate__api__hotkeys__watch_global_hotkeys_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -2170,8 +2207,8 @@ fn pde_ffi_dispatcher_sync_impl(
         32 => wire__crate__api__text__normalize_chat_body_impl(ptr, rust_vec_len, data_len),
         33 => wire__crate__api__text__normalize_display_name_impl(ptr, rust_vec_len, data_len),
         34 => wire__crate__api__auth__pkce_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__update__start_updates_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__update__start_updates_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

@@ -82,18 +82,14 @@ mod imp {
                         (!found.is_null()).then_some(found)
                     };
                     Some(Pulse {
-                        new: std::mem::transmute::<*mut c_void, New>(symbol(
-                            c"pa_simple_new",
-                        )?),
+                        new: std::mem::transmute::<*mut c_void, New>(symbol(c"pa_simple_new")?),
                         write: std::mem::transmute::<*mut c_void, Write>(symbol(
                             c"pa_simple_write",
                         )?),
                         drain: std::mem::transmute::<*mut c_void, Drain>(symbol(
                             c"pa_simple_drain",
                         )?),
-                        free: std::mem::transmute::<*mut c_void, Free>(symbol(
-                            c"pa_simple_free",
-                        )?),
+                        free: std::mem::transmute::<*mut c_void, Free>(symbol(c"pa_simple_free")?),
                     })
                 }
             })
@@ -115,12 +111,7 @@ mod imp {
         // SAFETY: `stream` came from pa_simple_new and is freed only here;
         // `pcm` outlives the calls.
         unsafe {
-            let written = (pulse.write)(
-                stream,
-                pcm.as_ptr().cast(),
-                pcm.len(),
-                &mut error,
-            ) == 0
+            let written = (pulse.write)(stream, pcm.as_ptr().cast(), pcm.len(), &mut error) == 0
                 && (pulse.drain)(stream, &mut error) == 0;
             (pulse.free)(stream);
             written
