@@ -153,6 +153,21 @@ Cue expectedCue(
   CallAction.unmute => serverMuted ? Cue.mute : Cue.unmute,
 };
 
+/// The sleepy owl's cue when [participant], someone in my call, steps away
+/// or comes back (WLK-42); `null` for any other update. [away] holds who is
+/// away and is kept up to date. Nothing for [me]: I know my own Away.
+@visibleForTesting
+Cue? awayCue(Set<String> away, Participant participant, {required String? me}) {
+  if (participant.session == me) return null;
+  if (participant.away == away.contains(participant.session)) return null;
+  if (participant.away) {
+    away.add(participant.session);
+    return Cue.asleep;
+  }
+  away.remove(participant.session);
+  return Cue.awake;
+}
+
 class Voice extends ChangeNotifier {
   Voice(this.gateway, this.preferences, {this.trust}) {
     _subscription = gateway.events.listen(_onEvent);
@@ -264,8 +279,11 @@ class Voice extends ChangeNotifier {
     _reset();
   }
 
-  /// Someone came or went: hoot, once we're in the call ourselves and
-  /// listening.
+  /// Others in the call who are away, for [awayCue].
+  final _awayPeople = <String>{};
+
+  /// Someone came, went, stepped away or came back: hoot, once we're in
+  /// the call ourselves and listening.
   void _cue(Cue cue) {
     if (state != VoiceState.connected || away || !preferences.cues) return;
     unawaited(sounds.play(cue));
@@ -680,6 +698,7 @@ class Voice extends ChangeNotifier {
 
   void _reset() {
     _attempt++;
+    _awayPeople.clear();
     _roomEvents?.dispose();
     _roomEvents = null;
     unawaited(_close(_room, _keys));
@@ -763,6 +782,12 @@ class Voice extends ChangeNotifier {
         final granted = data as Map<String, dynamic>;
         if (granted['channel'] != channel) return;
         _reviewKeys(_participants);
+        _awayPeople
+          ..clear()
+          ..addAll([
+            for (final p in _participants)
+              if (p.away && p.session != gateway.sessionId) p.session,
+          ]);
         final me = _participants
             .where((p) => p.session == gateway.sessionId)
             .firstOrNull;
@@ -797,6 +822,7 @@ class Voice extends ChangeNotifier {
         if (left['session'] == gateway.sessionId) {
           _reset();
         } else {
+          _awayPeople.remove(left['session']);
           unawaited(_rotate());
           _cue(Cue.leave);
         }
@@ -805,10 +831,10 @@ class Voice extends ChangeNotifier {
         final participant = Participant.fromJson(
           updated['participant'] as Map<String, dynamic>,
         );
-        if (updated['channel'] != channel ||
-            participant.session != gateway.sessionId) {
-          return;
-        }
+        if (updated['channel'] != channel) return;
+        final cue = awayCue(_awayPeople, participant, me: gateway.sessionId);
+        if (cue != null) _cue(cue);
+        if (participant.session != gateway.sessionId) return;
         if (participant.away == away) _awayAsked = false;
         // Our own Away coming back to us: nothing changed here.
         if (participant.serverMuted == serverMuted) return;

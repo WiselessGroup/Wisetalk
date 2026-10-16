@@ -17,6 +17,9 @@ Forgejo.
   entry before the app updated itself, Wisetalk now mends that entry
   instead of adding a hidden one of its own. GNOME can pin the window to
   the dock again, and wisetalk: links open through the same entry.
+- When someone in your call steps away, a sleepy owl hoots twice, low and
+  slow; when they come back, one short bright hoot. Only the others hear
+  it, and Join and Leave Sounds turns it off with the rest.
 
 ## 0.4.0
 

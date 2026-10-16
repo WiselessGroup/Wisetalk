@@ -1,7 +1,9 @@
 // Owl hoots for people coming into and leaving your call, the web client's
 // lib/sounds.ts: made on the fly, nothing to download or license. Arriving
 // hoots go up a fourth (G4 to C5), leaving ones come back down (C5 to G4),
-// softer. Shortcuts answer with ticks of the same make (ADR-0027): one
+// softer. Someone else stepping away gets a sleepy owl, two hoots lower and
+// slower, each sagging like a yawn; coming back, one short bright hoot
+// (WLK-42). Shortcuts answer with ticks of the same make (ADR-0027): one
 // sliding down when the microphone goes off, up when it comes on, two for
 // stepping away and coming back. Android plays them in Kotlin as voice call
 // sounds; elsewhere audioplayers plays a WAV file made once per run.
@@ -20,17 +22,32 @@ enum Cue {
   mute(1046.5, 784, 0.07, ticks: 1),
   unmute(784, 1046.5, 0.07, ticks: 1),
   away(1046.5, 784, 0.07, ticks: 2),
-  back(784, 1046.5, 0.07, ticks: 2);
+  back(784, 1046.5, 0.07, ticks: 2),
+  asleep(293.66, 220, 0.07, sleepy: true),
+  awake(392, 392, 0.06, bright: true);
 
-  const Cue(this.first, this.second, this.level, {this.ticks = 0});
+  const Cue(
+    this.first,
+    this.second,
+    this.level, {
+    this.ticks = 0,
+    this.sleepy = false,
+    this.bright = false,
+  });
 
   /// Hoots: the first and second note. Ticks: where each starts and ends.
   final double first;
   final double second;
   final double level;
 
-  /// How many ticks; none for the owl's two hoots.
+  /// How many ticks; none for the owl's hoots.
   final int ticks;
+
+  /// Someone else stepped away: slow hoots sagging like a yawn.
+  final bool sleepy;
+
+  /// Someone else came back: one short hoot rising fast, on [first].
+  final bool bright;
 }
 
 const _rate = 48000;
@@ -74,7 +91,23 @@ final sounds = Sounds();
 Uint8List _synthesize(Cue cue) {
   const start = 0.02;
   final Float64List samples;
-  if (cue.ticks == 0) {
+  if (cue.sleepy) {
+    samples = Float64List((_rate * 1.05).round());
+    _hoot(samples, start, cue.first, cue.level, 0.34, to: 0.9, rise: 0.1);
+    _hoot(samples, start + 0.46, cue.second, cue.level, 0.5, to: 0.84);
+  } else if (cue.bright) {
+    samples = Float64List((_rate * 0.25).round());
+    _hoot(
+      samples,
+      start,
+      cue.first,
+      cue.level,
+      0.16,
+      from: 0.84,
+      to: 1.03,
+      rise: 0.04,
+    );
+  } else if (cue.ticks == 0) {
     samples = Float64List((_rate * 0.6).round());
     _hoot(samples, start, cue.first, cue.level, 0.2);
     _hoot(samples, start + 0.26, cue.second, cue.level, 0.26);
@@ -93,14 +126,19 @@ Uint8List _synthesize(Cue cue) {
 }
 
 /// One hoot: a soft round tone that swells in, lifts and sags a little,
-/// with a faint octave above for the breathy edge of an owl's call.
+/// with a faint octave above for the breathy edge of an owl's call. The
+/// pitch glides from [from] × [pitch] up to [pitch] in [rise] seconds, then
+/// to [to] × [pitch] by the end.
 void _hoot(
   Float64List out,
   double at,
   double pitch,
   double level,
-  double length,
-) {
+  double length, {
+  double from = 0.96,
+  double to = 0.97,
+  double rise = 0.06,
+}) {
   double gain(double t) {
     if (t < 0.05) return level * t / 0.05;
     final fall = length - 0.09;
@@ -109,9 +147,9 @@ void _hoot(
     return level * pow(0.0001 / level, (t - fall) / 0.09);
   }
 
-  double frequency(double f, double t) => t < 0.06
-      ? f * 0.96 + f * 0.04 * t / 0.06
-      : f - f * 0.03 * (t - 0.06) / (length - 0.06);
+  double frequency(double f, double t) => t < rise
+      ? f * from + f * (1 - from) * t / rise
+      : f + f * (to - 1) * (t - rise) / (length - rise);
 
   final first = (at * _rate).round();
   final count = ((length + 0.02) * _rate).round();
