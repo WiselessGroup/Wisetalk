@@ -90,6 +90,9 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
 
   /// Names of those we summoned, for the answer.
   final Map<String, String> _summoned = {};
+
+  /// A channel to join once the connection is up: a summons tapped before.
+  String? _joinOnReady;
   String? _shownError;
 
   /// Phones in a call: the channel list, folded into one row until opened.
@@ -105,13 +108,21 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     _voice.addListener(_voiceChanged);
     _chats.addListener(_chatsChanged);
     final notifications = ref.read(notificationsProvider);
-    unawaited(notifications.prepare());
+    unawaited(_prepareNotifications(notifications));
     _subscriptions.addAll([
       _chats.incoming.listen(_message),
       _gateway.events.listen(_event),
       notifications.clicks.listen(_clicked),
       if (_voice.trust case final trust?) trust.notices.listen(_toast),
     ]);
+  }
+
+  /// Then follows the tap that started Wisetalk, or a summons to this
+  /// server tapped while another one was open.
+  Future<void> _prepareNotifications(Notifications notifications) async {
+    await notifications.prepare();
+    final waiting = notifications.takeWaiting();
+    if (waiting != null && mounted) _clicked(waiting);
   }
 
   @override
@@ -163,6 +174,11 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
 
   void _event(GatewayEvent event) {
     if (!mounted) return;
+    if (event.type == 'ready' && _joinOnReady != null) {
+      final channel = _joinOnReady!;
+      _joinOnReady = null;
+      _voice.join(channel);
+    }
     final texts = _texts;
     if (event.type == 'summon_sent') {
       final data = event.data as Map<String, dynamic>;
@@ -211,7 +227,10 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
             .show(
               title: texts.workspaceSummoned,
               body: text,
-              target: SummonTarget(channel),
+              target: SummonTarget(
+                channel,
+                server: widget.session.server.origin,
+              ),
             ),
       );
     }
@@ -221,9 +240,25 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     switch (target) {
       case ChatTarget(:final channel):
         unawaited(_chats.show(channel));
-      case SummonTarget(:final channel):
-        _voice.join(channel);
+      case SummonTarget(:final channel, :final server):
+        final here = widget.session.server.origin;
+        if (server != null && server != here) {
+          _switchServer(server, target);
+        } else if (_gateway.status == GatewayStatus.ready) {
+          _voice.join(channel);
+        } else {
+          _joinOnReady = channel;
+        }
     }
+  }
+
+  /// A summons from another server signed in here: over there, where its
+  /// workspace takes [target] up once connected.
+  void _switchServer(Uri server, NotificationTarget target) {
+    final known = ref.read(serversProvider).value?.list ?? const [];
+    if (!known.any((s) => s.origin == server)) return;
+    ref.read(notificationsProvider).wait(target);
+    unawaited(ref.read(serversProvider.notifier).select(server));
   }
 
   void _toast(String text) => ScaffoldMessenger.of(context).showSnackBar(

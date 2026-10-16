@@ -23,6 +23,9 @@ Forgejo.
 - Linux, Windows and macOS: the owl and the shortcut ticks play on the
   output picked in Settings, with the voices, not on the system's default
   one.
+- Android: summons reach your phone even when Wisetalk is closed, without
+  Google. Install the ntfy app and set your community's ntfy server as its
+  default; Settings › While Wisetalk Is Closed shows whether it works.
 
 ## 0.4.0
 

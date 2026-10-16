@@ -444,6 +444,22 @@ class Api {
   Future<void> setAllowSummons(bool allow) =>
       _send('PUT', '/me/settings', {'allow_summons': allow});
 
+  /// The server's VAPID public key (base64url), which push services check
+  /// its pushes against; `null` when the server sends no pushes.
+  Future<String?> pushKey() async {
+    final json = await _send('GET', '/push') as Map<String, dynamic>;
+    return json['public_key'] as String?;
+  }
+
+  /// Has the server push summons to [subscription] (see
+  /// `pushSubscriptionJson`), for accounts only.
+  Future<void> subscribePush(Map<String, dynamic> subscription) =>
+      _send('POST', '/push/subscriptions', subscription);
+
+  /// Stops the pushes to [endpoint].
+  Future<void> unsubscribePush(String endpoint) =>
+      _send('DELETE', '/push/subscriptions', {'endpoint': endpoint});
+
   /// Accounts matching [query] that could come into [channel] when summoned.
   Future<List<AccountSummary>> summonable(String channel, String query) async =>
       [

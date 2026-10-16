@@ -38,10 +38,10 @@ sealed class NotificationTarget {
   static NotificationTarget? parse(String? payload) {
     final at = payload?.indexOf(':') ?? -1;
     if (at < 1 || at == payload!.length - 1) return null;
-    final channel = payload.substring(at + 1);
+    final rest = payload.substring(at + 1);
     return switch (payload.substring(0, at)) {
-      'chat' => ChatTarget(channel),
-      'summon' => SummonTarget(channel),
+      'chat' => ChatTarget(rest),
+      'summon' => SummonTarget.parse(rest),
       _ => null,
     };
   }
@@ -61,30 +61,60 @@ class ChatTarget extends NotificationTarget {
 
 /// A channel someone summoned us to, to join.
 class SummonTarget extends NotificationTarget {
-  const SummonTarget(this.channel);
+  const SummonTarget(this.channel, {this.server});
+
+  /// From what follows `summon:` in a payload: the channel, then the server
+  /// after a space when there is one.
+  factory SummonTarget.parse(String rest) {
+    final space = rest.indexOf(' ');
+    if (space < 0) return SummonTarget(rest);
+    return SummonTarget(
+      rest.substring(0, space),
+      server: Uri.tryParse(rest.substring(space + 1)),
+    );
+  }
 
   final String channel;
 
+  /// Whose channel, when it may not be the current server's: a push comes
+  /// from any server signed in on this phone (WLK-10).
+  final Uri? server;
+
   @override
-  String get payload => 'summon:$channel';
+  String get payload =>
+      server == null ? 'summon:$channel' : 'summon:$channel $server';
 }
 
 /// The Linux runner's window (linux/runner/my_application.cc).
 const _window = MethodChannel('net.wiseless.wisetalk/window');
 
 class Notifications {
-  Notifications(this._preferences);
+  /// [background] when a push started Wisetalk to show one notification
+  /// (lib/data/unified_push.dart): there is no window to ask from then.
+  Notifications(this._preferences, {this.background = false});
 
   final Preferences _preferences;
+  final bool background;
   final _plugin = FlutterLocalNotificationsPlugin();
   // Linux has its own, for the click to bring the window forward.
   late final _linux = Platform.isLinux ? LinuxNotifications() : null;
   final _clicks = StreamController<NotificationTarget>.broadcast();
   Future<bool>? _ready;
   int _next = 0;
+  NotificationTarget? _waiting;
 
   /// Where clicked notifications lead.
   Stream<NotificationTarget> get clicks => _clicks.stream;
+
+  /// A click nobody could follow yet: the one that started Wisetalk, or a
+  /// summons to another server, waiting for its workspace.
+  NotificationTarget? takeWaiting() {
+    final target = _waiting;
+    _waiting = null;
+    return target;
+  }
+
+  void wait(NotificationTarget target) => _waiting = target;
 
   /// In the person's language, read when a notification is made.
   AppLocalizations get _texts => textsFor(_preferences.language.value);
@@ -115,7 +145,14 @@ class Notifications {
           if (target != null) _clicks.add(target);
         },
       );
-      if (Platform.isAndroid) {
+      if (Platform.isAndroid && !background) {
+        // A tap on a notification while Wisetalk was closed started it.
+        final launch = await _plugin.getNotificationAppLaunchDetails();
+        if (launch != null && launch.didNotificationLaunchApp) {
+          _waiting = NotificationTarget.parse(
+            launch.notificationResponse?.payload,
+          );
+        }
         await _plugin
             .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin
@@ -130,18 +167,19 @@ class Notifications {
     }
   }
 
-  /// [caller] summoned us to [channel], named [channelName]; the same
-  /// words as the web client's push.
+  /// [caller] summoned us to [channel], named [channelName], on [server];
+  /// the same words as the web client's push.
   Future<void> summoned({
     required String caller,
     required String channel,
     required String channelName,
+    Uri? server,
   }) {
     final texts = _texts;
     return show(
       title: texts.notificationSummonTitle(caller),
       body: texts.notificationSummonBody(channelName),
-      target: SummonTarget(channel),
+      target: SummonTarget(channel, server: server),
     );
   }
 
@@ -162,8 +200,12 @@ class Notifications {
         );
         return;
       }
+      // One notification per summons: the push and the open app's own
+      // (lib/ui/workspace_screen.dart) may both make it, the later one
+      // replaces the first without a second sound.
+      final summon = target is SummonTarget;
       await _plugin.show(
-        id: _next++,
+        id: summon ? 0 : _next++,
         title: title,
         body: body,
         payload: target.payload,
@@ -173,6 +215,8 @@ class Notifications {
             texts.notificationChannel,
             importance: Importance.high,
             priority: Priority.high,
+            tag: target is SummonTarget ? 'summon:${target.channel}' : null,
+            onlyAlertOnce: summon,
           ),
           macOS: const DarwinNotificationDetails(),
         ),

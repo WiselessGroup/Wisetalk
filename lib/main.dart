@@ -10,6 +10,7 @@ import 'data/input_filters.dart';
 import 'data/language.dart';
 import 'data/links.dart';
 import 'data/preferences.dart';
+import 'data/unified_push.dart';
 import 'data/updates.dart';
 import 'l10n/app_localizations.dart';
 import 'router.dart';
@@ -17,8 +18,14 @@ import 'src/rust/api/update.dart';
 import 'src/rust/frb_generated.dart';
 import 'theme.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (args.contains(pushBackgroundArgument)) {
+    // A summons came while Wisetalk was closed (Android): only what shows
+    // its notification, no window, no Rust, no connection.
+    await unifiedPushes.start(background: true);
+    return;
+  }
   // Before anything can set a call key.
   quietAndroidLogs();
   crashReports.watch();
@@ -27,6 +34,8 @@ Future<void> main() async {
   // First: while installing or updating, Velopack may end the process here.
   startUpdates();
   unawaited(registerDesktopEntry());
+  // Before anything registers, so endpoints and pushes have somewhere to go.
+  unawaited(unifiedPushes.start());
   runApp(const ProviderScope(child: WisetalkApp()));
 }
 
@@ -39,6 +48,8 @@ class WisetalkApp extends ConsumerWidget {
     // in or not.
     ref.watch(updatesProvider);
     ref.watch(linksProvider);
+    // Summons while closed follow whoever is signed in (Android).
+    ref.watch(unifiedPushProvider);
     final router = ref.watch(routerProvider);
     return ValueListenableBuilder(
       valueListenable: ref.watch(preferencesProvider).language,

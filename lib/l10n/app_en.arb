@@ -684,6 +684,38 @@
     "description": "Notification switch: a notification when someone summons you into their voice channel."
   },
   "settingsNotifySummonsDetail": "When someone calls you into a channel",
+  "settingsPushHeader": "While Wisetalk Is Closed",
+  "@settingsPushHeader": {
+    "description": "Settings group, Android only: how summons reach the phone while the app is not running."
+  },
+  "settingsPushApp": "Push App",
+  "@settingsPushApp": {
+    "description": "Row label: the UnifiedPush distributor app (such as ntfy) that delivers pushes while Wisetalk is closed."
+  },
+  "settingsPushAppNone": "None",
+  "@settingsPushAppNone": {
+    "description": "Value of the Push App row when no such app is installed."
+  },
+  "settingsPushAppChoose": "Choose…",
+  "settingsGetNtfy": "Get ntfy",
+  "@settingsGetNtfy": {
+    "description": "Button opening the store page of ntfy, a push app. \"ntfy\" is a name, written in lowercase."
+  },
+  "settingsPushVia": "Summons reach this phone through {app}, even while Wisetalk is closed.",
+  "@settingsPushVia": {
+    "description": "Caption under the Push App row.",
+    "placeholders": {
+      "app": {
+        "type": "String",
+        "example": "ntfy"
+      }
+    }
+  },
+  "settingsPushChooseHint": "Choose the app that brings summons while Wisetalk is closed.",
+  "settingsPushNoneHint": "Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.",
+  "@settingsPushNoneHint": {
+    "description": "Caption when no push app is installed: ntfy must use the community’s own ntfy server as its default server."
+  },
   "settingsPrivacy": "Privacy",
   "settingsCrashReports": "Send Crash Reports",
   "settingsCrashReportsHint": "When something in Wisetalk breaks, tell its developers what broke and where in the code. Never your messages, names, keys or servers.",

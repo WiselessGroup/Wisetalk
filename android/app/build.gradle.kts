@@ -71,3 +71,16 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
+
+// UnifiedPush decrypts pushes with Tink for the JVM, flutter_secure_storage
+// keeps secrets with Tink for Android: the same classes twice. One Tink,
+// flutter_secure_storage's version, for both (WLK-10).
+configurations.all {
+    val tink = "com.google.crypto.tink:tink-android:1.23.0"
+    resolutionStrategy {
+        force(tink)
+        dependencySubstitution {
+            substitute(module("com.google.crypto.tink:tink")).using(module(tink))
+        }
+    }
+}

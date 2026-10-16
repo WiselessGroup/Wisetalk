@@ -91,7 +91,19 @@ class Preferences extends ChangeNotifier {
   double volumeOf(Participant p) =>
       silenced.contains(personKey(p)) ? 0 : volumes[personKey(p)] ?? 1;
 
+  /// Done once [load] read what was saved, or found nothing.
+  Future<void> get loaded => _loaded.future;
+  final _loaded = Completer<void>();
+
   Future<void> load() async {
+    try {
+      await _read();
+    } finally {
+      if (!_loaded.isCompleted) _loaded.complete();
+    }
+  }
+
+  Future<void> _read() async {
     final raw = await _secrets.read(_key);
     if (raw == null) return;
     try {
