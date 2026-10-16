@@ -25,8 +25,19 @@ wisetalk-core = { git = "https://git.wiseless.net/Wisetalk/core.git", branch = "
 # Pictures pasted into chats. Phones paste through the keyboard instead.
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 arboard = { version = "3.6.1", default-features = false, features = ["image-data", "wayland-data-control"] }
+# Shortcuts that work while another app is in front (WLK-30): RegisterHotKey
+# on Windows, Carbon on macOS, XGrabKey on X11.
+global-hotkey = "0.8"
 # Desktop updates: the app installs, updates and restarts through Velopack.
 velopack = "1.2.161"
+
+# Global shortcuts register on the main thread on macOS, and on a thread of
+# their own that pumps messages on Windows (src/api/hotkeys.rs).
+[target.'cfg(target_os = "macos")'.dependencies]
+dispatch2 = "0.3.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [lints.rust]
 # Set by flutter_rust_bridge's code generator while it expands the API.

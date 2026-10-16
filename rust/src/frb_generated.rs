@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1748790433;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1826535172;
 
 // Section: executor
 
@@ -1363,6 +1363,35 @@ fn wire__crate__api__text__fingerprint_impl(
         },
     )
 }
+fn wire__crate__api__hotkeys__global_hotkeys_available_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "global_hotkeys_available",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::hotkeys::global_hotkeys_available())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__update__installed_version_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1646,6 +1675,41 @@ fn wire__crate__api__update__restart_to_update_impl(
         },
     )
 }
+fn wire__crate__api__hotkeys__set_global_hotkeys_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_global_hotkeys",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_hotkeys =
+                <Vec<crate::api::hotkeys::GlobalHotkey>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Ok::<_, ()>(crate::api::hotkeys::set_global_hotkeys(api_hotkeys))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__text__solve_challenge_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1711,6 +1775,44 @@ fn wire__crate__api__update__start_updates_impl(
                 })?;
                 std::result::Result::Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__hotkeys__watch_global_hotkeys_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "watch_global_hotkeys",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_sink =
+                <StreamSink<String, flutter_rust_bridge::for_generated::SseCodec>>::sse_decode(
+                    &mut deserializer,
+                );
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::hotkeys::watch_global_hotkeys(api_sink);
+                    })?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
         },
     )
 }
@@ -1814,6 +1916,14 @@ impl SseDecode
     }
 }
 
+impl SseDecode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
 impl SseDecode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1829,10 +1939,48 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::api::hotkeys::GlobalHotkey {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_action = <String>::sse_decode(deserializer);
+        let mut var_combo = <String>::sse_decode(deserializer);
+        return crate::api::hotkeys::GlobalHotkey {
+            action: var_action,
+            combo: var_combo,
+        };
+    }
+}
+
 impl SseDecode for i64 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_i64::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for Vec<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::hotkeys::GlobalHotkey> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::hotkeys::GlobalHotkey>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
     }
 }
 
@@ -1971,10 +2119,14 @@ fn pde_ffi_dispatcher_primary_impl(
         12 => wire__crate__api__chat__ChatKey_open_image_impl(port, ptr, rust_vec_len, data_len),
         26 => wire__crate__api__picture__clipboard_picture_impl(port, ptr, rust_vec_len, data_len),
         27 => wire__crate__api__update__download_update_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__picture__prepare_avatar_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__update__restart_to_update_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__picture__prepare_avatar_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__picture__prepare_picture_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__update__restart_to_update_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__hotkeys__set_global_hotkeys_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__text__solve_challenge_impl(port, ptr, rust_vec_len, data_len),
+        42 => {
+            wire__crate__api__hotkeys__watch_global_hotkeys_impl(port, ptr, rust_vec_len, data_len)
+        }
         _ => unreachable!(),
     }
 }
@@ -2012,13 +2164,14 @@ fn pde_ffi_dispatcher_sync_impl(
         24 => wire__crate__api__trust__KnownKeys_from_json_impl(ptr, rust_vec_len, data_len),
         25 => wire__crate__api__trust__KnownKeys_to_json_impl(ptr, rust_vec_len, data_len),
         28 => wire__crate__api__text__fingerprint_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__update__installed_version_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__text__normalize_channel_name_impl(ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__text__normalize_chat_body_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__text__normalize_display_name_impl(ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__auth__pkce_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__update__start_updates_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__hotkeys__global_hotkeys_available_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__update__installed_version_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__text__normalize_channel_name_impl(ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__text__normalize_chat_body_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__text__normalize_display_name_impl(ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__auth__pkce_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__text__protocol_version_impl(ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__update__start_updates_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2085,6 +2238,27 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<KnownKeys>> for KnownKeys {
     }
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::hotkeys::GlobalHotkey {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.action.into_into_dart().into_dart(),
+            self.combo.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::hotkeys::GlobalHotkey
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::hotkeys::GlobalHotkey>
+    for crate::api::hotkeys::GlobalHotkey
+{
+    fn into_into_dart(self) -> crate::api::hotkeys::GlobalHotkey {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::picture::Picture {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -2213,6 +2387,13 @@ impl SseEncode
     }
 }
 
+impl SseEncode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
 impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2227,10 +2408,38 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for crate::api::hotkeys::GlobalHotkey {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.action, serializer);
+        <String>::sse_encode(self.combo, serializer);
+    }
+}
+
 impl SseEncode for i64 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_i64::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for Vec<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <String>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::hotkeys::GlobalHotkey> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::hotkeys::GlobalHotkey>::sse_encode(item, serializer);
+        }
     }
 }
 

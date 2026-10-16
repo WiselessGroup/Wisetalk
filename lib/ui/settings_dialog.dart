@@ -14,6 +14,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../data/api.dart';
 import '../data/crash_reports.dart';
 import '../data/gateway.dart';
+import '../data/global_shortcuts.dart';
 import '../data/input_filters.dart';
 import '../data/preferences.dart';
 import '../data/shortcuts.dart';
@@ -404,8 +405,11 @@ class _ShortcutsGroupState extends State<_ShortcutsGroup> {
         footer: _recording != null
             ? 'Press the new keys. Backspace removes the shortcut, '
                   'Esc keeps it.'
-            : 'They work while Wisetalk’s window is in front. Click one to '
-                  'change it.',
+            : globalShortcutsAvailable
+            ? 'In a call they work whatever app is in front, otherwise in '
+                  'Wisetalk’s window. Click one to change it.'
+            : 'On Wayland they work only while Wisetalk’s window is in '
+                  'front. Click one to change it.',
         children: [
           for (final action in CallAction.values)
             SettingsRow(

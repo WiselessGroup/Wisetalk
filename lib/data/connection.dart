@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'chat.dart';
 import 'device.dart';
 import 'gateway.dart';
+import 'global_shortcuts.dart';
 import 'preferences.dart';
 import 'servers.dart';
 import 'session.dart';
@@ -38,9 +39,11 @@ final connectionProvider = FutureProvider<Connection?>((ref) async {
     session.api.server().then((info) => info.guestsOpen),
   );
   final voice = Voice(gateway, ref.read(preferencesProvider), trust: trust);
+  final shortcuts = GlobalShortcuts(voice, ref.read(preferencesProvider));
   final chats = Chats(gateway, device, account: session.me.id, trust: trust);
   ref.onDispose(() {
     chats.dispose();
+    shortcuts.dispose();
     voice.dispose();
     trust.dispose();
     gateway.dispose();

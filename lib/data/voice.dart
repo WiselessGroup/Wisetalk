@@ -290,6 +290,13 @@ class Voice extends ChangeNotifier {
   /// on. A refused unmute ticks off.
   Future<void> perform(CallAction action) async {
     if (_room == null || state != VoiceState.connected) return;
+    // A key both the window and the system catch must not act twice.
+    final now = DateTime.now();
+    if (_performed case (final last, final at)
+        when last == action && now.difference(at) < _sameKey) {
+      return;
+    }
+    _performed = (action, now);
     final wasAway = away;
     switch (action) {
       case CallAction.toggleMute:
@@ -307,6 +314,10 @@ class Voice extends ChangeNotifier {
         : (muted ? Cue.mute : Cue.unmute);
     unawaited(sounds.play(cue));
   }
+
+  /// The last shortcut's action and when, see [perform].
+  (CallAction, DateTime)? _performed;
+  static const _sameKey = Duration(milliseconds: 300);
 
   /// Steps away or comes back (ADR-0026).
   Future<void> toggleAway() async {

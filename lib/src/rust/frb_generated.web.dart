@@ -10,6 +10,7 @@ import 'api/auth.dart';
 import 'api/call.dart';
 import 'api/chat.dart';
 import 'api/device.dart';
+import 'api/hotkeys.dart';
 import 'api/picture.dart';
 import 'api/text.dart';
 import 'api/trust.dart';
@@ -128,6 +129,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<String> dco_decode_StreamSink_String_Sse(dynamic raw);
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -137,7 +141,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Picture dco_decode_box_autoadd_picture(dynamic raw);
 
   @protected
+  GlobalHotkey dco_decode_global_hotkey(dynamic raw);
+
+  @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<GlobalHotkey> dco_decode_list_global_hotkey(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -262,6 +275,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<String> sse_decode_StreamSink_String_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
@@ -271,7 +289,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Picture sse_decode_box_autoadd_picture(SseDeserializer deserializer);
 
   @protected
+  GlobalHotkey sse_decode_global_hotkey(SseDeserializer deserializer);
+
+  @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<GlobalHotkey> sse_decode_list_global_hotkey(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -415,6 +444,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_String_Sse(
+    RustStreamSink<String> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -424,7 +459,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_picture(Picture self, SseSerializer serializer);
 
   @protected
+  void sse_encode_global_hotkey(GlobalHotkey self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_global_hotkey(
+    List<GlobalHotkey> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
