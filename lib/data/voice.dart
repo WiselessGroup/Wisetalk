@@ -131,6 +131,25 @@ const _screenSound = lk.AudioPublishOptions(
   dtx: false,
 );
 
+/// The tick a shortcut is expected to end with, played before the action
+/// finishes (see [Voice.perform]). Away, the microphone is off already:
+/// turning it on comes back; a server mute refuses it.
+@visibleForTesting
+Cue expectedCue(
+  CallAction action, {
+  required bool away,
+  required bool muted,
+  required bool serverMuted,
+}) => switch (action) {
+  CallAction.toggleAway => away ? Cue.back : Cue.away,
+  CallAction.mute => Cue.mute,
+  CallAction.toggleMute when away => Cue.back,
+  CallAction.toggleMute when !muted => Cue.mute,
+  CallAction.unmute when away => Cue.back,
+  CallAction.toggleMute ||
+  CallAction.unmute => serverMuted ? Cue.mute : Cue.unmute,
+};
+
 class Voice extends ChangeNotifier {
   Voice(this.gateway, this.preferences, {this.trust}) {
     _subscription = gateway.events.listen(_onEvent);
@@ -298,6 +317,16 @@ class Voice extends ChangeNotifier {
     }
     _performed = (action, now);
     final wasAway = away;
+    // Tick at once: turning the microphone back on publishes it anew, which
+    // takes seconds on a Mac while Apple's voice processing starts up. A
+    // different outcome (a microphone that fails) ticks again after.
+    final expected = expectedCue(
+      action,
+      away: away,
+      muted: muted,
+      serverMuted: serverMuted,
+    );
+    if (preferences.cues) unawaited(sounds.play(expected));
     switch (action) {
       case CallAction.toggleMute:
         await toggleMute();
@@ -308,11 +337,10 @@ class Voice extends ChangeNotifier {
       case CallAction.unmute:
         await setMicrophone(on: true);
     }
-    if (!preferences.cues) return;
     final cue = away != wasAway
         ? (away ? Cue.away : Cue.back)
         : (muted ? Cue.mute : Cue.unmute);
-    unawaited(sounds.play(cue));
+    if (preferences.cues && cue != expected) unawaited(sounds.play(cue));
   }
 
   /// The last shortcut's action and when, see [perform].
