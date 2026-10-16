@@ -3,8 +3,25 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
-## Unreleased
+## 0.5.0
 
+- Keyboard shortcuts work while another app is in front, as long as
+  you are in a call: Windows, macOS and X11. Under Wayland they work
+  in Wisetalk's window only, and Settings says so.
+- The shortcut tick sounds the moment you press, not after the
+  microphone has switched.
+- Devices that filter their own input (Macs, Android phones with
+  hardware echo cancellation and noise suppression) are left to it:
+  Voice Processing disappears from their Settings, and their
+  microphone stays mono. Everywhere else your choice stands.
+- Wisetalk remembers the device keys of the people in your calls.
+  Someone you know joining from a new device is a toast; a known device
+  with another key gets a quiet key mark next to the person for the
+  rest of the call. Nothing to confirm. Devices not seen for 4 hours (a
+  week on servers with guests) are forgotten. A new device on your own
+  account gets a toast of its own.
+- Less work in a call: the media library no longer polls statistics
+  for every track every two seconds.
 - Wisetalk speaks eight languages: English, Russian, Traditional Chinese,
   Japanese, Brazilian Portuguese, German, French and Spanish. It follows
   the system, and Settings › Language picks another one, which then
