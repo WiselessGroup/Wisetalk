@@ -1401,6 +1401,54 @@ abstract class AppLocalizations {
   /// **'When someone calls you into a channel'**
   String get settingsNotifySummonsDetail;
 
+  /// Settings group, Android only: how summons reach the phone while the app is not running.
+  ///
+  /// In en, this message translates to:
+  /// **'While Wisetalk Is Closed'**
+  String get settingsPushHeader;
+
+  /// Row label: the UnifiedPush distributor app (such as ntfy) that delivers pushes while Wisetalk is closed.
+  ///
+  /// In en, this message translates to:
+  /// **'Push App'**
+  String get settingsPushApp;
+
+  /// Value of the Push App row when no such app is installed.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get settingsPushAppNone;
+
+  /// No description provided for @settingsPushAppChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose…'**
+  String get settingsPushAppChoose;
+
+  /// Button opening the store page of ntfy, a push app. "ntfy" is a name, written in lowercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Get ntfy'**
+  String get settingsGetNtfy;
+
+  /// Caption under the Push App row.
+  ///
+  /// In en, this message translates to:
+  /// **'Summons reach this phone through {app}, even while Wisetalk is closed.'**
+  String settingsPushVia(String app);
+
+  /// No description provided for @settingsPushChooseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the app that brings summons while Wisetalk is closed.'**
+  String get settingsPushChooseHint;
+
+  /// Caption when no push app is installed: ntfy must use the community’s own ntfy server as its default server.
+  ///
+  /// In en, this message translates to:
+  /// **'Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.'**
+  String get settingsPushNoneHint;
+
   /// No description provided for @settingsPrivacy.
   ///
   /// In en, this message translates to:

@@ -779,6 +779,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'When someone calls you into a channel';
 
   @override
+  String get settingsPushHeader => 'While Wisetalk Is Closed';
+
+  @override
+  String get settingsPushApp => 'Push App';
+
+  @override
+  String get settingsPushAppNone => 'None';
+
+  @override
+  String get settingsPushAppChoose => 'Choose…';
+
+  @override
+  String get settingsGetNtfy => 'Get ntfy';
+
+  @override
+  String settingsPushVia(String app) {
+    return 'Summons reach this phone through $app, even while Wisetalk is closed.';
+  }
+
+  @override
+  String get settingsPushChooseHint =>
+      'Choose the app that brings summons while Wisetalk is closed.';
+
+  @override
+  String get settingsPushNoneHint =>
+      'Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.';
+
+  @override
   String get settingsPrivacy => 'Privacy';
 
   @override

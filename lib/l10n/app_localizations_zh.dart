@@ -779,6 +779,34 @@ class AppLocalizationsZh extends AppLocalizations {
       'When someone calls you into a channel';
 
   @override
+  String get settingsPushHeader => 'While Wisetalk Is Closed';
+
+  @override
+  String get settingsPushApp => 'Push App';
+
+  @override
+  String get settingsPushAppNone => 'None';
+
+  @override
+  String get settingsPushAppChoose => 'Choose…';
+
+  @override
+  String get settingsGetNtfy => 'Get ntfy';
+
+  @override
+  String settingsPushVia(String app) {
+    return 'Summons reach this phone through $app, even while Wisetalk is closed.';
+  }
+
+  @override
+  String get settingsPushChooseHint =>
+      'Choose the app that brings summons while Wisetalk is closed.';
+
+  @override
+  String get settingsPushNoneHint =>
+      'Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.';
+
+  @override
   String get settingsPrivacy => 'Privacy';
 
   @override
@@ -2325,6 +2353,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsNotifySummonsDetail => '有人呼叫你進入頻道時';
+
+  @override
+  String get settingsPushHeader => 'Wisetalk 關閉時';
+
+  @override
+  String get settingsPushApp => '推播應用程式';
+
+  @override
+  String get settingsPushAppNone => '無';
+
+  @override
+  String get settingsPushAppChoose => '選擇…';
+
+  @override
+  String get settingsGetNtfy => '取得 ntfy';
+
+  @override
+  String settingsPushVia(String app) {
+    return '即使 Wisetalk 已關閉，呼叫也會透過 $app 送到這支手機。';
+  }
+
+  @override
+  String get settingsPushChooseHint => '選擇在 Wisetalk 關閉時接收呼叫的應用程式。';
+
+  @override
+  String get settingsPushNoneHint =>
+      '沒有推播應用程式時，只有在 Wisetalk 執行中才會顯示呼叫。請安裝 ntfy，並在它的設定中將你社群的 ntfy 伺服器設為預設伺服器。';
 
   @override
   String get settingsPrivacy => '隱私權';

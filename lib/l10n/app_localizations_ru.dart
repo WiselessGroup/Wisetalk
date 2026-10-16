@@ -783,6 +783,34 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsNotifySummonsDetail => 'Когда кто-то зовёт вас в канал';
 
   @override
+  String get settingsPushHeader => 'Когда Wisetalk закрыт';
+
+  @override
+  String get settingsPushApp => 'Приложение для уведомлений';
+
+  @override
+  String get settingsPushAppNone => 'Нет';
+
+  @override
+  String get settingsPushAppChoose => 'Выбрать…';
+
+  @override
+  String get settingsGetNtfy => 'Установить ntfy';
+
+  @override
+  String settingsPushVia(String app) {
+    return 'Когда вас зовут в канал, телефон узнаёт об этом через $app, даже если Wisetalk закрыт.';
+  }
+
+  @override
+  String get settingsPushChooseHint =>
+      'Выберите приложение, через которое вызовы будут приходить, пока Wisetalk закрыт.';
+
+  @override
+  String get settingsPushNoneHint =>
+      'Без такого приложения вызовы видны, только пока Wisetalk работает. Установите ntfy и в его настройках сделайте сервер ntfy вашего сообщества сервером по умолчанию.';
+
+  @override
   String get settingsPrivacy => 'Конфиденциальность';
 
   @override

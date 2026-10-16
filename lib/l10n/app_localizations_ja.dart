@@ -755,6 +755,34 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsNotifySummonsDetail => '誰かがあなたをチャンネルに呼び出したとき';
 
   @override
+  String get settingsPushHeader => 'Wisetalk を閉じているとき';
+
+  @override
+  String get settingsPushApp => 'プッシュ通知アプリ';
+
+  @override
+  String get settingsPushAppNone => 'なし';
+
+  @override
+  String get settingsPushAppChoose => '選択…';
+
+  @override
+  String get settingsGetNtfy => 'ntfy を入手';
+
+  @override
+  String settingsPushVia(String app) {
+    return 'Wisetalk を閉じていても、呼び出しは $app 経由でこのスマートフォンに届きます。';
+  }
+
+  @override
+  String get settingsPushChooseHint =>
+      'Wisetalk を閉じているときに呼び出しを受け取るアプリを選んでください。';
+
+  @override
+  String get settingsPushNoneHint =>
+      'プッシュ通知アプリがないと、呼び出しは Wisetalk の実行中にしか表示されません。ntfy をインストールし、その設定でコミュニティの ntfy サーバーをデフォルトのサーバーにしてください。';
+
+  @override
   String get settingsPrivacy => 'プライバシー';
 
   @override

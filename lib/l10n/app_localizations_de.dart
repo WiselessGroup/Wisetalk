@@ -788,6 +788,34 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wenn dich jemand in einen Kanal ruft';
 
   @override
+  String get settingsPushHeader => 'Wenn Wisetalk geschlossen ist';
+
+  @override
+  String get settingsPushApp => 'Push-App';
+
+  @override
+  String get settingsPushAppNone => 'Keine';
+
+  @override
+  String get settingsPushAppChoose => 'Auswählen…';
+
+  @override
+  String get settingsGetNtfy => 'ntfy installieren';
+
+  @override
+  String settingsPushVia(String app) {
+    return 'Wenn dich jemand in einen Kanal ruft, erfährt dein Handy es über $app, auch wenn Wisetalk geschlossen ist.';
+  }
+
+  @override
+  String get settingsPushChooseHint =>
+      'Wähle die App, über die Rufe ankommen, während Wisetalk geschlossen ist.';
+
+  @override
+  String get settingsPushNoneHint =>
+      'Ohne Push-App siehst du Rufe nur, solange Wisetalk läuft. Installiere ntfy und stell in seinen Einstellungen den ntfy-Server deiner Community als Standardserver ein.';
+
+  @override
   String get settingsPrivacy => 'Datenschutz';
 
   @override

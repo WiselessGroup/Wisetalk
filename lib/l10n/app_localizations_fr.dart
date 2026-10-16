@@ -787,6 +787,34 @@ class AppLocalizationsFr extends AppLocalizations {
       'Quand quelqu’un vous appelle dans un salon';
 
   @override
+  String get settingsPushHeader => 'Quand Wisetalk est fermé';
+
+  @override
+  String get settingsPushApp => 'Application de notifications';
+
+  @override
+  String get settingsPushAppNone => 'Aucune';
+
+  @override
+  String get settingsPushAppChoose => 'Choisir…';
+
+  @override
+  String get settingsGetNtfy => 'Installer ntfy';
+
+  @override
+  String settingsPushVia(String app) {
+    return 'Les appels vers un salon arrivent sur ce téléphone via $app, même quand Wisetalk est fermé.';
+  }
+
+  @override
+  String get settingsPushChooseHint =>
+      'Choisissez l’application qui reçoit les appels quand Wisetalk est fermé.';
+
+  @override
+  String get settingsPushNoneHint =>
+      'Sans application de notifications, les appels ne s’affichent que lorsque Wisetalk est ouvert. Installez ntfy, puis dans ses paramètres choisissez le serveur ntfy de votre communauté comme serveur par défaut.';
+
+  @override
   String get settingsPrivacy => 'Confidentialité';
 
   @override
