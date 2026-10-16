@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/android_logs.dart';
 import 'data/crash_reports.dart';
 import 'data/desktop_entry.dart';
+import 'data/input_filters.dart';
 import 'data/links.dart';
 import 'data/updates.dart';
 import 'router.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   quietAndroidLogs();
   crashReports.watch();
   await RustLib.init();
+  await inputFilters.detect();
   // First: while installing or updating, Velopack may end the process here.
   startUpdates();
   unawaited(registerDesktopEntry());

@@ -25,6 +25,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../src/rust/api/call.dart';
 import 'call_service.dart';
 import 'gateway.dart';
+import 'input_filters.dart';
 import 'link.dart';
 import 'link_stats.dart';
 import 'preferences.dart';
@@ -374,21 +375,27 @@ class Voice extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether the microphone is cleaned up: by the device where it can,
+  /// otherwise as the person chose (WLK-2).
+  bool get _processing => processingOn(
+    byDevice: inputFilters.byDevice,
+    chosen: preferences.processing,
+  );
+
   /// What the microphone goes out with: the channel's quality, as the web
-  /// client publishes it, but in stereo only where that brings something.
-  /// Echo cancellation works on one channel, so with the processing on both
-  /// channels would carry the same sound and only cost bits; and Android and
-  /// Apple platforms record one channel whatever the call asks (WLK-2).
+  /// client publishes it, but in stereo only where that brings something
+  /// (see [stereoMicrophone]).
   AudioQuality _quality() {
     final audio =
         gateway.channel(channel ?? '')?.channel.audio ??
         const AudioQuality(bitrate: 64000, stereo: false);
     return AudioQuality(
       bitrate: audio.bitrate,
-      stereo:
-          audio.stereo &&
-          !preferences.processing &&
-          (Platform.isLinux || Platform.isWindows),
+      stereo: stereoMicrophone(
+        channelStereo: audio.stereo,
+        processing: _processing,
+        recordsStereo: Platform.isLinux || Platform.isWindows,
+      ),
     );
   }
 
@@ -399,17 +406,17 @@ class Voice extends ChangeNotifier {
     final (microphone, processing, quality) = published;
     final now = _quality();
     return microphone != preferences.microphone ||
-        processing != preferences.processing ||
+        processing != _processing ||
         quality.bitrate != now.bitrate ||
         quality.stereo != now.stereo;
   }
 
   lk.AudioCaptureOptions _audioCapture() => lk.AudioCaptureOptions(
     deviceId: preferences.microphone,
-    noiseSuppression: preferences.processing,
-    echoCancellation: preferences.processing,
-    autoGainControl: preferences.processing,
-    highPassFilter: preferences.processing,
+    noiseSuppression: _processing,
+    echoCancellation: _processing,
+    autoGainControl: _processing,
+    highPassFilter: _processing,
   );
 
   /// The chosen device among those there now; `null` when it's gone.
@@ -966,7 +973,7 @@ class Voice extends ChangeNotifier {
           red: true,
         ),
       );
-      _published = (preferences.microphone, preferences.processing, quality);
+      _published = (preferences.microphone, _processing, quality);
       muted = false;
     } catch (e) {
       debugPrint('microphone unavailable: $e');

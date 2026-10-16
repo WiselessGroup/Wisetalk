@@ -3,6 +3,8 @@ package net.wiseless.wisetalk
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,6 +26,17 @@ class MainActivity : FlutterActivity() {
                             CallService.update(this, title, sharing) { result.success(it) }
                         }
                     }
+                    else -> result.notImplemented()
+                }
+            }
+        // lib/data/input_filters.dart: WebRTC uses the phone's own echo
+        // cancellation and noise suppression when it has both.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "net.wiseless.wisetalk/audio")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "filtersInput" -> result.success(
+                        AcousticEchoCanceler.isAvailable() && NoiseSuppressor.isAvailable(),
+                    )
                     else -> result.notImplemented()
                 }
             }

@@ -14,6 +14,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import '../data/api.dart';
 import '../data/crash_reports.dart';
 import '../data/gateway.dart';
+import '../data/input_filters.dart';
 import '../data/preferences.dart';
 import '../data/shortcuts.dart';
 import '../src/rust/api/picture.dart';
@@ -222,20 +223,23 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ),
           ],
         ),
-        SettingsGroup(
-          footer:
-              'Turn it off for the best sound, and wear headphones then: '
-              'without echo cancellation others hear themselves through '
-              'your speakers.',
-          children: [
-            SwitchRow(
-              label: 'Voice Processing',
-              detail: 'Noise suppression and echo cancellation',
-              value: _prefs.processing,
-              onChanged: (on) => _change(() => _prefs.processing = on),
-            ),
-          ],
-        ),
+        // Where the device filters the microphone itself there is
+        // nothing to choose (WLK-2).
+        if (!inputFilters.byDevice)
+          SettingsGroup(
+            footer:
+                'Turn it off for the best sound, and wear headphones then: '
+                'without echo cancellation others hear themselves through '
+                'your speakers.',
+            children: [
+              SwitchRow(
+                label: 'Voice Processing',
+                detail: 'Noise suppression and echo cancellation',
+                value: _prefs.processing,
+                onChanged: (on) => _change(() => _prefs.processing = on),
+              ),
+            ],
+          ),
         SettingsGroup(
           children: [
             SwitchRow(
