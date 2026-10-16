@@ -92,23 +92,8 @@ the widget test that loads the bridge and the D-Bus notification tests fail,
 so `flutter test` and `scripts/check.sh` are meant for Linux; the rest of
 the tests pass anywhere.
 
-Integration tests run against a local server (see the server's README), on
-Linux one file at a time, because the desktop runner can't start the app
-twice in one run:
-
-```sh
-flutter test integration_test/sign_in_test.dart -d linux
-flutter test integration_test/voice_test.dart -d linux
-flutter test integration_test/chat_test.dart -d linux
-flutter test integration_test/shortcuts_test.dart -d linux
-# An account's session (see the file) and a camera:
-WISETALK_TEST_TOKEN=... flutter test integration_test/video_test.dart -d linux
-# An owner's session. WISETALK_SHOTS=<folder> saves a picture of each step;
-# sheets_test.dart runs at a phone's size (412 x 915) for the forms.
-WISETALK_TEST_TOKEN=... flutter test integration_test/manage_test.dart -d linux
-WISETALK_TEST_TOKEN=... WISETALK_SHOTS=/tmp/shots \
-  flutter test integration_test/sheets_test.dart -d linux
-```
+There are no tests that drive the app on a desktop: how a change looks and
+feels in a call is checked by people using it.
 
 ## Releases
 
