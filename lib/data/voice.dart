@@ -33,6 +33,7 @@ import 'link_stats.dart';
 import 'preferences.dart';
 import 'problem.dart';
 import 'protocol.dart';
+import 'screen_sound.dart';
 import 'shortcuts.dart';
 import 'sounds.dart';
 import 'stereo_audio.dart';
@@ -118,16 +119,17 @@ enum ScreenQuality {
   final lk.VideoParameters parameters;
 }
 
-/// Whether a screen share can carry its sound: Windows only for now. There
-/// libwebrtc records just the shared window's app, or for a whole screen
-/// everything but Wisetalk, so the call's voices stay out. On Linux it would
-/// record the speakers, the call included (everyone would hear themselves);
-/// on macOS and Android it records nothing (WLK-3).
-bool get screenSoundAvailable => Platform.isWindows;
+/// Whether a screen share can carry its sound. On Windows libwebrtc records
+/// just the shared window's app, or for a whole screen everything but
+/// Wisetalk, so the call's voices stay out. On Android ScreenSound.kt
+/// records everything the phone plays but Wisetalk. On Linux libwebrtc
+/// would record the speakers, the call included (everyone would hear
+/// themselves); on macOS it records nothing (WLK-3).
+bool get screenSoundAvailable => Platform.isWindows || Platform.isAndroid;
 
 /// Screen sound is music and films more than speech: no pauses in the quiet
 /// parts (DTX), a music bitrate. Mono: LiveKit's Flutter SDK publishes no
-/// stereo, and the Windows capture mixes down to one channel anyway.
+/// stereo, and the Windows and Android captures mix down to one channel.
 const _screenSound = lk.AudioPublishOptions(
   name: 'screen_audio',
   encoding: lk.AudioEncoding.presetMusicHighQuality,
@@ -198,6 +200,11 @@ class Voice extends ChangeNotifier {
   (String?, bool, AudioQuality)? _published;
   final _audio = StereoAudio();
   final _service = CallService();
+
+  /// Android: the screen's sound, mixed into what the microphone records
+  /// (see [_phoneSoundFollows]); whether it runs.
+  final _phoneSound = ScreenSound();
+  bool _phoneSoundOn = false;
   late final StreamSubscription<GatewayEvent> _subscription;
 
   String? channel;
@@ -304,8 +311,7 @@ class Voice extends ChangeNotifier {
     // and to hear the answer.
     if (away) return _comeBack(unmute: true);
     if (!muted) {
-      await _unpublish(lk.TrackSource.microphone);
-      muted = true;
+      await _microphoneOff();
     } else if (serverMuted) {
       error = _texts.voiceMutedByModerator;
     } else {
@@ -380,10 +386,7 @@ class Voice extends ChangeNotifier {
     _mutedBeforeAway = muted;
     _tellAway();
     _hearOthers(false);
-    if (!muted) {
-      muted = true;
-      await _unpublish(lk.TrackSource.microphone);
-    }
+    if (!muted) await _microphoneOff();
     _refreshMicStates();
   }
 
@@ -590,6 +593,54 @@ class Voice extends ChangeNotifier {
     }
   }
 
+  /// Turns the microphone off; a screen's sound from the phone goes on
+  /// alone.
+  Future<void> _microphoneOff() async {
+    muted = true;
+    // Silent at once, before the track goes.
+    if (_phoneSoundOn) await _phoneSound.microphone(on: false);
+    await _unpublish(lk.TrackSource.microphone);
+    await _phoneSoundFollows();
+  }
+
+  /// Android, sharing with sound: every audio track there carries what the
+  /// microphone records, the screen's sound mixed in (ScreenSound.kt). With
+  /// the microphone on the sound rides on its track. With it off the voice
+  /// is silenced and the sound goes on a track of its own, published as the
+  /// screen's, so the others see the microphone off and still hear it.
+  Future<void> _phoneSoundFollows() async {
+    final local = _room?.localParticipant;
+    if (!_phoneSoundOn || local == null) return;
+    await _phoneSound.microphone(on: !muted);
+    final alone = local.getTrackPublicationBySource(
+      lk.TrackSource.screenShareAudio,
+    );
+    if (!muted || alone != null) return;
+    try {
+      final options = _audioCapture();
+      final stream = await lk.LocalTrack.createStream(options);
+      await local.publishAudioTrack(
+        lk.LocalAudioTrack(
+          lk.TrackSource.screenShareAudio,
+          stream,
+          stream.getAudioTracks().first,
+          options,
+        ),
+        publishOptions: _screenSound,
+      );
+    } catch (e) {
+      debugPrint('screen sound alone: $e');
+    }
+  }
+
+  /// Android: the screen's sound ends with the screen share.
+  Future<void> _stopPhoneSound() async {
+    if (!_phoneSoundOn) return;
+    _phoneSoundOn = false;
+    await _phoneSound.stop();
+    await _unpublish(lk.TrackSource.screenShareAudio);
+  }
+
   /// Shares a screen or a window: [source] from the desktop source list,
   /// or `null` for whatever the system lets the person pick (Wayland asks
   /// through its own dialog). With [sound] where [screenSoundAvailable].
@@ -617,13 +668,14 @@ class Voice extends ChangeNotifier {
       params: quality.parameters,
     );
     try {
-      if (sound && screenSoundAvailable) {
+      if (sound && Platform.isWindows) {
         await _shareWithSound(local, options);
       } else {
         await local.setScreenShareEnabled(
           true,
           screenShareCaptureOptions: options,
         );
+        if (sound && Platform.isAndroid) await _startPhoneSound(local);
       }
     } catch (e) {
       // Cancelling the system's share dialog lands here too.
@@ -664,9 +716,21 @@ class Voice extends ChangeNotifier {
     }
   }
 
+  /// Android: the screen's sound for the share just started. Without it
+  /// (no microphone permission, say), the picture alone.
+  Future<void> _startPhoneSound(lk.LocalParticipant local) async {
+    final track = local
+        .getTrackPublicationBySource(lk.TrackSource.screenShareVideo)
+        ?.track;
+    if (track == null) return;
+    _phoneSoundOn = await _phoneSound.start(track.mediaStreamTrack.id!);
+    await _phoneSoundFollows();
+  }
+
   Future<void> stopScreen() async {
     final local = _room?.localParticipant;
     if (local == null) return;
+    await _stopPhoneSound();
     try {
       // Takes the screen's sound down with it.
       await local.setScreenShareEnabled(false);
@@ -702,6 +766,10 @@ class Voice extends ChangeNotifier {
 
   void _reset() {
     _attempt++;
+    if (_phoneSoundOn) {
+      _phoneSoundOn = false;
+      unawaited(_phoneSound.stop());
+    }
     _awayPeople.clear();
     _roomEvents?.dispose();
     _roomEvents = null;
@@ -845,6 +913,8 @@ class Voice extends ChangeNotifier {
         serverMuted = participant.serverMuted;
         if (serverMuted) {
           muted = true;
+          // The server takes the microphone down itself.
+          unawaited(_phoneSoundFollows());
           error = _texts.voiceServerMuted;
         } else {
           error = _texts.voiceServerUnmuted;
@@ -981,7 +1051,11 @@ class Voice extends ChangeNotifier {
           // published, silent.
           if (e.publication.source == lk.TrackSource.screenShareVideo) {
             screen = false;
-            unawaited(_unpublish(lk.TrackSource.screenShareAudio));
+            unawaited(
+              _phoneSoundOn
+                  ? _stopPhoneSound()
+                  : _unpublish(lk.TrackSource.screenShareAudio),
+            );
             unawaited(_syncService());
           }
           if (e.publication.source == lk.TrackSource.camera) camera = false;
@@ -1060,6 +1134,7 @@ class Voice extends ChangeNotifier {
     if (serverMuted) {
       muted = true;
       unawaited(_syncService());
+      await _phoneSoundFollows();
       notifyListeners();
       return;
     }
@@ -1067,6 +1142,9 @@ class Voice extends ChangeNotifier {
     if (local == null) return;
     try {
       await _selectMicrophone();
+      // The microphone's track takes the screen's sound over: a moment of
+      // nothing rather than the sound twice.
+      if (_phoneSoundOn) await _unpublish(lk.TrackSource.screenShareAudio);
       // Low bitrates may pause in silence (DTX), RED repeats packets
       // against loss.
       final quality = _quality();
@@ -1088,6 +1166,7 @@ class Voice extends ChangeNotifier {
       muted = true;
       error = _texts.voiceMicrophoneUnavailable;
     }
+    await _phoneSoundFollows();
     // After the microphone permission: the service needs it.
     unawaited(_syncService());
     _refreshMicStates();

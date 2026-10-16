@@ -70,6 +70,9 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // ScreenSound.kt hooks into flutter_webrtc's audio processing, whose
+    // interfaces extend libwebrtc's: the same version flutter_webrtc ships.
+    compileOnly("io.github.webrtc-sdk:android:150.7871.01")
 }
 
 // UnifiedPush decrypts pushes with Tink for the JVM, flutter_secure_storage

@@ -1112,7 +1112,7 @@
   "@screenShareBestFor": {
     "description": "Header over the choice between text and motion."
   },
-  "screenShareAndroidHint": "Android asks next whether to share the entire screen or one app. Without sound, for now.",
+  "screenShareAndroidHint": "Android asks next whether to share the entire screen or one app.",
   "screenShareWaylandHint": "The first time, your system asks which screen to share. Later shares reuse that screen until Wisetalk restarts. Whole screens only, without sound, for now.",
   "@screenShareWaylandHint": {
     "description": "Linux on Wayland, where the system picks the screen."
@@ -1124,7 +1124,7 @@
   "screenShareSource": "Screen or Window",
   "screenShareSound": "Share Sound",
   "@screenShareSound": {
-    "description": "Switch: send the shared window or screen's sound too (Windows)."
+    "description": "Switch: send the shared window or screen's sound too (Windows, Android)."
   },
   "screenShareSoundWindow": "Only this window's app.",
   "@screenShareSoundWindow": {
@@ -1137,6 +1137,10 @@
   "screenShareSoundAny": "A window's app, or for a screen everything you hear, without the call.",
   "@screenShareSoundAny": {
     "description": "Under Share Sound before anything is picked."
+  },
+  "screenShareSoundPhone": "Everything the phone plays, without the call. Some apps don't allow it.",
+  "@screenShareSoundPhone": {
+    "description": "Under Share Sound on Android, which records all the phone plays."
   },
   "screenShareListFailed": "Can't list screens and windows.",
   "screenShareChooseTitle": "Choose a Screen",

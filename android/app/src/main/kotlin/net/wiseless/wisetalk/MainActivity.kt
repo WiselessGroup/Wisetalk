@@ -45,6 +45,25 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        // lib/data/screen_sound.dart
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "net.wiseless.wisetalk/screen_sound")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "start" -> {
+                        val track = call.argument<String>("track")
+                        result.success(track != null && ScreenSound.start(this, track))
+                    }
+                    "microphone" -> {
+                        ScreenSound.microphone = call.argument<Boolean>("on") ?: true
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        ScreenSound.stop()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         // lib/data/sounds.dart
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "net.wiseless.wisetalk/sound")
             .setMethodCallHandler { call, result ->
@@ -100,7 +119,10 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         // The call lives in this activity's engine: it ends with it.
-        if (isFinishing) CallService.stop(this)
+        if (isFinishing) {
+            ScreenSound.stop()
+            CallService.stop(this)
+        }
         super.onDestroy()
     }
 }

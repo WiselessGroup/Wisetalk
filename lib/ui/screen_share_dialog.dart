@@ -1,5 +1,5 @@
 // Before sharing: what it's for (text or motion), which screen or window,
-// and on Windows whether its sound goes too. On Wayland and Android the
+// and on Windows and Android whether its sound goes too. On Wayland and Android the
 // system asks what to share itself, so all that's left is two choices: on a
 // phone they rise from the bottom (a short SettingsSheet, ADR-0029) instead
 // of taking the whole screen.
@@ -129,11 +129,13 @@ class _ScreenShareDialogState extends State<ScreenShareDialog> {
           ),
         if (screenSoundAvailable)
           SettingsGroup(
-            footer: switch (_source?.type) {
-              rtc.SourceType.Window => texts.screenShareSoundWindow,
-              rtc.SourceType.Screen => texts.screenShareSoundScreen,
-              null => texts.screenShareSoundAny,
-            },
+            footer: Platform.isAndroid
+                ? texts.screenShareSoundPhone
+                : switch (_source?.type) {
+                    rtc.SourceType.Window => texts.screenShareSoundWindow,
+                    rtc.SourceType.Screen => texts.screenShareSoundScreen,
+                    null => texts.screenShareSoundAny,
+                  },
             children: [
               SwitchRow(
                 label: texts.screenShareSound,

@@ -26,6 +26,13 @@ Forgejo.
 - Android: summons reach your phone even when Wisetalk is closed, without
   Google. Install the ntfy app and set your community's ntfy server as its
   default; Settings › While Wisetalk Is Closed shows whether it works.
+- Android: a screen share carries the phone's sound too, games, videos
+  and music, everything it plays but Wisetalk, so nobody hears the call
+  twice. Share Sound turns it off before sharing. With your microphone
+  off the sound still goes, alone, and the others see the microphone
+  off. Android still shows the microphone in use then: Wisetalk keeps
+  it open and drops your voice before anything leaves the phone. Apps
+  that forbid recording, some streaming ones, stay silent.
 
 ## 0.4.0
 
