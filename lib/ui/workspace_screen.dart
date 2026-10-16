@@ -109,10 +109,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
       _chats.incoming.listen(_message),
       _gateway.events.listen(_event),
       notifications.clicks.listen(_clicked),
-      if (_voice.trust case final trust?)
-        trust.newDevices.listen(
-          (p) => _toast('${p.displayName} joined from a new device.'),
-        ),
+      if (_voice.trust case final trust?) trust.notices.listen(_toast),
     ]);
   }
 

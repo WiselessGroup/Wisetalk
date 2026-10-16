@@ -24,6 +24,7 @@ import 'api.dart';
 import 'device.dart';
 import 'gateway.dart';
 import 'protocol.dart';
+import 'trust.dart';
 
 /// One chat as this device knows it.
 class ChatRoom {
@@ -44,7 +45,7 @@ typedef _Outgoing = ({String body, Picture? picture});
 const _requestTimeout = Duration(seconds: 8);
 
 class Chats extends ChangeNotifier {
-  Chats(this.gateway, this.device, {required this.account}) {
+  Chats(this.gateway, this.device, {required this.account, this.trust}) {
     _subscription = gateway.events.listen(_apply);
   }
 
@@ -53,6 +54,10 @@ class Chats extends ChangeNotifier {
 
   /// Our account id; `null` for guests.
   final String? account;
+
+  /// Device keys remembered here, to warn about devices added to our
+  /// account before sealing a chat key for them (WLK-37); none in tests.
+  final KeyWatch? trust;
 
   /// The chat on screen, if any.
   String? open;
@@ -366,6 +371,7 @@ class Chats extends ChangeNotifier {
     _timer?.cancel();
     try {
       final devices = await _api.chatDevices(channel);
+      unawaited(trust?.watchMine(devices, account));
       final key = ChatKey.generate();
       final envelopes = [
         for (final d in devices)
@@ -408,6 +414,7 @@ class Chats extends ChangeNotifier {
 
   /// Seals the current key for a device that asked for it.
   Future<void> _share(String channel, DeviceKey to) async {
+    unawaited(trust?.watchMine([to], account));
     if (!(_rooms[channel]?.loaded ?? false)) await _load(channel);
     final key = _currentKey(channel);
     if (key == null) return;

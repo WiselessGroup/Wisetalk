@@ -201,15 +201,23 @@ class ChannelView {
 
 /// A device and its public key.
 class DeviceKey {
-  const DeviceKey({required this.device, required this.publicKey});
+  const DeviceKey({
+    required this.device,
+    required this.publicKey,
+    this.account,
+  });
 
   factory DeviceKey.fromJson(Map<String, dynamic> json) => DeviceKey(
     device: json['device'] as String,
     publicKey: json['public_key'] as String,
+    account: json['account'] as String?,
   );
 
   final String device;
   final String publicKey;
+
+  /// Whose device; `null` for guests and from servers before 1.8.0 (WLK-37).
+  final String? account;
 }
 
 /// A chat key sealed for this device, and the device that sealed it. The

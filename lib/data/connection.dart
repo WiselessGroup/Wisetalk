@@ -38,7 +38,7 @@ final connectionProvider = FutureProvider<Connection?>((ref) async {
     session.api.server().then((info) => info.guestsOpen),
   );
   final voice = Voice(gateway, ref.read(preferencesProvider), trust: trust);
-  final chats = Chats(gateway, device, account: session.me.id);
+  final chats = Chats(gateway, device, account: session.me.id, trust: trust);
   ref.onDispose(() {
     chats.dispose();
     voice.dispose();

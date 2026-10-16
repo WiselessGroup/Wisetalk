@@ -11,23 +11,46 @@ Participant _person(String session, String? account) => Participant(
   account: account,
 );
 
-/// Answers with a fixed verdict per session and records what was accepted.
+/// Answers with a fixed verdict per device and records what was accepted.
 class _Book implements KeyBook {
   _Book(this.verdicts);
 
   final Map<String, String> verdicts;
   final accepted = <String>[];
 
-  @override
-  String check(Participant p) =>
-      p.account == null ? 'guest' : verdicts[p.session]!;
+  String _name(String device) => device.replaceAll('-device', '');
 
   @override
-  bool accept(Participant p, int now) {
-    accepted.add(p.session);
-    return verdicts[p.session] != 'known';
+  String check(String? account, String device, String publicKey) =>
+      account == null ? 'guest' : verdicts[_name(device)]!;
+
+  @override
+  bool accept(String? account, String device, String publicKey, int now) {
+    accepted.add(_name(device));
+    return verdicts[_name(device)] != 'known';
   }
 }
+
+/// Answers like core: an unknown account is a first contact, another device
+/// of a known one a new device.
+class _Core implements KeyBook {
+  final known = <String>{};
+
+  @override
+  String check(String? account, String device, String publicKey) =>
+      known.isEmpty
+      ? 'first_contact'
+      : known.contains(device)
+      ? 'known'
+      : 'new_device';
+
+  @override
+  bool accept(String? account, String device, String publicKey, int now) =>
+      known.add(device);
+}
+
+DeviceKey _device(String name, String? account) =>
+    DeviceKey(device: '$name-device', publicKey: '$name-key', account: account);
 
 void main() {
   test(
@@ -81,5 +104,55 @@ void main() {
       knownKeysKey(Uri.parse('https://talk.example.com')),
       'knownKeys:https://talk.example.com',
     );
+  });
+
+  test('devices added to my account are counted, the list accepted', () {
+    final book = _Book({
+      'laptop': 'known',
+      'planted': 'new_device',
+      'swapped': 'key_changed',
+    });
+    final review = reviewMine(
+      book,
+      [
+        _device('laptop', 'me'),
+        _device('planted', 'me'),
+        _device('swapped', 'me'),
+      ],
+      'me',
+      1000,
+    );
+    expect((review.added, review.changed, review.save), (1, 1, true));
+    expect(book.accepted, ['laptop', 'planted', 'swapped']);
+  });
+
+  test('a first list of several devices is a first contact for all', () {
+    final core = _Core();
+    final first = reviewMine(
+      core,
+      [_device('phone', 'me'), _device('laptop', 'me')],
+      'me',
+      1000,
+    );
+    expect((first.added, first.save), (0, true));
+    final later = reviewMine(
+      core,
+      [_device('laptop', 'me'), _device('planted', 'me')],
+      'me',
+      2000,
+    );
+    expect(later.added, 1);
+  });
+
+  test('others, guests and old servers are left to the calls', () {
+    final book = _Book({'pal': 'new_device'});
+    final review = reviewMine(
+      book,
+      [_device('pal', 'a3'), _device('guest', null)],
+      'me',
+      1000,
+    );
+    expect((review.added, review.save), (0, false));
+    expect(book.accepted, isEmpty);
   });
 }
