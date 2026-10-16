@@ -618,8 +618,13 @@ class Voice extends ChangeNotifier {
     if (!muted || alone != null) return;
     try {
       final options = _audioCapture();
+      // livekit_client makes a screen-sound track only together with a
+      // display capture, which Android's MediaProjection already holds;
+      // its constructor is the one way to label ours (pinned 2.13.1).
+      // ignore: invalid_use_of_internal_member
       final stream = await lk.LocalTrack.createStream(options);
       await local.publishAudioTrack(
+        // ignore: invalid_use_of_internal_member
         lk.LocalAudioTrack(
           lk.TrackSource.screenShareAudio,
           stream,

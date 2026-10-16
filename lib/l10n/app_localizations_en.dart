@@ -1178,7 +1178,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get screenShareAndroidHint =>
-      'Android asks next whether to share the entire screen or one app. Without sound, for now.';
+      'Android asks next whether to share the entire screen or one app.';
 
   @override
   String get screenShareWaylandHint =>
@@ -1212,6 +1212,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get screenShareSoundAny =>
       'A window\'s app, or for a screen everything you hear, without the call.';
+
+  @override
+  String get screenShareSoundPhone =>
+      'Everything the phone plays, without the call. Some apps don\'t allow it.';
 
   @override
   String get screenShareListFailed => 'Can\'t list screens and windows.';

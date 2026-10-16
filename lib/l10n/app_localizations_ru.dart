@@ -1187,7 +1187,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get screenShareAndroidHint =>
-      'Дальше Android спросит, показать весь экран или одно приложение. Пока без звука.';
+      'Дальше Android спросит, показать весь экран или одно приложение.';
 
   @override
   String get screenShareWaylandHint =>
@@ -1222,6 +1222,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get screenShareSoundAny =>
       'Для окна — звук его приложения, для экрана — всё, что вы слышите, кроме звонка.';
+
+  @override
+  String get screenShareSoundPhone =>
+      'Всё, что играет на телефоне, кроме звонка. Некоторые приложения это запрещают.';
 
   @override
   String get screenShareListFailed =>

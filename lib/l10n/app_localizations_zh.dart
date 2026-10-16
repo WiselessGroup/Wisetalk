@@ -1178,7 +1178,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get screenShareAndroidHint =>
-      'Android asks next whether to share the entire screen or one app. Without sound, for now.';
+      'Android asks next whether to share the entire screen or one app.';
 
   @override
   String get screenShareWaylandHint =>
@@ -1212,6 +1212,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get screenShareSoundAny =>
       'A window\'s app, or for a screen everything you hear, without the call.';
+
+  @override
+  String get screenShareSoundPhone =>
+      'Everything the phone plays, without the call. Some apps don\'t allow it.';
 
   @override
   String get screenShareListFailed => 'Can\'t list screens and windows.';
@@ -2743,7 +2747,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get screenShareBestFor => '最適合';
 
   @override
-  String get screenShareAndroidHint => '接下來 Android 會詢問要分享整個螢幕還是單一應用程式。目前沒有聲音。';
+  String get screenShareAndroidHint => '接下來 Android 會詢問要分享整個螢幕還是單一應用程式。';
 
   @override
   String get screenShareWaylandHint =>
@@ -2775,6 +2779,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get screenShareSoundAny => '視窗：該應用程式的聲音；螢幕：你聽到的所有聲音，不含通話。';
+
+  @override
+  String get screenShareSoundPhone => '手機播放的所有聲音，不含通話。有些應用程式不允許。';
 
   @override
   String get screenShareListFailed => '無法列出螢幕和視窗。';

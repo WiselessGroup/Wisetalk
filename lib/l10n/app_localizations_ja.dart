@@ -1148,7 +1148,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get screenShareAndroidHint =>
-      '次に Android が、画面全体と 1 つのアプリのどちらを共有するか尋ねます。今のところ音声はありません。';
+      '次に Android が、画面全体と 1 つのアプリのどちらを共有するか尋ねます。';
 
   @override
   String get screenShareWaylandHint =>
@@ -1180,6 +1180,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get screenShareSoundAny => 'ウィンドウならそのアプリの音、画面なら聞こえているすべての音（通話を除く）。';
+
+  @override
+  String get screenShareSoundPhone =>
+      'スマートフォンで再生中のすべての音（通話を除く）。許可していないアプリもあります。';
 
   @override
   String get screenShareListFailed => '画面とウィンドウの一覧を取得できません。';

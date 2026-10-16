@@ -2082,7 +2082,7 @@ abstract class AppLocalizations {
   /// No description provided for @screenShareAndroidHint.
   ///
   /// In en, this message translates to:
-  /// **'Android asks next whether to share the entire screen or one app. Without sound, for now.'**
+  /// **'Android asks next whether to share the entire screen or one app.'**
   String get screenShareAndroidHint;
 
   /// Linux on Wayland, where the system picks the screen.
@@ -2121,7 +2121,7 @@ abstract class AppLocalizations {
   /// **'Screen or Window'**
   String get screenShareSource;
 
-  /// Switch: send the shared window or screen's sound too (Windows).
+  /// Switch: send the shared window or screen's sound too (Windows, Android).
   ///
   /// In en, this message translates to:
   /// **'Share Sound'**
@@ -2144,6 +2144,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A window\'s app, or for a screen everything you hear, without the call.'**
   String get screenShareSoundAny;
+
+  /// Under Share Sound on Android, which records all the phone plays.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything the phone plays, without the call. Some apps don\'t allow it.'**
+  String get screenShareSoundPhone;
 
   /// No description provided for @screenShareListFailed.
   ///

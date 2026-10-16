@@ -1193,7 +1193,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get screenShareAndroidHint =>
-      'Als Nächstes fragt Android, ob du den ganzen Bildschirm oder eine App teilen willst. Vorerst ohne Ton.';
+      'Als Nächstes fragt Android, ob du den ganzen Bildschirm oder eine App teilen willst.';
 
   @override
   String get screenShareWaylandHint =>
@@ -1228,6 +1228,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get screenShareSoundAny =>
       'Bei einem Fenster dessen App, bei einem Bildschirm alles, was du hörst, ohne den Anruf.';
+
+  @override
+  String get screenShareSoundPhone =>
+      'Alles, was auf dem Handy läuft, ohne den Anruf. Manche Apps erlauben das nicht.';
 
   @override
   String get screenShareListFailed =>
