@@ -13,6 +13,10 @@ Forgejo.
   speak it too.
 - What the server says when something doesn't work, and why you left a
   channel, show in your language too (with a server from 1.8).
+- Linux: when an AppImage manager such as Gear Lever made Wisetalk's menu
+  entry before the app updated itself, Wisetalk now mends that entry
+  instead of adding a hidden one of its own. GNOME can pin the window to
+  the dock again, and wisetalk: links open through the same entry.
 
 ## 0.4.0
 
