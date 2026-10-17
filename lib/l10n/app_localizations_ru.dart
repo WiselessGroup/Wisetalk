@@ -783,32 +783,42 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsNotifySummonsDetail => 'Когда кто-то зовёт вас в канал';
 
   @override
-  String get settingsPushHeader => 'Когда Wisetalk закрыт';
+  String get settingsStayConnected => 'Оставаться на связи';
 
   @override
-  String get settingsPushApp => 'Приложение для уведомлений';
+  String get settingsStayConnectedDetail =>
+      'Вас позовут, даже когда Wisetalk закрыт';
 
   @override
-  String get settingsPushAppNone => 'Нет';
+  String get settingsStayConnectedHint =>
+      'Wisetalk держит одно тихое соединение и своё уведомление. Некоторые телефоны всё равно его усыпляют: на Samsung уберите его из «Спящих приложений», на Xiaomi включите автозапуск.';
 
   @override
-  String get settingsPushAppChoose => 'Выбрать…';
+  String get settingsStayConnectedSteps => 'Как настроить этот телефон';
 
   @override
-  String get settingsGetNtfy => 'Установить ntfy';
+  String get stayConnectedTitle => 'Wisetalk на связи';
 
   @override
-  String settingsPushVia(String app) {
-    return 'Когда вас зовут в канал, телефон узнаёт об этом через $app, даже если Wisetalk закрыт.';
+  String stayConnectedBody(String server) {
+    return 'Ждёт, когда вас позовут на $server';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Выберите приложение, через которое вызовы будут приходить, пока Wisetalk закрыт.';
+  String get stayConnectedChannel => 'На связи';
 
   @override
-  String get settingsPushNoneHint =>
-      'Без такого приложения вызовы видны, только пока Wisetalk работает. Установите ntfy и в его настройках сделайте сервер ntfy вашего сообщества сервером по умолчанию.';
+  String get batteryTitle => 'Оставить Wisetalk на связи?';
+
+  @override
+  String get batteryBody =>
+      'Android усыпляет приложения ради батареи, и вызов дождётся, пока вы сами откроете Wisetalk. Разрешите ему работать без экономии батареи: он держит одно тихое соединение, несколько килобайт в час.';
+
+  @override
+  String get batteryLater => 'Не сейчас';
+
+  @override
+  String get batteryContinue => 'Продолжить';
 
   @override
   String get settingsPrivacy => 'Конфиденциальность';
@@ -979,9 +989,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from зовёт вас в $channel.';
   }
-
-  @override
-  String get workspaceSummoned => 'Вас зовут';
 
   @override
   String get workspaceRoleChangedOwner =>

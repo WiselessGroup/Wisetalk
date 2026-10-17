@@ -755,32 +755,41 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsNotifySummonsDetail => '誰かがあなたをチャンネルに呼び出したとき';
 
   @override
-  String get settingsPushHeader => 'Wisetalk を閉じているとき';
+  String get settingsStayConnected => '接続を維持';
 
   @override
-  String get settingsPushApp => 'プッシュ通知アプリ';
+  String get settingsStayConnectedDetail => 'Wisetalk を閉じていても呼び出しが届きます';
 
   @override
-  String get settingsPushAppNone => 'なし';
+  String get settingsStayConnectedHint =>
+      'Wisetalk は目立たない接続を 1 本だけ保ち、専用の通知を表示します。それでもスリープさせる端末があります。Samsung では「スリープ中のアプリ」から外し、Xiaomi では自動起動をオンにしてください。';
 
   @override
-  String get settingsPushAppChoose => '選択…';
+  String get settingsStayConnectedSteps => 'この端末での設定手順';
 
   @override
-  String get settingsGetNtfy => 'ntfy を入手';
+  String get stayConnectedTitle => 'Wisetalk は接続中です';
 
   @override
-  String settingsPushVia(String app) {
-    return 'Wisetalk を閉じていても、呼び出しは $app 経由でこのスマートフォンに届きます。';
+  String stayConnectedBody(String server) {
+    return '$server からの呼び出しを待っています';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Wisetalk を閉じているときに呼び出しを受け取るアプリを選んでください。';
+  String get stayConnectedChannel => '接続の維持';
 
   @override
-  String get settingsPushNoneHint =>
-      'プッシュ通知アプリがないと、呼び出しは Wisetalk の実行中にしか表示されません。ntfy をインストールし、その設定でコミュニティの ntfy サーバーをデフォルトのサーバーにしてください。';
+  String get batteryTitle => 'Wisetalk の接続を維持しますか？';
+
+  @override
+  String get batteryBody =>
+      'Android は電池を節約するためにアプリをスリープさせるので、呼び出しは Wisetalk を開くまで届きません。電池の最適化から外してください。目立たない接続を 1 本保つだけで、1 時間あたり数 KB です。';
+
+  @override
+  String get batteryLater => '後で';
+
+  @override
+  String get batteryContinue => '続ける';
 
   @override
   String get settingsPrivacy => 'プライバシー';
@@ -947,9 +956,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from があなたを $channel に呼び出しています。';
   }
-
-  @override
-  String get workspaceSummoned => '呼び出されています';
 
   @override
   String get workspaceRoleChangedOwner => 'サーバーでのあなたのロールがオーナーになりました。';

@@ -3,7 +3,25 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
-## 0.5.0
+## Unreleased
+
+- Android: summons arrive while Wisetalk is closed, with nothing else to
+  install. Stay Connected (on for accounts, in Settings) keeps one quiet
+  connection to the server with a silent notification, even after the
+  app is swiped away or the phone restarts. In the background the
+  connection carries only summons, and the server pings it every three
+  minutes so the radio can sleep; opening Wisetalk brings everything
+  back at once. Wisetalk asks once to be left out of battery
+  optimization, and Settings links to the steps for phones that put
+  apps to sleep anyway (needs a 1.9 server; older ones keep the full
+  connection).
+- UnifiedPush and ntfy are gone: the push app from 0.5.0 is no longer
+  needed and can be uninstalled. Wisetalk takes its old push address
+  back from the server on the first start.
+- Summons show as a notification while you are not looking at Wisetalk
+  on every system, named after the channel even when the app was
+  started in the background.
+
 
 - Keyboard shortcuts work while another app is in front, as long as
   you are in a call: Windows, macOS and X11. Under Wayland they work

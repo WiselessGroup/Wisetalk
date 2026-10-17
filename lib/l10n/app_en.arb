@@ -684,38 +684,44 @@
     "description": "Notification switch: a notification when someone summons you into their voice channel."
   },
   "settingsNotifySummonsDetail": "When someone calls you into a channel",
-  "settingsPushHeader": "While Wisetalk Is Closed",
-  "@settingsPushHeader": {
-    "description": "Settings group, Android only: how summons reach the phone while the app is not running."
+  "settingsStayConnected": "Stay Connected",
+  "@settingsStayConnected": {
+    "description": "Settings switch, Android only: keep a connection to the server while Wisetalk is closed, so summons arrive."
   },
-  "settingsPushApp": "Push App",
-  "@settingsPushApp": {
-    "description": "Row label: the UnifiedPush distributor app (such as ntfy) that delivers pushes while Wisetalk is closed."
+  "settingsStayConnectedDetail": "Summons arrive while Wisetalk is closed",
+  "settingsStayConnectedHint": "Wisetalk keeps one quiet connection and a notification of its own. Some phones put it to sleep anyway: on Samsung, keep it out of Sleeping apps; on Xiaomi, turn on Autostart.",
+  "@settingsStayConnectedHint": {
+    "description": "Caption under Stay Connected. \"Sleeping apps\" is Samsung's battery setting, \"Autostart\" Xiaomi's; use the names those phones show in the language."
   },
-  "settingsPushAppNone": "None",
-  "@settingsPushAppNone": {
-    "description": "Value of the Push App row when no such app is installed."
+  "settingsStayConnectedSteps": "Steps for This Phone",
+  "@settingsStayConnectedSteps": {
+    "description": "Button opening the steps that keep apps running in the background on this phone's make (dontkillmyapp.com)."
   },
-  "settingsPushAppChoose": "Choose…",
-  "settingsGetNtfy": "Get ntfy",
-  "@settingsGetNtfy": {
-    "description": "Button opening the store page of ntfy, a push app. \"ntfy\" is a name, written in lowercase."
+  "stayConnectedTitle": "Wisetalk is connected",
+  "@stayConnectedTitle": {
+    "description": "Title of the ongoing Android notification while Stay Connected keeps the connection."
   },
-  "settingsPushVia": "Summons reach this phone through {app}, even while Wisetalk is closed.",
-  "@settingsPushVia": {
-    "description": "Caption under the Push App row.",
+  "stayConnectedBody": "Waiting for summons from {server}",
+  "@stayConnectedBody": {
+    "description": "Text of the ongoing Stay Connected notification.",
     "placeholders": {
-      "app": {
+      "server": {
         "type": "String",
-        "example": "ntfy"
+        "example": "Wiseless"
       }
     }
   },
-  "settingsPushChooseHint": "Choose the app that brings summons while Wisetalk is closed.",
-  "settingsPushNoneHint": "Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.",
-  "@settingsPushNoneHint": {
-    "description": "Caption when no push app is installed: ntfy must use the community’s own ntfy server as its default server."
+  "stayConnectedChannel": "Staying connected",
+  "@stayConnectedChannel": {
+    "description": "Name of the Android notification channel of the ongoing Stay Connected notification, shown in the system's settings."
   },
+  "batteryTitle": "Let Wisetalk Stay Connected?",
+  "@batteryTitle": {
+    "description": "Dialog asked once on Android before the system's question about battery optimization."
+  },
+  "batteryBody": "Android puts apps to sleep to save battery, and a summons would wait until you open Wisetalk. Let it stay out of battery optimization: it keeps one quiet connection, a few kilobytes an hour.",
+  "batteryLater": "Not Now",
+  "batteryContinue": "Continue",
   "settingsPrivacy": "Privacy",
   "settingsCrashReports": "Send Crash Reports",
   "settingsCrashReportsHint": "When something in Wisetalk breaks, tell its developers what broke and where in the code. Never your messages, names, keys or servers.",
@@ -894,10 +900,6 @@
         "type": "String"
       }
     }
-  },
-  "workspaceSummoned": "Summoned",
-  "@workspaceSummoned": {
-    "description": "System notification title when someone summons me; the body says who and where."
   },
   "workspaceRoleChangedOwner": "Your server role is now owner.",
   "workspaceRoleChangedAdmin": "Your server role is now admin.",

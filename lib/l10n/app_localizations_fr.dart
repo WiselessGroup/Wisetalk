@@ -787,32 +787,42 @@ class AppLocalizationsFr extends AppLocalizations {
       'Quand quelqu’un vous appelle dans un salon';
 
   @override
-  String get settingsPushHeader => 'Quand Wisetalk est fermé';
+  String get settingsStayConnected => 'Rester connecté';
 
   @override
-  String get settingsPushApp => 'Application de notifications';
+  String get settingsStayConnectedDetail =>
+      'Les appels arrivent même quand Wisetalk est fermé';
 
   @override
-  String get settingsPushAppNone => 'Aucune';
+  String get settingsStayConnectedHint =>
+      'Wisetalk garde une connexion discrète et sa propre notification. Certains téléphones l’endorment quand même : sur Samsung, retirez-le des « Applications en veille » ; sur Xiaomi, activez le démarrage automatique.';
 
   @override
-  String get settingsPushAppChoose => 'Choisir…';
+  String get settingsStayConnectedSteps => 'Instructions pour ce téléphone';
 
   @override
-  String get settingsGetNtfy => 'Installer ntfy';
+  String get stayConnectedTitle => 'Wisetalk est connecté';
 
   @override
-  String settingsPushVia(String app) {
-    return 'Les appels vers un salon arrivent sur ce téléphone via $app, même quand Wisetalk est fermé.';
+  String stayConnectedBody(String server) {
+    return 'En attente d’appels de $server';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Choisissez l’application qui reçoit les appels quand Wisetalk est fermé.';
+  String get stayConnectedChannel => 'Connexion maintenue';
 
   @override
-  String get settingsPushNoneHint =>
-      'Sans application de notifications, les appels ne s’affichent que lorsque Wisetalk est ouvert. Installez ntfy, puis dans ses paramètres choisissez le serveur ntfy de votre communauté comme serveur par défaut.';
+  String get batteryTitle => 'Laisser Wisetalk connecté ?';
+
+  @override
+  String get batteryBody =>
+      'Android endort les applications pour économiser la batterie, et un appel attendrait que vous ouvriez Wisetalk. Exemptez-le de l’optimisation de la batterie : il garde une seule connexion discrète, quelques kilo-octets par heure.';
+
+  @override
+  String get batteryLater => 'Plus tard';
+
+  @override
+  String get batteryContinue => 'Continuer';
 
   @override
   String get settingsPrivacy => 'Confidentialité';
@@ -984,9 +994,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from vous appelle dans $channel.';
   }
-
-  @override
-  String get workspaceSummoned => 'On vous appelle';
 
   @override
   String get workspaceRoleChangedOwner =>

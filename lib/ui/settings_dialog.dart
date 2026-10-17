@@ -1,6 +1,6 @@
 // Settings: the account's picture, the interface's language, which
 // microphone, camera and speakers, voice processing, summons, notifications
-// (on Android with the app that brings them while Wisetalk is closed) and,
+// (on Android with Stay Connected, for summons while Wisetalk is closed) and,
 // on desktops, keyboard shortcuts. The web client's Settings dialog,
 // plus the app's own notification switches and shortcuts. Everything
 // applies as it changes, so the sheet has Done only.
@@ -21,7 +21,7 @@ import '../data/input_filters.dart';
 import '../data/language.dart';
 import '../data/preferences.dart';
 import '../data/shortcuts.dart';
-import '../data/unified_push.dart';
+import '../data/stay_connected.dart';
 import '../l10n/app_localizations.dart';
 import '../src/rust/api/picture.dart';
 import '../theme.dart';
@@ -33,10 +33,14 @@ class SettingsDialog extends StatefulWidget {
     super.key,
     required this.gateway,
     required this.preferences,
+    this.stayConnected,
   });
 
   final Gateway gateway;
   final Preferences preferences;
+
+  /// Android only.
+  final StayConnected? stayConnected;
 
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
@@ -50,15 +54,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
   String? _profileError;
   String? _summonsError;
 
-  /// The push apps on this phone, once asked (Android, accounts).
-  Distributors? _push;
-  AppLifecycleListener? _lifecycle;
-
   Preferences get _prefs => widget.preferences;
   Gateway get _gateway => widget.gateway;
   Api get _api => _gateway.session.api;
   bool get _account => !_gateway.session.me.isGuest;
-  bool get _pushes => unifiedPushes.available && _account;
 
   @override
   void initState() {
@@ -75,57 +74,28 @@ class _SettingsDialogState extends State<SettingsDialog> {
           })
           .catchError((Object _) {});
     }
-    if (_pushes) {
-      unawaited(_refreshPush());
-      // Back from installing a push app, or from setting it up.
-      _lifecycle = AppLifecycleListener(
-        onResume: () => unawaited(_refreshPush(follow: true)),
-      );
-    }
   }
 
   @override
   void dispose() {
     unawaited(_changes?.cancel());
-    _lifecycle?.dispose();
     super.dispose();
   }
 
-  /// Asks which push apps there are; with [follow], one that just came
-  /// gets this server's summons at once.
-  Future<void> _refreshPush({bool follow = false}) async {
-    var push = await unifiedPushes.distributors();
-    if (follow &&
-        push.chosen == null &&
-        push.installed.isNotEmpty &&
-        _prefs.notifySummons) {
-      final session = _gateway.session;
-      await unifiedPushes.follow(session.server.origin, session.token);
-      push = await unifiedPushes.distributors();
+  /// Stay Connected on or off; on, the phone may put Wisetalk to sleep
+  /// unless it lets it stay, so Android asks right away.
+  Future<void> _setStayConnected(bool on) async {
+    _change(() => _prefs.stayConnected = on);
+    final stay = widget.stayConnected;
+    if (on && stay != null && !await stay.batteryExempt()) {
+      await stay.askBattery();
     }
-    if (mounted) setState(() => _push = push);
   }
 
-  Future<void> _choosePush(String distributor) async {
-    final installed = _push?.installed ?? const <String>[];
-    setState(() => _push = (installed: installed, chosen: distributor));
-    final session = _gateway.session;
-    await unifiedPushes.choose(
-      distributor,
-      session.server.origin,
-      session.token,
-    );
-  }
-
-  /// Summons on or off here: on Android, every server's pushes too.
-  void _setNotifySummons(bool on) {
-    _change(() => _prefs.notifySummons = on);
-    if (!unifiedPushes.available) return;
-    if (!on) {
-      unawaited(unifiedPushes.forgetAll());
-    } else if (_account) {
-      final session = _gateway.session;
-      unawaited(unifiedPushes.follow(session.server.origin, session.token));
+  Future<void> _openSteps() async {
+    final steps = await widget.stayConnected?.steps();
+    if (steps != null) {
+      await launchUrl(steps, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -364,12 +334,26 @@ class _SettingsDialogState extends State<SettingsDialog> {
               label: texts.settingsNotifySummons,
               detail: texts.settingsNotifySummonsDetail,
               value: _prefs.notifySummons,
-              onChanged: _setNotifySummons,
+              onChanged: (on) => _change(() => _prefs.notifySummons = on),
             ),
           ],
         ),
-        if (_push case final push? when _prefs.notifySummons)
-          _pushGroup(texts, push),
+        if (widget.stayConnected != null && _account && _prefs.notifySummons)
+          SettingsGroup(
+            footer: texts.settingsStayConnectedHint,
+            children: [
+              SwitchRow(
+                label: texts.settingsStayConnected,
+                detail: texts.settingsStayConnectedDetail,
+                value: _prefs.stayConnected,
+                onChanged: (on) => unawaited(_setStayConnected(on)),
+              ),
+              ButtonRow(
+                label: texts.settingsStayConnectedSteps,
+                onTap: () => unawaited(_openSteps()),
+              ),
+            ],
+          ),
         if (crashReports.available)
           SettingsGroup(
             header: texts.settingsPrivacy,
@@ -383,61 +367,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ],
           ),
       ],
-    );
-  }
-
-  /// Which app brings summons while Wisetalk is closed: its name, a choice
-  /// when there are several, or where to get ntfy when there is none.
-  Widget _pushGroup(AppLocalizations texts, Distributors push) {
-    // One chosen and uninstalled since counts as none.
-    final chosen = push.installed.contains(push.chosen) ? push.chosen : null;
-    final String footer;
-    final List<Widget> rows;
-    if (push.installed.isEmpty) {
-      footer = texts.settingsPushNoneHint;
-      rows = [
-        SettingsRow(
-          label: texts.settingsPushApp,
-          value: texts.settingsPushAppNone,
-        ),
-        ButtonRow(
-          label: texts.settingsGetNtfy,
-          onTap: () => unawaited(
-            launchUrl(ntfyStorePage, mode: LaunchMode.externalApplication),
-          ),
-        ),
-      ];
-    } else if (push.installed.length == 1 && chosen != null) {
-      footer = texts.settingsPushVia(distributorName(chosen));
-      rows = [
-        SettingsRow(
-          label: texts.settingsPushApp,
-          value: distributorName(chosen),
-        ),
-      ];
-    } else {
-      footer = chosen == null
-          ? texts.settingsPushChooseHint
-          : texts.settingsPushVia(distributorName(chosen));
-      rows = [
-        PickerRow<String?>(
-          label: texts.settingsPushApp,
-          value: chosen,
-          options: [
-            if (chosen == null) (null, texts.settingsPushAppChoose),
-            for (final distributor in push.installed)
-              (distributor, distributorName(distributor)),
-          ],
-          onChanged: (distributor) {
-            if (distributor != null) unawaited(_choosePush(distributor));
-          },
-        ),
-      ];
-    }
-    return SettingsGroup(
-      header: texts.settingsPushHeader,
-      footer: footer,
-      children: rows,
     );
   }
 }

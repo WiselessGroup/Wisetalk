@@ -18,6 +18,8 @@ import '../data/preferences.dart';
 import '../data/protocol.dart';
 import '../data/servers.dart';
 import '../data/session.dart';
+import '../data/stay_connected.dart';
+import '../data/summons.dart';
 import '../data/updates.dart';
 import '../data/voice.dart';
 import '../l10n/app_localizations.dart';
@@ -123,6 +125,12 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     await notifications.prepare();
     final waiting = notifications.takeWaiting();
     if (waiting != null && mounted) _clicked(waiting);
+    // Android, Stay Connected: once, why the battery matters, after the
+    // system asked about notifications.
+    final stay = ref.read(stayConnectedProvider);
+    if (stay != null && mounted) {
+      await stay.offerBatteryExemption(context);
+    }
   }
 
   @override
@@ -207,7 +215,12 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
     final data = event.data as Map<String, dynamic>;
     final channel = data['channel'] as String;
     final from = data['from'] as String;
-    final text = texts.summonReceived(from, _channelName(channel));
+    final text = texts.summonReceived(
+      from,
+      summonedChannelName(data, _gateway, texts.channelSomeChannel),
+    );
+    // The system notification while nobody looks comes from
+    // lib/data/summons.dart, also without a window.
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
@@ -220,20 +233,6 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         ),
       ),
     );
-    if (!appInFront && ref.read(preferencesProvider).notifySummons) {
-      unawaited(
-        ref
-            .read(notificationsProvider)
-            .show(
-              title: texts.workspaceSummoned,
-              body: text,
-              target: SummonTarget(
-                channel,
-                server: widget.session.server.origin,
-              ),
-            ),
-      );
-    }
   }
 
   void _clicked(NotificationTarget target) {
@@ -388,6 +387,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
       builder: (_) => SettingsDialog(
         gateway: _gateway,
         preferences: ref.read(preferencesProvider),
+        stayConnected: ref.read(stayConnectedProvider),
       ),
     ),
   );

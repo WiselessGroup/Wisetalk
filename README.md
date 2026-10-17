@@ -37,8 +37,8 @@ updates itself from the releases of this repository.
   microphone goes out in stereo when voice processing is off.
 - Channel chats with pictures, notifications for summons and messages (over
   D-Bus on Linux, with a foreground service keeping calls alive on Android).
-  On Android summons also arrive while the app is closed, through
-  UnifiedPush (ntfy), without Google.
+  On Android summons also arrive while the app is closed: it keeps a quiet
+  connection of its own (Stay Connected), without Google or a push app.
 - Away, connection bars with ping and loss, Ctrl+Shift+M and Ctrl+Shift+A
   (⌘ on a Mac) while the window is in front.
 - Settings for devices, voice processing, sounds, summons and notifications.

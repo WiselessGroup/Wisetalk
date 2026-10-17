@@ -1401,53 +1401,71 @@ abstract class AppLocalizations {
   /// **'When someone calls you into a channel'**
   String get settingsNotifySummonsDetail;
 
-  /// Settings group, Android only: how summons reach the phone while the app is not running.
+  /// Settings switch, Android only: keep a connection to the server while Wisetalk is closed, so summons arrive.
   ///
   /// In en, this message translates to:
-  /// **'While Wisetalk Is Closed'**
-  String get settingsPushHeader;
+  /// **'Stay Connected'**
+  String get settingsStayConnected;
 
-  /// Row label: the UnifiedPush distributor app (such as ntfy) that delivers pushes while Wisetalk is closed.
+  /// No description provided for @settingsStayConnectedDetail.
   ///
   /// In en, this message translates to:
-  /// **'Push App'**
-  String get settingsPushApp;
+  /// **'Summons arrive while Wisetalk is closed'**
+  String get settingsStayConnectedDetail;
 
-  /// Value of the Push App row when no such app is installed.
+  /// Caption under Stay Connected. "Sleeping apps" is Samsung's battery setting, "Autostart" Xiaomi's; use the names those phones show in the language.
   ///
   /// In en, this message translates to:
-  /// **'None'**
-  String get settingsPushAppNone;
+  /// **'Wisetalk keeps one quiet connection and a notification of its own. Some phones put it to sleep anyway: on Samsung, keep it out of Sleeping apps; on Xiaomi, turn on Autostart.'**
+  String get settingsStayConnectedHint;
 
-  /// No description provided for @settingsPushAppChoose.
+  /// Button opening the steps that keep apps running in the background on this phone's make (dontkillmyapp.com).
   ///
   /// In en, this message translates to:
-  /// **'Choose…'**
-  String get settingsPushAppChoose;
+  /// **'Steps for This Phone'**
+  String get settingsStayConnectedSteps;
 
-  /// Button opening the store page of ntfy, a push app. "ntfy" is a name, written in lowercase.
+  /// Title of the ongoing Android notification while Stay Connected keeps the connection.
   ///
   /// In en, this message translates to:
-  /// **'Get ntfy'**
-  String get settingsGetNtfy;
+  /// **'Wisetalk is connected'**
+  String get stayConnectedTitle;
 
-  /// Caption under the Push App row.
+  /// Text of the ongoing Stay Connected notification.
   ///
   /// In en, this message translates to:
-  /// **'Summons reach this phone through {app}, even while Wisetalk is closed.'**
-  String settingsPushVia(String app);
+  /// **'Waiting for summons from {server}'**
+  String stayConnectedBody(String server);
 
-  /// No description provided for @settingsPushChooseHint.
+  /// Name of the Android notification channel of the ongoing Stay Connected notification, shown in the system's settings.
   ///
   /// In en, this message translates to:
-  /// **'Choose the app that brings summons while Wisetalk is closed.'**
-  String get settingsPushChooseHint;
+  /// **'Staying connected'**
+  String get stayConnectedChannel;
 
-  /// Caption when no push app is installed: ntfy must use the community’s own ntfy server as its default server.
+  /// Dialog asked once on Android before the system's question about battery optimization.
   ///
   /// In en, this message translates to:
-  /// **'Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.'**
-  String get settingsPushNoneHint;
+  /// **'Let Wisetalk Stay Connected?'**
+  String get batteryTitle;
+
+  /// No description provided for @batteryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Android puts apps to sleep to save battery, and a summons would wait until you open Wisetalk. Let it stay out of battery optimization: it keeps one quiet connection, a few kilobytes an hour.'**
+  String get batteryBody;
+
+  /// No description provided for @batteryLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Now'**
+  String get batteryLater;
+
+  /// No description provided for @batteryContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get batteryContinue;
 
   /// No description provided for @settingsPrivacy.
   ///
@@ -1730,12 +1748,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{from} summons you to {channel}.'**
   String summonReceived(String from, String channel);
-
-  /// System notification title when someone summons me; the body says who and where.
-  ///
-  /// In en, this message translates to:
-  /// **'Summoned'**
-  String get workspaceSummoned;
 
   /// No description provided for @workspaceRoleChangedOwner.
   ///

@@ -779,32 +779,42 @@ class AppLocalizationsZh extends AppLocalizations {
       'When someone calls you into a channel';
 
   @override
-  String get settingsPushHeader => 'While Wisetalk Is Closed';
+  String get settingsStayConnected => 'Stay Connected';
 
   @override
-  String get settingsPushApp => 'Push App';
+  String get settingsStayConnectedDetail =>
+      'Summons arrive while Wisetalk is closed';
 
   @override
-  String get settingsPushAppNone => 'None';
+  String get settingsStayConnectedHint =>
+      'Wisetalk keeps one quiet connection and a notification of its own. Some phones put it to sleep anyway: on Samsung, keep it out of Sleeping apps; on Xiaomi, turn on Autostart.';
 
   @override
-  String get settingsPushAppChoose => 'Choose…';
+  String get settingsStayConnectedSteps => 'Steps for This Phone';
 
   @override
-  String get settingsGetNtfy => 'Get ntfy';
+  String get stayConnectedTitle => 'Wisetalk is connected';
 
   @override
-  String settingsPushVia(String app) {
-    return 'Summons reach this phone through $app, even while Wisetalk is closed.';
+  String stayConnectedBody(String server) {
+    return 'Waiting for summons from $server';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Choose the app that brings summons while Wisetalk is closed.';
+  String get stayConnectedChannel => 'Staying connected';
 
   @override
-  String get settingsPushNoneHint =>
-      'Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.';
+  String get batteryTitle => 'Let Wisetalk Stay Connected?';
+
+  @override
+  String get batteryBody =>
+      'Android puts apps to sleep to save battery, and a summons would wait until you open Wisetalk. Let it stay out of battery optimization: it keeps one quiet connection, a few kilobytes an hour.';
+
+  @override
+  String get batteryLater => 'Not Now';
+
+  @override
+  String get batteryContinue => 'Continue';
 
   @override
   String get settingsPrivacy => 'Privacy';
@@ -974,9 +984,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from summons you to $channel.';
   }
-
-  @override
-  String get workspaceSummoned => 'Summoned';
 
   @override
   String get workspaceRoleChangedOwner => 'Your server role is now owner.';
@@ -2359,31 +2366,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsNotifySummonsDetail => '有人呼叫你進入頻道時';
 
   @override
-  String get settingsPushHeader => 'Wisetalk 關閉時';
+  String get settingsStayConnected => '保持連線';
 
   @override
-  String get settingsPushApp => '推播應用程式';
+  String get settingsStayConnectedDetail => '即使 Wisetalk 已關閉，也能收到呼叫';
 
   @override
-  String get settingsPushAppNone => '無';
+  String get settingsStayConnectedHint =>
+      'Wisetalk 會保持一條安靜的連線，並顯示自己的通知。有些手機仍會讓它休眠：在 Samsung 上請將它移出「休眠中的應用程式」，在小米上請開啟自動啟動。';
 
   @override
-  String get settingsPushAppChoose => '選擇…';
+  String get settingsStayConnectedSteps => '這支手機的設定步驟';
 
   @override
-  String get settingsGetNtfy => '取得 ntfy';
+  String get stayConnectedTitle => 'Wisetalk 已連線';
 
   @override
-  String settingsPushVia(String app) {
-    return '即使 Wisetalk 已關閉，呼叫也會透過 $app 送到這支手機。';
+  String stayConnectedBody(String server) {
+    return '正在等待 $server 的呼叫';
   }
 
   @override
-  String get settingsPushChooseHint => '選擇在 Wisetalk 關閉時接收呼叫的應用程式。';
+  String get stayConnectedChannel => '保持連線';
 
   @override
-  String get settingsPushNoneHint =>
-      '沒有推播應用程式時，只有在 Wisetalk 執行中才會顯示呼叫。請安裝 ntfy，並在它的設定中將你社群的 ntfy 伺服器設為預設伺服器。';
+  String get batteryTitle => '讓 Wisetalk 保持連線？';
+
+  @override
+  String get batteryBody =>
+      'Android 會讓應用程式休眠以節省電力，呼叫會等到你打開 Wisetalk 才出現。請將它排除在電池最佳化之外：它只保持一條安靜的連線，每小時幾 KB。';
+
+  @override
+  String get batteryLater => '以後再說';
+
+  @override
+  String get batteryContinue => '繼續';
 
   @override
   String get settingsPrivacy => '隱私權';
@@ -2547,9 +2564,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String summonReceived(String from, String channel) {
     return '$from 呼叫你到 $channel。';
   }
-
-  @override
-  String get workspaceSummoned => '有人呼叫你';
 
   @override
   String get workspaceRoleChangedOwner => '你在伺服器的角色現在是擁有者。';

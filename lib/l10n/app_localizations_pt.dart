@@ -786,32 +786,42 @@ class AppLocalizationsPt extends AppLocalizations {
       'Quando alguém chama você para um canal';
 
   @override
-  String get settingsPushHeader => 'Com o Wisetalk fechado';
+  String get settingsStayConnected => 'Manter conectado';
 
   @override
-  String get settingsPushApp => 'App de notificações';
+  String get settingsStayConnectedDetail =>
+      'As convocações chegam mesmo com o Wisetalk fechado';
 
   @override
-  String get settingsPushAppNone => 'Nenhum';
+  String get settingsStayConnectedHint =>
+      'O Wisetalk mantém uma conexão discreta e uma notificação própria. Alguns celulares o colocam para dormir mesmo assim: no Samsung, tire-o de “Apps em suspensão”; no Xiaomi, ative a inicialização automática.';
 
   @override
-  String get settingsPushAppChoose => 'Escolher…';
+  String get settingsStayConnectedSteps => 'Passos para este celular';
 
   @override
-  String get settingsGetNtfy => 'Baixar o ntfy';
+  String get stayConnectedTitle => 'Wisetalk conectado';
 
   @override
-  String settingsPushVia(String app) {
-    return 'As convocações chegam a este celular pelo $app, mesmo com o Wisetalk fechado.';
+  String stayConnectedBody(String server) {
+    return 'Esperando convocações de $server';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Escolha o app que recebe as convocações com o Wisetalk fechado.';
+  String get stayConnectedChannel => 'Conexão ativa';
 
   @override
-  String get settingsPushNoneHint =>
-      'Sem um app de notificações, as convocações só aparecem com o Wisetalk aberto. Instale o ntfy e, nas configurações dele, defina o servidor ntfy da sua comunidade como padrão.';
+  String get batteryTitle => 'Manter o Wisetalk conectado?';
+
+  @override
+  String get batteryBody =>
+      'O Android coloca apps para dormir para economizar bateria, e uma convocação esperaria até você abrir o Wisetalk. Tire-o da otimização de bateria: ele mantém só uma conexão discreta, alguns kilobytes por hora.';
+
+  @override
+  String get batteryLater => 'Agora não';
+
+  @override
+  String get batteryContinue => 'Continuar';
 
   @override
   String get settingsPrivacy => 'Privacidade';
@@ -984,9 +994,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from está chamando você para $channel.';
   }
-
-  @override
-  String get workspaceSummoned => 'Alguém está chamando você';
 
   @override
   String get workspaceRoleChangedOwner => 'Seu papel no servidor agora é dono.';

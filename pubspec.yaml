@@ -49,12 +49,6 @@ dependencies:
   livekit_client: 2.13.1
   path_provider: ^2.1.6
   sentry: ^10.0.0
-  # Summons while the Android app is closed, without Google (WLK-10). The
-  # Android plugin itself, not the `unifiedpush` package over it: that one
-  # brings its Linux side too, which wants dbus 0.7 and builds webcrypto
-  # (BoringSSL) and window_manager into every desktop app.
-  unifiedpush_android: ^3.5.0
-  unifiedpush_platform_interface: ^4.0.0
   url_launcher: ^6.3.3
 
 dev_dependencies:

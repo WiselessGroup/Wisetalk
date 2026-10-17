@@ -19,8 +19,15 @@ import 'preferences.dart';
 /// minimized one too, the system doesn't tell), a hidden one `hidden`, an
 /// app in the background on a phone `paused`. `null` is before the window
 /// first showed, right after the person started the app.
-bool isInFront(AppLifecycleState? state) =>
-    state == null || state == AppLifecycleState.resumed;
+///
+/// [launchedInBackground] when the system started Wisetalk without a window
+/// for Stay Connected: then nobody is looking until a window shows.
+bool isInFront(AppLifecycleState? state, {bool launchedInBackground = false}) =>
+    state == null ? !launchedInBackground : state == AppLifecycleState.resumed;
+
+/// The system started Wisetalk for Stay Connected, with no window (Android,
+/// `--background`, lib/data/stay_connected.dart).
+bool launchedInBackground = false;
 
 /// Whether Wisetalk is the window in front now: notifications only when not.
 /// Read from the binding, which follows every change from the start, and
@@ -28,7 +35,10 @@ bool isInFront(AppLifecycleState? state) =>
 /// workspace built for a new connection while Wisetalk was in the
 /// background thought it was in front until the window was focused and left
 /// again (WLK-1).
-bool get appInFront => isInFront(WidgetsBinding.instance.lifecycleState);
+bool get appInFront => isInFront(
+  WidgetsBinding.instance.lifecycleState,
+  launchedInBackground: launchedInBackground,
+);
 
 /// What a notification leads to when clicked.
 sealed class NotificationTarget {
@@ -76,8 +86,7 @@ class SummonTarget extends NotificationTarget {
 
   final String channel;
 
-  /// Whose channel, when it may not be the current server's: a push comes
-  /// from any server signed in on this phone (WLK-10).
+  /// Whose channel, when it may not be the current server's.
   final Uri? server;
 
   @override
@@ -89,17 +98,15 @@ class SummonTarget extends NotificationTarget {
 const _window = MethodChannel('net.wiseless.wisetalk/window');
 
 class Notifications {
-  /// [background] when a push started Wisetalk to show one notification
-  /// (lib/data/unified_push.dart): there is no window to ask from then.
-  Notifications(this._preferences, {this.background = false});
+  Notifications(this._preferences);
 
   final Preferences _preferences;
-  final bool background;
   final _plugin = FlutterLocalNotificationsPlugin();
   // Linux has its own, for the click to bring the window forward.
   late final _linux = Platform.isLinux ? LinuxNotifications() : null;
   final _clicks = StreamController<NotificationTarget>.broadcast();
   Future<bool>? _ready;
+  bool _askedPermission = false;
   int _next = 0;
   NotificationTarget? _waiting;
 
@@ -120,8 +127,24 @@ class Notifications {
   AppLocalizations get _texts => textsFor(_preferences.language.value);
 
   /// Sets notifications up, and asks for the permission where the system
-  /// wants that (Android), up front instead of at the first message.
-  Future<bool> prepare() => _ready ??= _start();
+  /// wants that (Android), up front instead of at the first message: once
+  /// there is a window to ask in, which Stay Connected may start without.
+  Future<bool> prepare() async {
+    final ok = await (_ready ??= _start());
+    if (ok && Platform.isAndroid && !_askedPermission && appInFront) {
+      _askedPermission = true;
+      try {
+        await _plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()
+            ?.requestNotificationsPermission();
+      } catch (e) {
+        debugPrint('cannot ask for notifications: $e');
+      }
+    }
+    return ok;
+  }
 
   Future<bool> _start() async {
     try {
@@ -142,10 +165,10 @@ class Notifications {
         ),
         onDidReceiveNotificationResponse: (response) {
           final target = NotificationTarget.parse(response.payload);
-          if (target != null) _clicks.add(target);
+          if (target != null) _clicked(target);
         },
       );
-      if (Platform.isAndroid && !background) {
+      if (Platform.isAndroid) {
         // A tap on a notification while Wisetalk was closed started it.
         final launch = await _plugin.getNotificationAppLaunchDetails();
         if (launch != null && launch.didNotificationLaunchApp) {
@@ -153,11 +176,6 @@ class Notifications {
             launch.notificationResponse?.payload,
           );
         }
-        await _plugin
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >()
-            ?.requestNotificationsPermission();
       }
       return ok ?? false;
     } catch (e) {
@@ -200,9 +218,8 @@ class Notifications {
         );
         return;
       }
-      // One notification per summons: the push and the open app's own
-      // (lib/ui/workspace_screen.dart) may both make it, the later one
-      // replaces the first without a second sound.
+      // One notification per summons and channel: a second summons to
+      // the same channel replaces the first without a second sound.
       final summon = target is SummonTarget;
       await _plugin.show(
         id: summon ? 0 : _next++,
@@ -232,7 +249,17 @@ class Notifications {
       debugPrint('cannot bring the window forward: $e');
     });
     final target = NotificationTarget.parse(click.payload);
-    if (target != null) _clicks.add(target);
+    if (target != null) _clicked(target);
+  }
+
+  /// Kept for the workspace when none listens yet: a tap that opened the
+  /// window of a Wisetalk Stay Connected started without one.
+  void _clicked(NotificationTarget target) {
+    if (_clicks.hasListener) {
+      _clicks.add(target);
+    } else {
+      _waiting = target;
+    }
   }
 }
 

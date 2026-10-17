@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api.dart';
 import 'servers.dart';
-import 'unified_push.dart';
 
 class Session {
   const Session({required this.server, required this.me, required this.token});
@@ -59,8 +58,6 @@ class SessionNotifier extends AsyncNotifier<Session?> {
   Future<void> signOut() async {
     final session = state.value;
     if (session == null) return;
-    // While the token still works to take the push endpoint back.
-    await unifiedPushes.forget(session.server.origin);
     try {
       await session.api.signOut();
     } on ApiException {

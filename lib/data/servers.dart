@@ -8,7 +8,6 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'secrets.dart';
-import 'unified_push.dart';
 
 final secretsProvider = Provider<Secrets>((ref) => SystemSecrets());
 
@@ -137,11 +136,9 @@ class ServersNotifier extends AsyncNotifier<Servers> {
     );
   }
 
-  /// Forgets a server with its session token and device key, and stops
-  /// its pushes while the token still works.
+  /// Forgets a server with its session token and device key.
   Future<void> remove(Uri origin) async {
     final now = await _now;
-    await unifiedPushes.forget(origin);
     await _secrets.delete(tokenKey(origin));
     await _secrets.delete(deviceKey(origin));
     await _save(

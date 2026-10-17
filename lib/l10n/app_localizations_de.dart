@@ -788,32 +788,42 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wenn dich jemand in einen Kanal ruft';
 
   @override
-  String get settingsPushHeader => 'Wenn Wisetalk geschlossen ist';
+  String get settingsStayConnected => 'Verbunden bleiben';
 
   @override
-  String get settingsPushApp => 'Push-App';
+  String get settingsStayConnectedDetail =>
+      'Rufe kommen auch an, wenn Wisetalk geschlossen ist';
 
   @override
-  String get settingsPushAppNone => 'Keine';
+  String get settingsStayConnectedHint =>
+      'Wisetalk hält eine ruhige Verbindung und zeigt dafür eine eigene Mitteilung. Manche Handys legen es trotzdem schlafen: Nimm es bei Samsung aus den „Schlafenden Apps“, schalte bei Xiaomi den Autostart ein.';
 
   @override
-  String get settingsPushAppChoose => 'Auswählen…';
+  String get settingsStayConnectedSteps => 'Anleitung für dieses Handy';
 
   @override
-  String get settingsGetNtfy => 'ntfy installieren';
+  String get stayConnectedTitle => 'Wisetalk ist verbunden';
 
   @override
-  String settingsPushVia(String app) {
-    return 'Wenn dich jemand in einen Kanal ruft, erfährt dein Handy es über $app, auch wenn Wisetalk geschlossen ist.';
+  String stayConnectedBody(String server) {
+    return 'Wartet auf Rufe von $server';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Wähle die App, über die Rufe ankommen, während Wisetalk geschlossen ist.';
+  String get stayConnectedChannel => 'Verbunden bleiben';
 
   @override
-  String get settingsPushNoneHint =>
-      'Ohne Push-App siehst du Rufe nur, solange Wisetalk läuft. Installiere ntfy und stell in seinen Einstellungen den ntfy-Server deiner Community als Standardserver ein.';
+  String get batteryTitle => 'Wisetalk verbunden lassen?';
+
+  @override
+  String get batteryBody =>
+      'Android legt Apps schlafen, um Akku zu sparen, und ein Ruf wartet dann, bis du Wisetalk öffnest. Nimm es von der Akkuoptimierung aus: Es hält nur eine ruhige Verbindung, ein paar Kilobyte pro Stunde.';
+
+  @override
+  String get batteryLater => 'Nicht jetzt';
+
+  @override
+  String get batteryContinue => 'Weiter';
 
   @override
   String get settingsPrivacy => 'Datenschutz';
@@ -986,9 +996,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from ruft dich in $channel.';
   }
-
-  @override
-  String get workspaceSummoned => 'Du wirst gerufen';
 
   @override
   String get workspaceRoleChangedOwner =>

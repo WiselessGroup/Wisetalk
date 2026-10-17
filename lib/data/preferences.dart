@@ -56,6 +56,13 @@ class Preferences extends ChangeNotifier {
   bool notifyMessages = true;
   bool notifySummons = true;
 
+  /// Android: keep a quiet connection while Wisetalk is closed, for
+  /// summons (lib/data/stay_connected.dart). For accounts only.
+  bool stayConnected = true;
+
+  /// Android: the one-time question about battery optimization came.
+  bool batteryAsked = false;
+
   /// Ping and loss next to the connection icon in a call, measured once a
   /// second while the window shows. Off: the icon alone costs nothing.
   bool showPingAndLoss = false;
@@ -134,6 +141,8 @@ class Preferences extends ChangeNotifier {
       showPingAndLoss = json['show_ping_and_loss'] as bool? ?? false;
       notifyMessages = json['notify_messages'] as bool? ?? true;
       notifySummons = json['notify_summons'] as bool? ?? true;
+      stayConnected = json['stay_connected'] as bool? ?? true;
+      batteryAsked = json['battery_asked'] as bool? ?? false;
       screenSound = json['screen_sound'] as bool? ?? true;
       collapsed = {
         for (final id in json['collapsed'] as List<dynamic>? ?? [])
@@ -174,6 +183,8 @@ class Preferences extends ChangeNotifier {
           'show_ping_and_loss': showPingAndLoss,
           'notify_messages': notifyMessages,
           'notify_summons': notifySummons,
+          'stay_connected': stayConnected,
+          'battery_asked': batteryAsked,
           'screen_sound': screenSound,
           'collapsed': collapsed.toList(),
           'language': language.value,

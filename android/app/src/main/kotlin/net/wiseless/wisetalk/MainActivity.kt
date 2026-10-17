@@ -1,5 +1,6 @@
 package net.wiseless.wisetalk
 
+import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -10,6 +11,14 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    // The process's engine, which may already run for Stay Connected.
+    override fun provideFlutterEngine(context: Context): FlutterEngine =
+        WisetalkEngine.get(context, background = false)
+
+    // With Stay Connected the engine, and the connection in it, outlive
+    // the window; without it they end with it, as before.
+    override fun shouldDestroyEngineWithHost(): Boolean = !StayConnectedService.running
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // lib/data/call_service.dart
@@ -118,10 +127,12 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
-        // The call lives in this activity's engine: it ends with it.
+        // Closing Wisetalk ends the call, also when the engine stays for
+        // Stay Connected: the microphone can't go on without the window.
         if (isFinishing) {
             ScreenSound.stop()
             CallService.stop(this)
+            if (StayConnectedService.running) WisetalkEngine.tell("closed")
         }
         super.onDestroy()
     }

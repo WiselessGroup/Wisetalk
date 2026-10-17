@@ -779,32 +779,42 @@ class AppLocalizationsEn extends AppLocalizations {
       'When someone calls you into a channel';
 
   @override
-  String get settingsPushHeader => 'While Wisetalk Is Closed';
+  String get settingsStayConnected => 'Stay Connected';
 
   @override
-  String get settingsPushApp => 'Push App';
+  String get settingsStayConnectedDetail =>
+      'Summons arrive while Wisetalk is closed';
 
   @override
-  String get settingsPushAppNone => 'None';
+  String get settingsStayConnectedHint =>
+      'Wisetalk keeps one quiet connection and a notification of its own. Some phones put it to sleep anyway: on Samsung, keep it out of Sleeping apps; on Xiaomi, turn on Autostart.';
 
   @override
-  String get settingsPushAppChoose => 'Choose…';
+  String get settingsStayConnectedSteps => 'Steps for This Phone';
 
   @override
-  String get settingsGetNtfy => 'Get ntfy';
+  String get stayConnectedTitle => 'Wisetalk is connected';
 
   @override
-  String settingsPushVia(String app) {
-    return 'Summons reach this phone through $app, even while Wisetalk is closed.';
+  String stayConnectedBody(String server) {
+    return 'Waiting for summons from $server';
   }
 
   @override
-  String get settingsPushChooseHint =>
-      'Choose the app that brings summons while Wisetalk is closed.';
+  String get stayConnectedChannel => 'Staying connected';
 
   @override
-  String get settingsPushNoneHint =>
-      'Without a push app, summons show only while Wisetalk runs. Install ntfy, then in its settings make your community’s ntfy server the default server.';
+  String get batteryTitle => 'Let Wisetalk Stay Connected?';
+
+  @override
+  String get batteryBody =>
+      'Android puts apps to sleep to save battery, and a summons would wait until you open Wisetalk. Let it stay out of battery optimization: it keeps one quiet connection, a few kilobytes an hour.';
+
+  @override
+  String get batteryLater => 'Not Now';
+
+  @override
+  String get batteryContinue => 'Continue';
 
   @override
   String get settingsPrivacy => 'Privacy';
@@ -974,9 +984,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String summonReceived(String from, String channel) {
     return '$from summons you to $channel.';
   }
-
-  @override
-  String get workspaceSummoned => 'Summoned';
 
   @override
   String get workspaceRoleChangedOwner => 'Your server role is now owner.';

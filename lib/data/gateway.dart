@@ -62,6 +62,61 @@ class Gateway extends ChangeNotifier {
   Timer? _reconnect;
   bool _closed = false;
   bool _disposed = false;
+  bool _background = false;
+
+  /// The phone has no network (Stay Connected says so): nothing to retry.
+  bool _networkGone = false;
+
+  /// The server is older than background mode (before 1.9) and can't read
+  /// `set_background`: the connection stays as it is.
+  bool _backgroundUnsupported = false;
+  bool _sentBackground = false;
+
+  /// Coming back from the background: the full `ready` that should follow,
+  /// or the connection died quietly while the phone slept.
+  Timer? _awaitingReady;
+
+  /// The connection only carries summons, kicks and chat keys (ADR-0035,
+  /// lib/data/stay_connected.dart): an app in the background on Android.
+  bool get background => _background;
+
+  /// Goes to the background or comes back. Coming back brings a full
+  /// `ready`, which replaces whatever went stale meanwhile.
+  void setBackground(bool on) {
+    if (_background == on) return;
+    _background = on;
+    if (_backgroundUnsupported || _socket == null) return;
+    _sentBackground = true;
+    send('set_background', {'background': on});
+    _awaitingReady?.cancel();
+    if (!on) {
+      // One check per coming back, not a timer that keeps running.
+      _awaitingReady = Timer(const Duration(seconds: 10), () {
+        if (_socket != null) unawaited(_socket!.close());
+      });
+    }
+  }
+
+  /// The phone's network changed ([available]) or went: a connection over
+  /// the old one is gone even if nothing said so yet. Reconnects at once
+  /// instead of waiting for the backoff; nothing at all without a network.
+  void networkChanged(bool available) {
+    if (_closed) return;
+    _reconnect?.cancel();
+    _reconnect = null;
+    _retry = 0;
+    _networkGone = !available;
+    if (!available) return;
+    final socket = _socket;
+    if (socket == null) {
+      if (status != GatewayStatus.connecting) unawaited(connect());
+    } else if (_background) {
+      // Closing ends in _dropped, which reconnects after a second. Not in
+      // the foreground: a call rides on this connection, and a working
+      // one is better left alone.
+      unawaited(socket.close());
+    }
+  }
 
   /// Every event, after the channel list took it in.
   Stream<GatewayEvent> get events => _events.stream;
@@ -99,6 +154,11 @@ class Gateway extends ChangeNotifier {
       }
       _socket = socket;
       _retry = 0;
+      // Before hello: then the ready that answers it is small.
+      if (_background && !_backgroundUnsupported) {
+        _sentBackground = true;
+        send('set_background', {'background': true});
+      }
       send('hello', {
         'protocol': protocolVersion(),
         'device': device.id,
@@ -126,6 +186,7 @@ class Gateway extends ChangeNotifier {
     _closed = true;
     _disposed = true;
     _reconnect?.cancel();
+    _awaitingReady?.cancel();
     _socket?.close();
     _events.close();
     super.dispose();
@@ -141,6 +202,7 @@ class Gateway extends ChangeNotifier {
   Future<void> _dropped() async {
     _socket = null;
     sessionId = null;
+    _awaitingReady?.cancel();
     if (_closed) return;
     status = GatewayStatus.offline;
     notifyListeners();
@@ -157,6 +219,9 @@ class Gateway extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    // Stay Connected says when there is a network again (networkChanged):
+    // no tries in the meantime.
+    if (_networkGone) return;
     final delay = Duration(
       milliseconds: (1000 * (1 << _retry)).clamp(1000, 30000),
     );
@@ -167,8 +232,38 @@ class Gateway extends ChangeNotifier {
   void _receive(String message) {
     final json = jsonDecode(message) as Map<String, dynamic>;
     final event = (type: json['type'] as String, data: json['data']);
+    if (_quiet(event)) return;
     _apply(event);
     if (!_events.isClosed) _events.add(event);
+  }
+
+  /// What background mode says to this connection only: a `ready` without
+  /// channels, which must not empty the list, and an older server's answer
+  /// that it can't read `set_background`. Nobody else hears these.
+  bool _quiet(GatewayEvent event) {
+    final data = event.data;
+    if (event.type == 'ready' &&
+        data is Map<String, dynamic> &&
+        data['background'] == true) {
+      sessionId = data['session'] as String;
+      status = GatewayStatus.ready;
+      error = null;
+      notifyListeners();
+      return true;
+    }
+    if (event.type == 'ready') _awaitingReady?.cancel();
+    if (event.type == 'error' &&
+        data is Map<String, dynamic> &&
+        (data['problem'] as Map<String, dynamic>?)?['key'] ==
+            'unreadable_command' &&
+        !_backgroundUnsupported &&
+        _sentBackground) {
+      // Only set_background is newer than the servers we talk to.
+      _backgroundUnsupported = true;
+      _awaitingReady?.cancel();
+      return true;
+    }
+    return false;
   }
 
   void _apply(GatewayEvent event) {

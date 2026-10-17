@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,8 +10,11 @@ import 'data/desktop_entry.dart';
 import 'data/input_filters.dart';
 import 'data/language.dart';
 import 'data/links.dart';
+import 'data/notifications.dart';
 import 'data/preferences.dart';
-import 'data/unified_push.dart';
+import 'data/secrets.dart';
+import 'data/stay_connected.dart';
+import 'data/summons.dart';
 import 'data/updates.dart';
 import 'l10n/app_localizations.dart';
 import 'router.dart';
@@ -20,12 +24,9 @@ import 'theme.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (args.contains(pushBackgroundArgument)) {
-    // A summons came while Wisetalk was closed (Android): only what shows
-    // its notification, no window, no Rust, no connection.
-    await unifiedPushes.start(background: true);
-    return;
-  }
+  // Started by StayConnectedService.kt without a window: the same app,
+  // which connects and waits for summons until someone opens it.
+  launchedInBackground = args.contains('--background');
   // Before anything can set a call key.
   quietAndroidLogs();
   crashReports.watch();
@@ -34,8 +35,8 @@ Future<void> main(List<String> args) async {
   // First: while installing or updating, Velopack may end the process here.
   startUpdates();
   unawaited(registerDesktopEntry());
-  // Before anything registers, so endpoints and pushes have somewhere to go.
-  unawaited(unifiedPushes.start());
+  // What the 0.5 app left on its servers for UnifiedPush (WLK-48).
+  if (Platform.isAndroid) unawaited(forgetOldPushEndpoints(SystemSecrets()));
   runApp(const ProviderScope(child: WisetalkApp()));
 }
 
@@ -48,8 +49,9 @@ class WisetalkApp extends ConsumerWidget {
     // in or not.
     ref.watch(updatesProvider);
     ref.watch(linksProvider);
-    // Summons while closed follow whoever is signed in (Android).
-    ref.watch(unifiedPushProvider);
+    // Summons while nobody looks, and on Android while Wisetalk is closed.
+    ref.watch(summonNotificationsProvider);
+    ref.watch(stayConnectedProvider);
     final router = ref.watch(routerProvider);
     return ValueListenableBuilder(
       valueListenable: ref.watch(preferencesProvider).language,
