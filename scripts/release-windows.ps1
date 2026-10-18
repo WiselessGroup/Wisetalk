@@ -102,13 +102,26 @@ $env:DOTNET_ROLL_FORWARD = 'Major'
 
 $steps = 4
 $step = 0
-$timesFile = Join-Path $env:LOCALAPPDATA 'wisetalk\release-times-windows'
-New-Item -ItemType Directory -Force (Split-Path $timesFile) | Out-Null
+# Next to the token, not under %LOCALAPPDATA%\Wisetalk: that is where
+# Velopack installs the app itself, and a run there lost the folder between
+# making it and writing to it (WLK-44).
+$timesFile = Join-Path $env:APPDATA 'wisetalk\release-times-windows'
 $times = @{}
 if (Test-Path $timesFile) {
     foreach ($line in Get-Content $timesFile) {
         $name, $seconds = $line -split ' '
         $times[$name] = [int]$seconds
+    }
+}
+
+# Remembers how long the steps took; a release never fails over that.
+function SaveTimes {
+    try {
+        [IO.Directory]::CreateDirectory((Split-Path $timesFile)) | Out-Null
+        [IO.File]::WriteAllLines($timesFile,
+            [string[]]($times.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }))
+    } catch {
+        Write-Host "(could not remember the step times: $($_.Exception.Message))" -ForegroundColor DarkGray
     }
 }
 $started = [Diagnostics.Stopwatch]::StartNew()
@@ -144,7 +157,7 @@ function Step([string]$Name, [string]$Title, [string]$Command) {
         exit 1
     }
     $times[$Name] = $took
-    ($times.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) | Set-Content $timesFile
+    SaveTimes
     Write-Host ("+ [{0}/{1}] {2}  {3}" -f $script:step, $steps, $Title, (Clock $took)) -ForegroundColor Green
 }
 
