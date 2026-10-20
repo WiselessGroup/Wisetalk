@@ -83,7 +83,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         challenge: challenge.challenge,
         difficulty: challenge.difficulty,
       );
-      final signedIn = await api.signInAsGuest(name, challenge, nonce);
+      // The passport from an earlier visit says we are no stranger here;
+      // the first visit hands one out to keep.
+      final secrets = ref.read(secretsProvider);
+      final signedIn = await api.signInAsGuest(
+        name,
+        challenge,
+        nonce,
+        passport: await secrets.read(passportKey(server.origin)),
+      );
+      if (signedIn.passport case final passport?) {
+        await secrets.write(passportKey(server.origin), passport);
+      }
       await ref.read(sessionProvider.notifier).start(server, signedIn);
       if (mounted) context.go('/');
     } on ApiException catch (e) {

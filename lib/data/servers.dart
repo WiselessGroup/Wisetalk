@@ -13,6 +13,10 @@ final secretsProvider = Provider<Secrets>((ref) => SystemSecrets());
 
 String tokenKey(Uri origin) => 'token:$origin';
 String deviceKey(Uri origin) => 'device:$origin';
+
+/// The guest passport of a server, see [SignedIn.passport]; outlives the
+/// session token, goes with the server.
+String passportKey(Uri origin) => 'passport:$origin';
 const serversKey = 'servers';
 const currentServerKey = 'current-server';
 
@@ -136,11 +140,12 @@ class ServersNotifier extends AsyncNotifier<Servers> {
     );
   }
 
-  /// Forgets a server with its session token and device key.
+  /// Forgets a server with its session token, device key and guest passport.
   Future<void> remove(Uri origin) async {
     final now = await _now;
     await _secrets.delete(tokenKey(origin));
     await _secrets.delete(deviceKey(origin));
+    await _secrets.delete(passportKey(origin));
     await _save(
       Servers([
         for (final s in now.list)

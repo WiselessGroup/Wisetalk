@@ -126,15 +126,22 @@ class ServerInfo {
 
 /// A new session: its bearer token and who it belongs to.
 class SignedIn {
-  const SignedIn({required this.token, required this.me});
+  const SignedIn({required this.token, required this.me, this.passport});
 
   factory SignedIn.fromJson(Map<String, dynamic> json) => SignedIn(
     token: json['token'] as String,
     me: Me.fromJson(json['me'] as Map<String, dynamic>),
+    passport: json['passport'] as String?,
   );
 
   final String token;
   final Me me;
+
+  /// A guest's new passport (WLK-49), kept with the server past sign-out
+  /// and sent at the next guest sign-in, so a guest the server knows and
+  /// never kicked is not held back by the limits for their address. Only
+  /// with a first sign-in; a known passport gets none.
+  final String? passport;
 }
 
 class GuestChallenge {
@@ -287,14 +294,17 @@ class Api {
     );
   }
 
+  /// [passport] is the one an earlier guest sign-in here handed out, if any.
   Future<SignedIn> signInAsGuest(
     String name,
     GuestChallenge challenge,
-    int nonce,
-  ) async => SignedIn.fromJson(
+    int nonce, {
+    String? passport,
+  }) async => SignedIn.fromJson(
     await _send('POST', '/auth/guest/token', {
       'display_name': name,
       'proof': {'challenge': challenge.challenge, 'nonce': nonce},
+      if (passport != null) 'passport': passport,
     }) as Map<String, dynamic>,
   );
 
