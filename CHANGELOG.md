@@ -5,6 +5,19 @@ Forgejo.
 
 ## Unreleased
 
+- Channels and spaces show their icons, as on the web: an emoji, or a
+  picture the admins uploaded, in the sidebar, in the call row on
+  phones and in the call title on the desktop. Icons are still set in
+  the web client.
+- Guests get a passport: after the first guest sign-in on a server the
+  app keeps a token for it and shows it next time, so a guest the
+  server has seen and never kicked is not held back by the sign-in
+  limits of a shared address. The passport outlives signing out and
+  goes when the server is forgotten (needs a 1.9 server).
+- Linux under Wayland: a minimized Wisetalk window no longer keeps
+  drawing video and animations. GNOME does not tell the window it is
+  minimized, so the app now notices that the compositor stopped
+  showing its frames and pauses drawing until the window is back.
 - Android: summons arrive while Wisetalk is closed, with nothing else to
   install. Stay Connected (on for accounts, in Settings) keeps one quiet
   connection to the server with a silent notification, even after the

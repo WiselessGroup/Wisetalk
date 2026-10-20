@@ -55,9 +55,143 @@ static void window_method_cb(FlMethodChannel* channel, FlMethodCall* call,
   fl_method_call_respond_success(call, nullptr, nullptr);
 }
 
+// GNOME under Wayland never tells a minimized window that it is minimized
+// (xdg-shell has no state for it before "suspended" in version 6, which
+// GTK 3 does not pass on), so Flutter keeps the window "inactive" and goes
+// on drawing video and animations nobody sees (WLK-38). What the compositor
+// does do is stop answering the window's frame callbacks: after a paint
+// GDK freezes the frame clock until the compositor says the frame was
+// shown, and for a window out of sight that never comes. So, a second after
+// a paint, this asks the clock for a tick; when none comes within half a
+// second, the window is out of sight and Flutter hears "hidden". The next
+// tick, which comes the moment the compositor shows the window again, says
+// "resumed" or "inactive", by focus, as the engine's own monitor would. A
+// visible window that just sits still ticks at once when asked, so nothing
+// happens there, and nothing runs while nothing is painted.
+struct VisibilityWatch {
+  GtkWindow* window;
+  FlBinaryMessenger* messenger;
+  GdkFrameClock* clock;
+  gulong paint_handler;
+  // After a paint, a second later: ask for a tick.
+  guint probe_source;
+  // The tick asked for; stays registered while out of sight.
+  guint tick_id;
+  // Half a second after asking: no tick means out of sight.
+  guint confirm_source;
+  gboolean presumed_hidden;
+};
+
+static void send_lifecycle_state(VisibilityWatch* watch, const gchar* state) {
+  g_autoptr(FlValue) value = fl_value_new_string(state);
+  g_autoptr(FlStringCodec) codec = fl_string_codec_new();
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(GBytes) message =
+      fl_message_codec_encode_message(FL_MESSAGE_CODEC(codec), value, &error);
+  if (message == nullptr) {
+    g_warning("Cannot encode lifecycle state: %s", error->message);
+    return;
+  }
+  fl_binary_messenger_send_on_channel(watch->messenger, "flutter/lifecycle",
+                                      message, nullptr, nullptr, nullptr);
+}
+
+static gboolean visibility_tick_cb(GtkWidget* widget, GdkFrameClock* clock,
+                                   gpointer user_data) {
+  VisibilityWatch* watch = static_cast<VisibilityWatch*>(user_data);
+  if (watch->confirm_source != 0) {
+    g_source_remove(watch->confirm_source);
+    watch->confirm_source = 0;
+  }
+  if (watch->presumed_hidden) {
+    watch->presumed_hidden = FALSE;
+    GdkWindow* gdk_window = gtk_widget_get_window(GTK_WIDGET(watch->window));
+    gboolean focused =
+        gdk_window != nullptr &&
+        (gdk_window_get_state(gdk_window) & GDK_WINDOW_STATE_FOCUSED);
+    send_lifecycle_state(
+        watch, focused ? "AppLifecycleState.resumed" : "AppLifecycleState.inactive");
+  }
+  watch->tick_id = 0;
+  return G_SOURCE_REMOVE;
+}
+
+static gboolean visibility_confirm_cb(gpointer user_data) {
+  VisibilityWatch* watch = static_cast<VisibilityWatch*>(user_data);
+  watch->confirm_source = 0;
+  if (!watch->presumed_hidden) {
+    watch->presumed_hidden = TRUE;
+    send_lifecycle_state(watch, "AppLifecycleState.hidden");
+  }
+  return G_SOURCE_REMOVE;
+}
+
+static gboolean visibility_probe_cb(gpointer user_data) {
+  VisibilityWatch* watch = static_cast<VisibilityWatch*>(user_data);
+  watch->probe_source = 0;
+  if (watch->tick_id == 0) {
+    watch->tick_id = gtk_widget_add_tick_callback(
+        GTK_WIDGET(watch->window), visibility_tick_cb, watch, nullptr);
+  }
+  if (watch->confirm_source == 0) {
+    watch->confirm_source =
+        g_timeout_add(500, visibility_confirm_cb, watch);
+  }
+  return G_SOURCE_REMOVE;
+}
+
+// GdkFrameClock::paint: something was drawn, and the clock now waits for
+// the compositor to show it.
+static void visibility_paint_cb(GdkFrameClock* clock, gpointer user_data) {
+  VisibilityWatch* watch = static_cast<VisibilityWatch*>(user_data);
+  if (watch->probe_source == 0 && watch->confirm_source == 0) {
+    watch->probe_source = g_timeout_add(1000, visibility_probe_cb, watch);
+  }
+}
+
+// GtkWidget::destroy, while the window and its frame clock are still whole.
+static void visibility_watch_destroy_cb(GtkWidget* widget, gpointer data) {
+  VisibilityWatch* watch = static_cast<VisibilityWatch*>(data);
+  if (watch->probe_source != 0) g_source_remove(watch->probe_source);
+  if (watch->confirm_source != 0) g_source_remove(watch->confirm_source);
+  if (watch->tick_id != 0) {
+    gtk_widget_remove_tick_callback(widget, watch->tick_id);
+  }
+  if (watch->paint_handler != 0) {
+    g_signal_handler_disconnect(watch->clock, watch->paint_handler);
+  }
+  g_clear_object(&watch->clock);
+  g_clear_object(&watch->messenger);
+  g_free(watch);
+}
+
+static void watch_visibility(GtkWindow* window, FlView* view) {
+#ifdef GDK_WINDOWING_WAYLAND
+  if (!GDK_IS_WAYLAND_DISPLAY(gtk_widget_get_display(GTK_WIDGET(window)))) {
+    return;
+  }
+  GdkFrameClock* clock = gtk_widget_get_frame_clock(GTK_WIDGET(window));
+  if (clock == nullptr) return;
+  VisibilityWatch* watch = g_new0(VisibilityWatch, 1);
+  watch->window = window;
+  watch->messenger = FL_BINARY_MESSENGER(
+      g_object_ref(fl_engine_get_binary_messenger(fl_view_get_engine(view))));
+  watch->clock = GDK_FRAME_CLOCK(g_object_ref(clock));
+  watch->paint_handler =
+      g_signal_connect(clock, "paint", G_CALLBACK(visibility_paint_cb), watch);
+  g_signal_connect(window, "destroy", G_CALLBACK(visibility_watch_destroy_cb),
+                   watch);
+#else
+  (void)window;
+  (void)view;
+#endif
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
-  gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+  GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(view));
+  gtk_widget_show(window);
+  watch_visibility(GTK_WINDOW(window), view);
 }
 
 // Implements GApplication::activate.
