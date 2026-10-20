@@ -3,7 +3,7 @@
 The native app. Each release section becomes the notes of its release on
 Forgejo.
 
-## Unreleased
+## 0.6.0
 
 - Channels and spaces show their icons, as on the web: an emoji, or a
   picture the admins uploaded, in the sidebar, in the call row on
@@ -35,6 +35,7 @@ Forgejo.
   on every system, named after the channel even when the app was
   started in the background.
 
+## 0.5.0
 
 - Keyboard shortcuts work while another app is in front, as long as
   you are in a call: Windows, macOS and X11. Under Wayland they work
