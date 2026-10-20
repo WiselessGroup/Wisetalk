@@ -4,6 +4,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../data/gateway.dart';
+import '../data/protocol.dart';
 import '../l10n/app_localizations.dart';
 import '../theme.dart';
 
@@ -215,4 +217,62 @@ Future<bool> confirm(
     ),
   );
   return yes ?? false;
+}
+
+/// A channel or space icon, as the web's Icon.svelte: an emoji as text, a
+/// custom emoji (`:name:`) as its picture from the server, and [fallback]
+/// (nothing, when not given) without an icon or when the custom emoji is
+/// gone. The picture is decoded at the size it shows (ADR-0019).
+class PlaceIcon extends StatelessWidget {
+  const PlaceIcon({
+    super.key,
+    required this.icon,
+    required this.gateway,
+    this.size = 18,
+    this.fallback,
+  });
+
+  final String? icon;
+  final Gateway gateway;
+  final double size;
+  final Widget? fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = this.icon;
+    final name = customEmojiName(icon);
+    final picture = name == null ? null : gateway.emojiPicture(name);
+    if (picture != null) {
+      final pixels = (size * MediaQuery.devicePixelRatioOf(context)).round();
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: Image(
+          image: ResizeImage(
+            NetworkImage(picture.toString()),
+            width: pixels,
+            height: pixels,
+            policy: ResizeImagePolicy.fit,
+          ),
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) =>
+              fallback ?? SizedBox.square(dimension: size),
+        ),
+      );
+    }
+    if (icon != null && name == null) {
+      return SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: Text(
+            icon,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: size * 0.95, height: 1),
+          ),
+        ),
+      );
+    }
+    return fallback ?? const SizedBox.shrink();
+  }
 }

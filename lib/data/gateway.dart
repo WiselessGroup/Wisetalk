@@ -32,6 +32,9 @@ class Gateway extends ChangeNotifier {
   /// This connection's id, also its identity in calls; `null` until ready.
   String? sessionId;
   List<Space> spaces = [];
+
+  /// The server's custom emoji, for channel and space icons (WLK-50).
+  List<CustomEmoji> emoji = [];
   List<ChannelView> channels = [];
   String? error;
 
@@ -126,6 +129,14 @@ class Gateway extends ChangeNotifier {
       account == null || version == null
       ? null
       : avatarUrl(session.server.origin, account, version);
+
+  /// Where the picture of custom emoji [name] is; `null` once it is gone.
+  Uri? emojiPicture(String name) {
+    for (final e in emoji) {
+      if (e.name == name) return emojiUrl(session.server.origin, e);
+    }
+    return null;
+  }
 
   ChannelView? channel(String id) {
     for (final view in channels) {
@@ -266,6 +277,11 @@ class Gateway extends ChangeNotifier {
     return false;
   }
 
+  static List<CustomEmoji> _emojiList(dynamic json) => [
+    for (final e in json as List<dynamic>? ?? const [])
+      CustomEmoji.fromJson(e as Map<String, dynamic>),
+  ];
+
   void _apply(GatewayEvent event) {
     final data = event.data;
     switch (event.type) {
@@ -280,8 +296,11 @@ class Gateway extends ChangeNotifier {
           for (final c in ready['channels'] as List<dynamic>)
             ChannelView.fromJson(c as Map<String, dynamic>),
         ];
+        emoji = _emojiList(ready['emoji']);
         status = GatewayStatus.ready;
         error = null;
+      case 'emoji_updated':
+        emoji = _emojiList((data as Map<String, dynamic>)['emoji']);
       case 'channel_updated':
         final view = ChannelView.fromJson(data as Map<String, dynamic>);
         final index = channels.indexWhere(

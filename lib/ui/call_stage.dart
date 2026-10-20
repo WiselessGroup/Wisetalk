@@ -96,6 +96,14 @@ class _CallAreaState extends State<CallArea> {
           child: Row(
             children: [
               if (widget.showName) ...[
+                if (view.channel.icon != null) ...[
+                  PlaceIcon(
+                    icon: view.channel.icon,
+                    gateway: widget.gateway,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Text(
                   view.channel.name,
                   style: TextStyle(

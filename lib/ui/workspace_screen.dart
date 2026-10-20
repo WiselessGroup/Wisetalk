@@ -440,6 +440,7 @@ class _WorkspaceState extends ConsumerState<_Workspace> {
         children: [
           _NowRow(
             view: call,
+            gateway: _gateway,
             open: _listOpen,
             onPressed: () => setState(() => _listOpen = !_listOpen),
           ),
@@ -510,11 +511,13 @@ const _phoneWidth = 896.0;
 class _NowRow extends StatelessWidget {
   const _NowRow({
     required this.view,
+    required this.gateway,
     required this.open,
     required this.onPressed,
   });
 
   final ChannelView view;
+  final Gateway gateway;
   final bool open;
   final VoidCallback onPressed;
 
@@ -534,7 +537,16 @@ class _NowRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                Icon(Icons.volume_up_outlined, size: 20, color: palette.accent),
+                PlaceIcon(
+                  icon: view.channel.icon,
+                  gateway: gateway,
+                  size: 20,
+                  fallback: Icon(
+                    Icons.volume_up_outlined,
+                    size: 20,
+                    color: palette.accent,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -851,6 +863,14 @@ class _SpaceHeader extends StatelessWidget {
                   children: [
                     if (manager.gateway.isAdmin)
                       _Grip(manager: manager, dragged: dragged),
+                    if (space.icon != null) ...[
+                      PlaceIcon(
+                        icon: space.icon,
+                        gateway: manager.gateway,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Expanded(
                       child: Text(
                         space.name,
@@ -950,15 +970,23 @@ class _ChannelRow extends StatelessWidget {
                       children: [
                         if (gateway.isAdmin)
                           _Grip(manager: manager, dragged: dragged),
-                        Icon(
-                          view.locked
-                              ? Icons.lock_outline
-                              : Icons.volume_up_outlined,
-                          size: 17,
-                          color: view.locked
-                              ? palette.tertiary
-                              : palette.accent,
-                        ),
+                        if (view.locked)
+                          Icon(
+                            Icons.lock_outline,
+                            size: 17,
+                            color: palette.tertiary,
+                          )
+                        else
+                          PlaceIcon(
+                            icon: view.channel.icon,
+                            gateway: gateway,
+                            size: 17,
+                            fallback: Icon(
+                              Icons.volume_up_outlined,
+                              size: 17,
+                              color: palette.accent,
+                            ),
+                          ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(

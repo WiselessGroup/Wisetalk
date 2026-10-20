@@ -334,3 +334,31 @@ Uri avatarUrl(Uri origin, String account, int version) => origin.replace(
   path: '/api/avatars/$account',
   queryParameters: {'v': '$version'},
 );
+
+/// An emoji picture admins uploaded, used as `:name:` in channel and space
+/// icons. Edited in the web client only (ADR-0020); the app just shows it.
+class CustomEmoji {
+  const CustomEmoji({required this.name, required this.version});
+
+  factory CustomEmoji.fromJson(Map<String, dynamic> json) => CustomEmoji(
+    name: json['name'] as String,
+    version: json['version'] as int,
+  );
+
+  final String name;
+
+  /// Changes with every upload, so the picture can be cached forever.
+  final int version;
+}
+
+final _customEmojiRef = RegExp(r'^:([a-z0-9_]{2,32}):$');
+
+/// The custom emoji an icon refers to (`:name:`), if it is one.
+String? customEmojiName(String? icon) =>
+    icon == null ? null : _customEmojiRef.firstMatch(icon)?.group(1);
+
+/// Where a custom emoji's picture is.
+Uri emojiUrl(Uri origin, CustomEmoji emoji) => origin.replace(
+  path: '/api/emoji/${emoji.name}',
+  queryParameters: {'v': '${emoji.version}'},
+);
