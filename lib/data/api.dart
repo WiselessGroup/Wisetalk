@@ -304,7 +304,7 @@ class Api {
     await _send('POST', '/auth/guest/token', {
       'display_name': name,
       'proof': {'challenge': challenge.challenge, 'nonce': nonce},
-      if (passport != null) 'passport': passport,
+      'passport': ?passport,
     }) as Map<String, dynamic>,
   );
 
