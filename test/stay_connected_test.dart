@@ -93,6 +93,15 @@ Map<String, dynamic> _ready({bool background = false}) => {
   if (background) 'background': true,
 };
 
+/// Waits for what the app makes of a message. It comes over a real socket, so
+/// on a busy machine it may not have arrived after a pumped event queue.
+Future<void> _until(bool Function() done) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (!done() && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
 void main() {
   setUpAll(() async => RustLib.init());
 
@@ -153,7 +162,7 @@ void main() {
       await server.accepted();
       expect((await server.command()).$1, 'hello');
       server.say('ready', _ready());
-      await pumpEventQueue();
+      await _until(() => gateway.channels.isNotEmpty);
       expect(gateway.channels.single.channel.name, 'Lobby');
 
       gateway.setBackground(true);
@@ -165,7 +174,7 @@ void main() {
       await server.expectBackground(true);
       expect((await server.command()).$1, 'hello');
       server.say('ready', _ready(background: true));
-      await pumpEventQueue();
+      await _until(() => gateway.status == GatewayStatus.ready);
       expect(gateway.status, GatewayStatus.ready);
       // The small ready empties nothing and reaches nobody else.
       expect(gateway.channels.single.channel.name, 'Lobby');
@@ -176,22 +185,24 @@ void main() {
         'from': 'boss',
         'channel_name': 'Lobby',
       });
-      await pumpEventQueue();
+      await _until(() => heard.length == 2);
       expect(heard, ['ready', 'summoned']);
 
       gateway.setBackground(false);
       await server.expectBackground(false);
       server.say('ready', _ready());
-      await pumpEventQueue();
+      await _until(() => heard.length == 3);
       expect(heard, ['ready', 'summoned', 'ready']);
     });
 
     test('an older server that can\'t read it changes nothing', () async {
+      final heard = <String>[];
+      gateway.events.listen((event) => heard.add(event.type));
       unawaited(gateway.connect());
       await server.accepted();
       expect((await server.command()).$1, 'hello');
       server.say('ready', _ready());
-      await pumpEventQueue();
+      await _until(() => gateway.channels.isNotEmpty);
 
       gateway.setBackground(true);
       expect((await server.command()).$1, 'set_background');
@@ -200,7 +211,9 @@ void main() {
         'message': 'unreadable command',
         'problem': {'key': 'unreadable_command'},
       });
-      await pumpEventQueue();
+      // Messages keep their order: this one arriving means the error did.
+      server.say('summoned', {'channel': 'lobby', 'from': 'boss'});
+      await _until(() => heard.contains('summoned'));
       expect(gateway.error, isNull);
 
       // Not asked again: the next thing the server hears is a summon.
