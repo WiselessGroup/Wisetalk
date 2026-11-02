@@ -1,0 +1,187 @@
+# Runs on the GitHub mirror (github.com/WiselessGroup/Wisetalk). The source of
+# truth is git.wiseless.net/Wisetalk/client, which pushes here; a tag v* pushed
+# there ends up as a GitHub release with the AppImage, the Windows installer,
+# the macOS disk image, the Android APK and Velopack's update packages.
+name: Build
+
+# A push to master runs the checks only; the packages are built for a tag (and
+# released) or on demand from the Actions tab. Docs-only pushes skip CI.
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  FLUTTER_VERSION: 3.47.7
+  # Must match the velopack crate in rust/Cargo.toml.
+  VPK_VERSION: 1.2.161
+  ANDROID_PLATFORM: 36
+  ANDROID_BUILD_TOOLS: 36.0.0
+  ANDROID_NDK: 28.2.13676358
+  # vpk is built for .NET 8; a newer runtime runs it too.
+  DOTNET_ROLL_FORWARD: Major
+  WISETALK_SENTRY_DSN: ${{ secrets.WISETALK_SENTRY_DSN }}
+  # For vpk, to fetch the release before without hitting the anonymous limit.
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  check:
+    # Forgejo runs .github/workflows too when it has Actions turned on, and the
+    # server must never build the app (ADR-0038). So does every job below.
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          linux-desktop: 'true'
+      - run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      # The notification tests talk to a session bus.
+      - run: dbus-run-session -- scripts/check.sh
+
+  linux:
+    if: github.server_url == 'https://github.com' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    # The oldest glibc on offer: an image built here runs on older distros
+    # too, not the other way round.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          linux-desktop: 'true'
+      - uses: ./.github/actions/vpk
+      - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
+      - run: scripts/build-linux.sh "$VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: |
+            dist/Wisetalk-${{ env.VERSION }}-x86_64.AppImage
+            dist/Wisetalk-${{ env.VERSION }}-x86_64.AppImage.zsync
+            dist/Wisetalk-${{ env.VERSION }}-linux-*.nupkg
+            dist/releases.linux.json
+          if-no-files-found: error
+
+  windows:
+    if: github.server_url == 'https://github.com' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - uses: ./.github/actions/vpk
+      - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
+      - run: scripts/build-windows.sh "$VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            dist/Wisetalk-${{ env.VERSION }}-x64-Setup.exe
+            dist/Wisetalk-${{ env.VERSION }}-win-*.nupkg
+            dist/releases.win.json
+          if-no-files-found: error
+
+  macos:
+    if: github.server_url == 'https://github.com' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    # Apple silicon runner: the .dmg is arm64 only.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - uses: ./.github/actions/vpk
+      - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
+      - run: scripts/build-macos.sh "$VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: |
+            dist/Wisetalk-${{ env.VERSION }}-arm64.dmg
+            dist/Wisetalk-${{ env.VERSION }}-osx-*.nupkg
+            dist/releases.osx.json
+          if-no-files-found: error
+
+  android:
+    if: github.server_url == 'https://github.com' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      # android-35: jni compiles against it.
+      - run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-$ANDROID_PLATFORM" "platforms;android-35"
+          "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK" > /dev/null
+      - uses: ./.github/actions/setup
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          # Its own: the shared one is saved first by a job with no Android
+          # artifacts in it.
+          flutter-cache-key: 'flutter-android-:version:-:arch:-:hash:'
+      - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
+      - name: Build
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: scripts/build-android.sh "$VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: dist/Wisetalk-${{ env.VERSION }}.apk
+          if-no-files-found: error
+
+  release:
+    if: github.server_url == 'https://github.com' && startsWith(github.ref, 'refs/tags/v')
+    # Packages build in parallel with the checks; nothing ships unless both
+    # the checks and every package came through.
+    needs: [check, linux, windows, macos, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: CHANGELOG.md
+      - uses: actions/download-artifact@v8
+        with:
+          path: files
+          merge-multiple: true
+      - name: Publish
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          # The tag's section of the changelog. A version with a hyphen
+          # (1.0.0-rc.1) is a prerelease: installed apps and the Download
+          # button keep to the latest full release.
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" { on = 1; next }
+            on && /^## / { exit }
+            on { print }' CHANGELOG.md > notes.md
+          pre=()
+          [[ $version != *-* ]] || pre=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" files/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Wisetalk $version" \
+            --notes-file notes.md \
+            "${pre[@]}"

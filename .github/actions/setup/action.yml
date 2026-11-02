@@ -1,0 +1,44 @@
+name: Set up
+description: Flutter at the fixed version, Rust from rust/rust-toolchain.toml, and caches of what cargo downloads and builds.
+inputs:
+  flutter-version:
+    required: true
+  linux-desktop:
+    description: Install what building for the Linux desktop needs.
+    default: 'false'
+  flutter-cache-key:
+    description: Flutter's cache, when a job needs its own.
+    default: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+runs:
+  using: composite
+  steps:
+    - if: inputs.linux-desktop == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+          libstdc++-12-dev libsecret-1-dev libayatana-appindicator3-dev libpulse-dev \
+          libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev squashfs-tools zstd zsync
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ inputs.flutter-version }}
+        channel: stable
+        cache: true
+        cache-key: ${{ inputs.flutter-cache-key }}
+    # Every target rust-toolchain.toml lists; Flutter's build hook runs cargo
+    # with this toolchain.
+    - shell: bash
+      working-directory: rust
+      run: rustup toolchain install
+    - uses: actions/cache@v4
+      with:
+        # .dart_tool holds the bridge the build hook compiled.
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          .dart_tool/hooks_runner
+          rust/target
+        key: rust-${{ github.job }}-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+        restore-keys: |
+          rust-${{ github.job }}-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+          rust-${{ github.job }}-${{ runner.os }}-

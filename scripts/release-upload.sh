@@ -1,8 +1,12 @@
 #!/bin/sh
 # Attaches files to the Forgejo release of a tag, creating the release
-# first if there is none yet, and replacing files of the same name. Each
-# platform's release script sends its own files to the same release. Notes come from the tag's section in
-# CHANGELOG.md; versions with a hyphen (1.0.0-beta.1) are prereleases.
+# first if there is none yet, and replacing files of the same name. Notes come
+# from the tag's section in CHANGELOG.md; versions with a hyphen (1.0.0-beta.1)
+# are prereleases.
+#
+# Only for the bridge release: apps from before 0.7.0 look for updates on
+# Forgejo, so 0.7.0 goes there too, and from then on they look on GitHub
+# (ADR-0038). Goes away with WLK-52.
 # Usage: TOKEN=... scripts/release-upload.sh vX.Y.Z <file>...
 set -eu
 

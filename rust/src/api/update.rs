@@ -1,12 +1,12 @@
 //! Desktop updates through Velopack: the app checks the client's releases
-//! on Forgejo, downloads an update in the background, and applies it on
+//! on GitHub, downloads an update in the background, and applies it on
 //! "Restart to Update" or, failing that, on the next start. Builds Velopack
 //! didn't install (`flutter run`, a bare bundle) don't update.
 
 use flutter_rust_bridge::frb;
 
 /// Where releases come from, for every community's servers alike.
-const RELEASES: &str = "https://git.wiseless.net/Wisetalk/client";
+const RELEASES: &str = "https://github.com/WiselessGroup/Wisetalk";
 
 /// Lets Velopack handle install and update hooks. Runs first thing in
 /// `main`: during an install or update it may finish the process itself.
@@ -24,7 +24,7 @@ fn manager() -> Option<velopack::UpdateManager> {
             velopack::UpdateManager::new(velopack::sources::FileSource::new(folder), None, None)
         }
         Err(_) => velopack::UpdateManager::new(
-            velopack::sources::GiteaSource::new(RELEASES, None, false),
+            velopack::sources::GithubSource::new(RELEASES, None, false),
             None,
             None,
         ),

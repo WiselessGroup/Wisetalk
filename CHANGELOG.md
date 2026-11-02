@@ -1,7 +1,15 @@
 # Changelog
 
 The native app. Each release section becomes the notes of its release on
-Forgejo.
+GitHub.
+
+## 0.7.0
+
+- Releases now come from [GitHub](https://github.com/WiselessGroup/Wisetalk/releases),
+  all platforms at once. Installed apps move there by themselves with this
+  update; there is nothing to do.
+- Linux: Gear Lever finds new versions of the AppImage on its own. The
+  app's own "Restart to Update" works as before, and the two get along.
 
 ## 0.6.0
 
