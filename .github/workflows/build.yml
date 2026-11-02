@@ -95,7 +95,7 @@ jobs:
           name: windows
           path: |
             dist/Wisetalk-${{ env.VERSION }}-x64-Setup.exe
-            dist/Wisetalk-${{ env.VERSION }}-win-*.nupkg
+            dist/Wisetalk-${{ env.VERSION }}-*.nupkg
             dist/releases.win.json
           if-no-files-found: error
 
@@ -159,7 +159,7 @@ jobs:
     # Packages build in parallel with the checks; nothing ships unless both
     # the checks and every package came through.
     needs: [check, linux, windows, macos, android]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -173,6 +173,13 @@ jobs:
       - name: Publish
         run: |
           version=${GITHUB_REF_NAME#v}
+          # Every package this version's feeds name has to be here: without
+          # one, installed apps see the update and can't download it.
+          for feed in files/releases.*.json; do
+            for name in $(jq -r --arg v "$version" '.Assets[] | select(.Version == $v) | .FileName' "$feed"); do
+              [[ -f files/$name ]] || { echo "::error::$feed names $name, which wasn't built"; exit 1; }
+            done
+          done
           # The tag's section of the changelog. A version with a hyphen
           # (1.0.0-rc.1) is a prerelease: installed apps and the Download
           # button keep to the latest full release.
