@@ -46,6 +46,8 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           linux-desktop: 'true'
+      - run: rustup component add rustfmt clippy
+        working-directory: rust
       - run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
       # The notification tests talk to a session bus.
       - run: dbus-run-session -- scripts/check.sh
@@ -120,7 +122,7 @@ jobs:
 
   android:
     if: github.server_url == 'https://github.com' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v6

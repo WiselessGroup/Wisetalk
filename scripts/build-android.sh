@@ -21,7 +21,7 @@ if [[ -n ${ANDROID_KEYSTORE:-} ]]; then
   base64 -d <<< "$ANDROID_KEYSTORE" > android/release.jks
   # The alias, read from the keystore itself.
   alias=$(keytool -list -keystore android/release.jks -storepass:env ANDROID_KEYSTORE_PASSWORD 2>/dev/null |
-    sed -n 's/^\([^,]*\), .*PrivateKeyEntry.*/\1/p' | head -n 1)
+    sed -n 's/^\([^,]*\), .*PrivateKeyEntry.*/\1/p' | head -n 1 || true)
   [[ -n $alias ]] || { echo "wrong password, or no key in the keystore" >&2; exit 1; }
   printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
     "$ANDROID_KEYSTORE_PASSWORD" "$alias" "${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}" \
