@@ -1,5 +1,6 @@
 #include "my_application.h"
 
+#include <epoxy/gl.h>
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
@@ -187,6 +188,46 @@ static void watch_visibility(GtkWindow* window, FlView* view) {
 #endif
 }
 
+// What every frame costs on Wayland (WLK-56). The engine hands GTK its frame
+// as a texture with alpha, so GTK first uploads what it thinks lies underneath:
+// a window-sized image, cleared, then filled with the window's and the view's
+// backgrounds, all by the CPU, only for the frame to cover it completely. With
+// video playing that took a third of a core, and 15 MB per frame at 1440p.
+//
+// The backgrounds go away with app-paintable and a transparent view. The upload
+// goes away by telling GTK this area is already on screen: an opaque
+// renderbuffer through gdk_cairo_draw_from_gl marks it so. It is 1x1, and a blit
+// from outside a framebuffer writes nothing, so that costs nothing either.
+static gboolean mark_view_drawn_cb(GtkWidget* widget, cairo_t* cr,
+                                   gpointer user_data) {
+  static GdkGLContext* context = nullptr;
+  static GLuint renderbuffer = 0;
+  static gboolean failed = FALSE;
+  if (failed) return FALSE;
+  GdkWindow* window = gtk_widget_get_window(widget);
+  if (renderbuffer == 0) {
+    g_autoptr(GError) error = nullptr;
+    context = gdk_window_create_gl_context(window, &error);
+    if (context == nullptr || !gdk_gl_context_realize(context, &error)) {
+      g_warning("Painting the whole window on every frame: %s",
+                error != nullptr ? error->message : "no GL context");
+      g_clear_object(&context);
+      failed = TRUE;
+      return FALSE;
+    }
+    gdk_gl_context_make_current(context);
+    glGenRenderbuffers(1, &renderbuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB8, 1, 1);
+    gdk_gl_context_clear_current();
+  }
+  gint scale = gtk_widget_get_scale_factor(widget);
+  gdk_cairo_draw_from_gl(cr, window, renderbuffer, GL_RENDERBUFFER, scale, 0, 0,
+                         gtk_widget_get_allocated_width(widget) * scale,
+                         gtk_widget_get_allocated_height(widget) * scale);
+  return FALSE;
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(view));
@@ -247,6 +288,14 @@ static void my_application_activate(GApplication* application) {
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
   gdk_rgba_parse(&background_color, "#000000");
+#ifdef GDK_WINDOWING_WAYLAND
+  if (GDK_IS_WAYLAND_DISPLAY(gtk_widget_get_display(GTK_WIDGET(window))) &&
+      g_getenv("FLUTTER_LINUX_RENDERER") == nullptr) {
+    gdk_rgba_parse(&background_color, "#00000000");
+    gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+    g_signal_connect(view, "draw", G_CALLBACK(mark_view_drawn_cb), nullptr);
+  }
+#endif
   fl_view_set_background_color(view, &background_color);
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));

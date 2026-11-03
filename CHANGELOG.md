@@ -11,6 +11,11 @@ GitHub.
 - Windows: updates can now be downloaded. Earlier releases announced a new
   version without publishing its update package, so the app could never
   fetch it.
+- Linux under Wayland: watching video costs much less. For every frame GTK
+  filled and uploaded a window-sized picture only to have the frame cover
+  it, which took a third of a core at 1440p; the window's main thread now
+  takes about a tenth. Decoding is still done by the processor, so a full
+  screen share at 1080p is not free yet.
 - Linux: Gear Lever finds new versions of the AppImage on its own. The
   app's own "Restart to Update" works as before, and the two get along.
 
