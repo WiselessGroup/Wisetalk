@@ -1,18 +1,85 @@
 name: Set up
-description: Flutter at the fixed version, Rust from rust/rust-toolchain.toml, and caches of what cargo downloads and builds.
+description: >
+  Flutter at the fixed version, Rust from rust/rust-toolchain.toml with only the
+  targets one build needs, and the cache of what cargo downloads and builds.
 inputs:
   flutter-version:
+    required: true
+  platform:
+    description: >
+      The build this is for: check, linux, windows, macos or android. Picks the
+      Rust targets and names the cache, so a package job on a tag restores what
+      the warm job of the same platform saved on master.
     required: true
   linux-desktop:
     description: Install what building for the Linux desktop needs.
     default: 'false'
-  flutter-cache-key:
-    description: Flutter's cache, when a job needs its own.
-    default: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+  warm:
+    description: >
+      'true' only fills the cache: when master already holds it for this key,
+      the rest of the set up is skipped and the warm-hit output is 'true'.
+    default: 'false'
+outputs:
+  warm-hit:
+    description: The cache is already there, nothing to build.
+    value: ${{ steps.lookup.outputs.cache-hit == 'true' }}
 runs:
   using: composite
   steps:
-    - if: inputs.linux-desktop == 'true'
+    # The key covers what cargo's output depends on beyond the sources: a new
+    # lock file, profile, toolchain, Flutter, runner image or NDK starts a new
+    # cache. Sources aren't in it: cargo rebuilds the bridge after every
+    # checkout anyway, and reuses the dependencies.
+    - id: rust
+      shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        FLUTTER: ${{ inputs.flutter-version }}
+        RUST_HASH: ${{ hashFiles('rust/Cargo.lock', 'rust/Cargo.toml', 'rust/rust-toolchain.toml') }}
+        GRADLE_HASH: ${{ inputs.platform == 'android' && hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') || '' }}
+      run: |
+        # Flutter builds macOS release apps for both architectures, and the
+        # APK for arm, arm64 and x86_64.
+        case $PLATFORM in
+          check | linux) targets=x86_64-unknown-linux-gnu ;;
+          windows) targets=x86_64-pc-windows-msvc ;;
+          macos) targets='aarch64-apple-darwin x86_64-apple-darwin' ;;
+          android) targets='aarch64-linux-android armv7-linux-androideabi x86_64-linux-android' ;;
+          *) echo "::error::unknown platform '$PLATFORM'"; exit 1 ;;
+        esac
+        salt=
+        [[ $PLATFORM != android ]] || salt=-ndk$ANDROID_NDK-${GRADLE_HASH:0:16}
+        channel=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' rust/rust-toolchain.toml)
+        [[ -n $channel ]] || { echo "::error::no channel in rust/rust-toolchain.toml"; exit 1; }
+        prefix=rust-$PLATFORM-${ImageOS:-$RUNNER_OS}-$RUNNER_ARCH-
+        {
+          echo "channel=$channel"
+          echo "targets=$targets"
+          echo "prefix=$prefix"
+          echo "key=$prefix$FLUTTER$salt-${RUST_HASH:0:32}"
+          # Cargo's target directories: rust/target for the checks, the build
+          # hook's under .dart_tool, and on Windows the hook's short path in
+          # %TEMP% (flutter_rust_bridge_hooks moves it there). Not the hook
+          # runner's own records next to them: it decides whether to rerun by
+          # the sources alone, and would keep a library built against an older
+          # Cargo.lock. Without them it always asks cargo, which knows.
+          echo 'paths<<EOF'
+          echo '~/.cargo/registry/index'
+          echo '~/.cargo/registry/cache'
+          echo '~/.cargo/git/db'
+          echo 'rust/target'
+          echo '.dart_tool/hooks_runner/shared'
+          echo '~/AppData/Local/Temp/frb_native_assets_*'
+          echo 'EOF'
+        } >> "$GITHUB_OUTPUT"
+    - id: lookup
+      if: inputs.warm == 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.rust.outputs.paths }}
+        key: ${{ steps.rust.outputs.key }}
+        lookup-only: true
+    - if: inputs.linux-desktop == 'true' && steps.lookup.outputs.cache-hit != 'true'
       shell: bash
       run: |
         sudo apt-get update
@@ -22,26 +89,41 @@ runs:
           libstdc++-12-dev libsecret-1-dev libayatana-appindicator3-dev libpulse-dev libepoxy-dev \
           libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
           squashfs-tools zstd zsync
-    - uses: subosito/flutter-action@v2
+    - if: steps.lookup.outputs.cache-hit != 'true'
+      uses: subosito/flutter-action@v2
       with:
         flutter-version: ${{ inputs.flutter-version }}
         channel: stable
         cache: true
-        cache-key: ${{ inputs.flutter-cache-key }}
-    # Every target rust-toolchain.toml lists; Flutter's build hook runs cargo
-    # with this toolchain.
-    - shell: bash
-      working-directory: rust
-      run: rustup toolchain install
-    - uses: actions/cache@v5
+        # Android's own: the shared one is saved first by a job with no
+        # Android artifacts in it.
+        cache-key: ${{ inputs.platform == 'android' && 'flutter-android-:version:-:arch:-:hash:' || 'flutter-:os:-:channel:-:version:-:arch:-:hash:' }}
+    # The toolchain rust-toolchain.toml names, with this build's targets only
+    # and without the docs. Flutter's build hook runs cargo with it. Left
+    # alone, rustup would add every target the file lists the first time
+    # cargo runs in rust/, so it stops installing on its own.
+    - if: steps.lookup.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        CHANNEL: ${{ steps.rust.outputs.channel }}
+        TARGETS: ${{ steps.rust.outputs.targets }}
+      run: |
+        args=()
+        for target in $TARGETS; do args+=(--target "$target"); done
+        rustup toolchain install "$CHANNEL" --profile minimal --no-self-update "${args[@]}"
+        rustup set auto-install disable \
+          || echo "::warning::this rustup can't turn auto-install off; it will add the other targets"
+    # Saved on master (the checks and the warm jobs), restored everywhere. A
+    # tag can't use what another tag saved, so a tag only restores.
+    - if: steps.lookup.outputs.cache-hit != 'true' && !startsWith(github.ref, 'refs/tags/')
+      uses: actions/cache@v5
       with:
-        # .dart_tool holds the bridge the build hook compiled.
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          .dart_tool/hooks_runner
-          rust/target
-        key: rust-${{ github.job }}-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
-        restore-keys: |
-          rust-${{ github.job }}-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-          rust-${{ github.job }}-${{ runner.os }}-
+        path: ${{ steps.rust.outputs.paths }}
+        key: ${{ steps.rust.outputs.key }}
+        restore-keys: ${{ steps.rust.outputs.prefix }}
+    - if: steps.lookup.outputs.cache-hit != 'true' && startsWith(github.ref, 'refs/tags/')
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.rust.outputs.paths }}
+        key: ${{ steps.rust.outputs.key }}
+        restore-keys: ${{ steps.rust.outputs.prefix }}

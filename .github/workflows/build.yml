@@ -4,8 +4,9 @@
 # the macOS disk image, the Android APK and Velopack's update packages.
 name: Build
 
-# A push to master runs the checks only; the packages are built for a tag (and
-# released) or on demand from the Actions tab. Docs-only pushes skip CI.
+# A push to master runs the checks, and warms the caches a tag's package jobs
+# restore; the packages are built for a tag (and released) or on demand from
+# the Actions tab. Docs-only pushes skip CI.
 on:
   push:
     branches: [master]
@@ -40,15 +41,36 @@ jobs:
     # server must never build the app (ADR-0038). So does every job below.
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-22.04
+    # A quicker build of the same code for scripts/check.sh: no fat LTO for a
+    # library only the tests load, no incremental state or full debug info to
+    # build and cache. The package jobs keep rust/Cargo.toml's profile.
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_PROFILE_RELEASE_LTO: 'off'
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          platform: check
           linux-desktop: 'true'
       - run: rustup component add rustfmt clippy
         working-directory: rust
-      - run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      # The bindings generator, and cargo-expand, which it would otherwise
+      # install itself at whatever version is latest. Built once per version.
+      - id: tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/flutter_rust_bridge_codegen
+            ~/.cargo/bin/cargo-expand
+          key: cargo-tools-${{ runner.os }}-${{ runner.arch }}-frb2.13.0-expand1.0.127
+      - if: steps.tools.outputs.cache-hit != 'true'
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+          cargo install cargo-expand --version 1.0.127 --locked
       # The notification tests talk to a session bus.
       - run: dbus-run-session -- scripts/check.sh
 
@@ -62,6 +84,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          platform: linux
           linux-desktop: 'true'
       - uses: ./.github/actions/vpk
       - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
@@ -87,6 +110,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          platform: windows
       - uses: ./.github/actions/vpk
       - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
       - run: scripts/build-windows.sh "$VERSION"
@@ -101,15 +125,19 @@ jobs:
 
   macos:
     if: github.server_url == 'https://github.com' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
-    # Apple silicon runner: the .dmg is arm64 only.
-    runs-on: macos-latest
+    # Apple silicon runner: the .dmg is arm64 only. macOS 26 for Xcode 26,
+    # whose actool compiles the Icon Composer icon (macos/Runner/AppIcon.icon).
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          platform: macos
       - uses: ./.github/actions/vpk
       - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
+      # Which Xcode built it, in the log.
+      - run: xcodebuild -version
       - run: scripts/build-macos.sh "$VERSION"
       - uses: actions/upload-artifact@v7
         with:
@@ -138,9 +166,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          # Its own: the shared one is saved first by a job with no Android
-          # artifacts in it.
-          flutter-cache-key: 'flutter-android-:version:-:arch:-:hash:'
+          platform: android
       - run: echo "VERSION=$(scripts/version.sh)" >> "$GITHUB_ENV"
       - name: Build
         env:
@@ -153,6 +179,62 @@ jobs:
           name: android
           path: dist/Wisetalk-${{ env.VERSION }}.apk
           if-no-files-found: error
+
+  # Fills the caches the package jobs restore on a tag: a tag can restore
+  # what master saved, but not what an earlier tag did, so without this every
+  # release built Rust from nothing. Takes seconds unless the Rust
+  # dependencies, the toolchain, Flutter, the runner image, the NDK or the
+  # Gradle files changed; then it builds once the way the tag will, signed
+  # with the debug key and thrown away. Nothing waits for it, but a tag pushed
+  # before it finishes builds cold.
+  warm:
+    name: warm (${{ matrix.platform }})
+    if: github.server_url == 'https://github.com' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    strategy:
+      fail-fast: false
+      matrix:
+        # The same runners as the package jobs: the cache is per image.
+        include:
+          - platform: linux
+            runner: ubuntu-22.04
+            target: linux
+          - platform: windows
+            runner: windows-latest
+            target: windows
+          - platform: macos
+            runner: macos-26
+            target: macos
+          - platform: android
+            runner: ubuntu-24.04
+            target: apk
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - id: setup
+        uses: ./.github/actions/setup
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          platform: ${{ matrix.platform }}
+          linux-desktop: ${{ matrix.platform == 'linux' }}
+          warm: 'true'
+      - if: steps.setup.outputs.warm-hit != 'true' && matrix.platform == 'android'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - if: steps.setup.outputs.warm-hit != 'true' && matrix.platform == 'android'
+        run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-$ANDROID_PLATFORM" "platforms;android-35"
+          "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK" > /dev/null
+      - if: steps.setup.outputs.warm-hit != 'true'
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter build ${{ matrix.target }} --release
 
   release:
     if: github.server_url == 'https://github.com' && startsWith(github.ref, 'refs/tags/v')

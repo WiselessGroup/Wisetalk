@@ -13,6 +13,15 @@ anything.
    (`1.0.0-rc.1`) is a prerelease: installed apps and the Download button stay
    on the latest full release, so use one to try the pipeline out.
 
+A tag builds faster when master's `warm` jobs have finished first: a tag can
+only restore caches that master saved. They take seconds, unless the Rust
+dependencies (`rust/Cargo.lock`, `rust/Cargo.toml`, `rust/rust-toolchain.toml`),
+Flutter, the NDK, the Gradle files or a runner image changed; then each builds
+its platform once, about as long as the tag's job. So after such a change, push
+the commit, wait for the `warm` jobs, then push the tag. A tag pushed earlier
+still builds, only from nothing. GitHub drops a cache nobody used for a week,
+and the `warm` jobs fill it again on the next push.
+
 Before a release, `scripts/measure.sh [seconds] [pid]` prints the CPU, wakeups
 and memory of a running release build. Take the window idle, minimized, in a
 call and with video, and compare with the release before: the app is supposed
