@@ -98,7 +98,7 @@ rust/               wisetalk_bridge: ключи устройств, шифров
 hook/build.dart     собирает rust/ во время flutter build и кладёт библиотеку
 android/ linux/
 macos/ windows/     раннеры платформ
-packaging/linux/    ярлык, metainfo и AppRun для AppImage
+packaging/linux/    ярлык, metainfo, AppRun и иконка для AppImage
 scripts/            проверки, замеры, сборка пакетов
 ```
 

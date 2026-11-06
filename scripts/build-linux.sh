@@ -31,7 +31,8 @@ flutter build linux --release --build-name="$base" \
 app=build/Wisetalk.AppDir
 rm -rf "$app"
 mkdir -p "$app/usr/bin" "$app/usr/share/metainfo" \
-  "$app/usr/share/icons/hicolor/512x512/apps"
+  "$app/usr/share/icons/hicolor/512x512/apps" \
+  "$app/usr/share/icons/hicolor/scalable/apps"
 cp -a build/linux/x64/release/bundle/. "$app/usr/bin/"
 cp packaging/linux/AppRun "$app/AppRun"
 sed "s/@VERSION@/$version/" packaging/linux/net.wiseless.wisetalk.desktop \
@@ -39,10 +40,15 @@ sed "s/@VERSION@/$version/" packaging/linux/net.wiseless.wisetalk.desktop \
 sed "s/@VERSION@/$version/; s/@DATE@/$(date -u +%F)/" \
   packaging/linux/net.wiseless.wisetalk.metainfo.xml \
   > "$app/usr/share/metainfo/net.wiseless.wisetalk.metainfo.xml"
+# The desktop entry names its icon, so an icon theme can draw its own in its
+# place; without one it's ours, a squircle on macOS's grid
+# (scripts/app-icons.py makes both files).
 for icon in net.wiseless.wisetalk.png .DirIcon \
   usr/share/icons/hicolor/512x512/apps/net.wiseless.wisetalk.png; do
   cp packaging/linux/wisetalk.png "$app/$icon"
 done
+cp packaging/linux/wisetalk.svg \
+  "$app/usr/share/icons/hicolor/scalable/apps/net.wiseless.wisetalk.svg"
 
 scripts/set-update-info.sh "$update_info"
 vpk download github --repoUrl "$repo" --channel linux -o dist ${GH_TOKEN:+--token "$GH_TOKEN"} \

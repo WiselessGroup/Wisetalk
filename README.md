@@ -98,7 +98,7 @@ rust/               wisetalk_bridge: device keys, call and chat encryption,
 hook/build.dart     compiles rust/ during flutter build and bundles the library
 android/ linux/
 macos/ windows/     platform runners
-packaging/linux/    the AppImage's desktop entry, metainfo and AppRun
+packaging/linux/    the AppImage's desktop entry, metainfo, AppRun and icon
 scripts/            checks, measuring, the package builds
 ```
 
