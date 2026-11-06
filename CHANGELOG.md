@@ -6,8 +6,9 @@ GitHub.
 ## 0.7.0
 
 - Releases now come from [GitHub](https://github.com/WiselessGroup/Wisetalk/releases),
-  all platforms at once. Installed apps move there by themselves with this
-  update; there is nothing to do.
+  all platforms at once, and the app updates itself from there. Versions
+  before 0.7.0 looked elsewhere and don't see it: install 0.7.0 once from
+  the release page, and updates come by themselves after that.
 - Windows: updates can now be downloaded. Earlier releases announced a new
   version without publishing its update package, so the app could never
   fetch it.
