@@ -4,7 +4,10 @@
 - Android: an adaptive icon, the owl inside the 66 dp circle every launcher
   mask keeps, over a flat background colour that turns dark in the dark
   theme, and a one-colour owl for Android 13's themed icons;
-- macOS: a rounded square on Apple's 1024 px grid, in the asset catalog;
+- macOS: an Icon Composer AppIcon.icon for macOS 26, the owl over a fill
+  that is light or dark with the system, and for older systems, which have
+  one icon, the light tile in the asset catalog plus the dark one the app
+  puts in the Dock itself while it runs (both drawn like Linux's);
 - Windows: the same square as an .ico for the program and its installer;
 - Linux: docs/logo.svg on a squircle with macOS's grid and shadow, as an SVG
   for icon themes and a PNG drawn from it (needs PyGObject and librsvg).
@@ -14,6 +17,7 @@ Run it again after the logo changes:
     python3 scripts/app-icons.py
 """
 
+import json
 import math
 import re
 from pathlib import Path
@@ -23,7 +27,10 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parent.parent
 LOGO = ROOT / "assets" / "logo.png"
 RES = ROOT / "android" / "app" / "src" / "main" / "res"
-MAC_ICONS = ROOT / "macos" / "Runner" / "Assets.xcassets" / "AppIcon.appiconset"
+MAC_ASSETS = ROOT / "macos" / "Runner" / "Assets.xcassets"
+MAC_ICONS = MAC_ASSETS / "AppIcon.appiconset"
+MAC_DARK_ICON = MAC_ASSETS / "AppIconDark.imageset"
+MAC_ICON_COMPOSER = ROOT / "macos" / "Runner" / "AppIcon.icon"
 WINDOWS_ICON = ROOT / "windows" / "runner" / "resources" / "app_icon.ico"
 LINUX = ROOT / "packaging" / "linux"
 # Catppuccin Latte's base: the dark owl needs a light ground.
@@ -32,10 +39,15 @@ BACKGROUND = "#EFF1F5"
 # still shows.
 BACKGROUND_DARK = "#11111B"
 # The squircle's fill from top to bottom, and its hairline edge, per theme.
+# The dark one runs from Mocha's mantle to its crust: the owl's navy body is
+# lighter than both (about 1.4:1), so its silhouette holds, where Mocha's
+# base at the top would swallow the head.
 TILES = {
     "light": ("#FAFBFC", BACKGROUND, "#1B1E36", 0.08),
-    "dark": ("#1E1E2E", BACKGROUND_DARK, "#CDD6F4", 0.10),
+    "dark": ("#181825", BACKGROUND_DARK, "#CDD6F4", 0.10),
 }
+# How much of the squircle the owl's longer side takes.
+OWL_ON_TILE = 0.66
 # The owl's bounds in docs/logo.svg's 1254 px box, headphones and tufts
 # included.
 OWL_BOUNDS = (189, 206, 1065, 1086)
@@ -78,11 +90,70 @@ def tile(size: int, body: float, radius: float, share: float) -> Image.Image:
 
 
 def macos() -> None:
-    # Apple's grid: an 824 px square with 185 px corners on a 1024 px canvas.
-    # The asset catalog's Contents.json already lists these files.
-    big = tile(1024, 824 / 1024, 185 / 824, 0.66)
+    # The classic icon, for macOS before 26 when an Xcode before 26 builds
+    # the app; Xcode 26 makes these bitmaps from AppIcon.icon instead. The
+    # asset catalog's Contents.json already lists the files.
     for pixels in (16, 32, 64, 128, 256, 512, 1024):
-        big.resize((pixels, pixels), Image.LANCZOS).save(MAC_ICONS / f"app_icon_{pixels}.png")
+        render(tile_svg("light"), pixels).save(MAC_ICONS / f"app_icon_{pixels}.png")
+
+    # macOS before 26 knows one icon per app, so in the dark theme the app
+    # shows this one in the Dock itself while it runs
+    # (macos/Runner/AppDelegate.swift).
+    MAC_DARK_ICON.mkdir(exist_ok=True)
+    images = []
+    for pixels, scale in ((512, "1x"), (1024, "2x")):
+        name = f"app_icon_dark_{pixels}.png"
+        render(tile_svg("dark"), pixels).save(MAC_DARK_ICON / name)
+        images.append({"filename": name, "idiom": "mac", "scale": scale})
+    contents = {"images": images, "info": {"author": "xcode", "version": 1}}
+    (MAC_DARK_ICON / "Contents.json").write_text(json.dumps(contents, indent=2) + "\n")
+
+    icon_composer()
+
+
+def icon_colour(hex_colour: str) -> str:
+    """#RRGGBB the way Icon Composer writes colours."""
+    r, g, b = (int(hex_colour[i : i + 2], 16) / 255 for i in (1, 3, 5))
+    return f"srgb:{r:.5f},{g:.5f},{b:.5f},1.00000"
+
+
+def icon_composer() -> None:
+    """macOS 26's icon, a folder Icon Composer opens and Xcode 26 compiles:
+    the owl as one layer on a 1024 pt canvas, over the tile's gradient for
+    each appearance. The system cuts the squircle and draws its edge, glass
+    and shadow. The owl's layer isn't glass, so it looks as everywhere else.
+    Xcode also renders the light one into the bitmaps older macOS shows."""
+    assets = MAC_ICON_COMPOSER / "Assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    owl_svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"'
+        ' viewBox="0 0 1024 1024">'
+        f"{placed(logo_inner(), 1024, 1024 * OWL_ON_TILE)}</svg>"
+    )
+    render(owl_svg, 1024).save(assets / "owl.png")
+
+    def gradient(theme: str) -> dict:
+        top, bottom, _, _ = TILES[theme]
+        return {
+            "linear-gradient": [icon_colour(top), icon_colour(bottom)],
+            "orientation": {"start": {"x": 0.5, "y": 0}, "stop": {"x": 0.5, "y": 1}},
+        }
+
+    manifest = {
+        "fill-specializations": [
+            {"value": gradient("light")},
+            {"appearance": "dark", "value": gradient("dark")},
+        ],
+        "groups": [
+            {
+                "layers": [{"glass": False, "image-name": "owl.png", "name": "owl"}],
+                "shadow": {"kind": "neutral", "opacity": 0.5},
+                "translucency": {"enabled": False, "value": 0.5},
+            }
+        ],
+        "supported-platforms": {"squares": ["macOS"]},
+    }
+    (MAC_ICON_COMPOSER / "icon.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 def windows() -> None:
@@ -190,8 +261,8 @@ def placed(inner: str, canvas: float, side: float) -> str:
 def tile_svg(theme: str = "light") -> str:
     """The owl on Apple's grid as an SVG: a 1024 canvas, an 824 squircle
     100 px in with corners of about 185, and the soft shadow under it. The
-    owl takes the same share of the square as on macOS. [theme] is "light"
-    or "dark"; the owl stays the same on both."""
+    owl takes the same share of the square as in AppIcon.icon. [theme] is
+    "light" or "dark"; the owl stays the same on both."""
     top, bottom, edge, edge_opacity = TILES[theme]
     shape = squircle(100, 100, 824, 185, 0.6)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024" width="1024" height="1024">
@@ -210,7 +281,7 @@ def tile_svg(theme: str = "light") -> str:
   {shape} fill="#000" filter="url(#shadow)"/>
   {shape} fill="url(#ground)"/>
   {shape} fill="none" stroke="{edge}" stroke-opacity="{edge_opacity}" stroke-width="2"/>
-  {placed(logo_inner(), 1024, 824 * 0.66)}
+  {placed(logo_inner(), 1024, 824 * OWL_ON_TILE)}
 </svg>
 """
 
@@ -263,7 +334,7 @@ def render(svg: str, size: int, share: float = 1.0) -> Image.Image:
 
 def linux() -> None:
     # Linux has no light and dark app icons, only whole icon themes, so the
-    # AppImage carries the light tile; the dark one is for macOS (WLK-59).
+    # AppImage carries the light tile; the dark one is for macOS.
     svg = tile_svg("light")
     (LINUX / "wisetalk.svg").write_text(svg)
     # The same drawing as a PNG, for .DirIcon and whatever can't read SVG.
