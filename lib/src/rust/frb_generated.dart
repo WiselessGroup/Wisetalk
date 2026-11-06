@@ -9,6 +9,7 @@ import 'api/chat.dart';
 import 'api/device.dart';
 import 'api/hotkeys.dart';
 import 'api/picture.dart';
+import 'api/screen_sound.dart';
 import 'api/sound.dart';
 import 'api/text.dart';
 import 'api/trust.dart';
@@ -76,7 +77,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 2080689881;
+  int get rustContentHash => -1551698852;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -229,6 +230,12 @@ abstract class RustLibApi extends BaseApi {
   int crateApiTextProtocolVersion();
 
   Future<void> crateApiUpdateRestartToUpdate();
+
+  Future<bool> crateApiScreenSoundScreenSoundAttached({required int timeoutMs});
+
+  Future<bool> crateApiScreenSoundScreenSoundStart();
+
+  Future<void> crateApiScreenSoundScreenSoundStop();
 
   Future<List<String>> crateApiHotkeysSetGlobalHotkeys({
     required List<GlobalHotkey> hotkeys,
@@ -1421,6 +1428,93 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "restart_to_update", argNames: []);
 
   @override
+  Future<bool> crateApiScreenSoundScreenSoundAttached({
+    required int timeoutMs,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(timeoutMs, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 40,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiScreenSoundScreenSoundAttachedConstMeta,
+        argValues: [timeoutMs],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiScreenSoundScreenSoundAttachedConstMeta =>
+      const TaskConstMeta(
+        debugName: "screen_sound_attached",
+        argNames: ["timeoutMs"],
+      );
+
+  @override
+  Future<bool> crateApiScreenSoundScreenSoundStart() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 41,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiScreenSoundScreenSoundStartConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiScreenSoundScreenSoundStartConstMeta =>
+      const TaskConstMeta(debugName: "screen_sound_start", argNames: []);
+
+  @override
+  Future<void> crateApiScreenSoundScreenSoundStop() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 42,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiScreenSoundScreenSoundStopConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiScreenSoundScreenSoundStopConstMeta =>
+      const TaskConstMeta(debugName: "screen_sound_stop", argNames: []);
+
+  @override
   Future<List<String>> crateApiHotkeysSetGlobalHotkeys({
     required List<GlobalHotkey> hotkeys,
   }) {
@@ -1432,7 +1526,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1467,7 +1561,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1493,7 +1587,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1521,7 +1615,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 43,
+              funcId: 46,
               port: port_,
             );
           },

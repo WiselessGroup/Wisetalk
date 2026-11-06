@@ -4,6 +4,7 @@ pub mod chat;
 pub mod device;
 pub mod hotkeys;
 pub mod picture;
+pub mod screen_sound;
 pub mod sound;
 pub mod text;
 pub mod trust;

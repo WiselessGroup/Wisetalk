@@ -24,6 +24,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 
 import '../l10n/app_localizations.dart';
 import '../src/rust/api/call.dart';
+import '../src/rust/api/screen_sound.dart';
 import 'call_service.dart';
 import 'gateway.dart';
 import 'input_filters.dart';
@@ -123,9 +124,11 @@ enum ScreenQuality {
 /// just the shared window's app, or for a whole screen everything but
 /// Wisetalk, so the call's voices stay out. On Android ScreenSound.kt
 /// records everything the phone plays but Wisetalk. On Linux libwebrtc
-/// would record the speakers, the call included (everyone would hear
-/// themselves); on macOS it records nothing (WLK-3).
-bool get screenSoundAvailable => Platform.isWindows || Platform.isAndroid;
+/// records the speakers, the call included, so the Rust side mixes every
+/// other app's sound and hands the plugin that instead (screen_sound.rs);
+/// on macOS it records nothing (WLK-3).
+bool get screenSoundAvailable =>
+    Platform.isWindows || Platform.isAndroid || Platform.isLinux;
 
 /// Screen sound is music and films more than speech: no pauses in the quiet
 /// parts (DTX), a music bitrate. Mono: LiveKit's Flutter SDK publishes no
@@ -673,7 +676,11 @@ class Voice extends ChangeNotifier {
       params: quality.parameters,
     );
     try {
-      if (sound && Platform.isWindows) {
+      // On Linux without PulseAudio or PipeWire to mix with, the picture
+      // alone: the plugin would record the call too.
+      if (sound &&
+          (Platform.isWindows ||
+              (Platform.isLinux && await screenSoundStart()))) {
         await _shareWithSound(local, options);
       } else {
         await local.setScreenShareEnabled(
@@ -703,13 +710,24 @@ class Voice extends ChangeNotifier {
       options,
     );
     final video = tracks.whereType<lk.LocalVideoTrack>().first;
-    final audio = tracks.whereType<lk.LocalAudioTrack>().firstOrNull;
+    var audio = tracks.whereType<lk.LocalAudioTrack>().firstOrNull;
+    // Linux: the plugin's recording starts on the speakers and is moved
+    // onto the mix right away; if it isn't, it stays home.
+    if (Platform.isLinux &&
+        audio != null &&
+        !await screenSoundAttached(timeoutMs: 2000)) {
+      debugPrint('sharing without sound: the call would be in it');
+      await audio.stop();
+      audio = null;
+    }
+    if (audio == null) _stopDesktopSound();
     try {
       await local.publishVideoTrack(video);
     } catch (_) {
       for (final track in tracks) {
         await track.stop();
       }
+      _stopDesktopSound();
       rethrow;
     }
     if (audio == null) return;
@@ -732,6 +750,12 @@ class Voice extends ChangeNotifier {
     await _phoneSoundFollows();
   }
 
+  /// Linux: the mix of other apps' sound goes once nothing records it.
+  /// It also ends by itself when the plugin stops recording.
+  void _stopDesktopSound() {
+    if (Platform.isLinux) unawaited(screenSoundStop());
+  }
+
   Future<void> stopScreen() async {
     final local = _room?.localParticipant;
     if (local == null) return;
@@ -742,6 +766,7 @@ class Voice extends ChangeNotifier {
     } catch (e) {
       debugPrint('cannot stop screen share: $e');
     }
+    _stopDesktopSound();
     screen = _room?.localParticipant?.isScreenShareEnabled() ?? false;
     unawaited(_syncService());
     notifyListeners();
@@ -775,6 +800,7 @@ class Voice extends ChangeNotifier {
       _phoneSoundOn = false;
       unawaited(_phoneSound.stop());
     }
+    _stopDesktopSound();
     _awayPeople.clear();
     _roomEvents?.dispose();
     _roomEvents = null;
@@ -1059,7 +1085,8 @@ class Voice extends ChangeNotifier {
             unawaited(
               _phoneSoundOn
                   ? _stopPhoneSound()
-                  : _unpublish(lk.TrackSource.screenShareAudio),
+                  : _unpublish(lk.TrackSource.screenShareAudio)
+                        .then((_) => _stopDesktopSound()),
             );
             unawaited(_syncService());
           }
