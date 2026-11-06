@@ -3,6 +3,21 @@
 The native app. Each release section becomes the notes of its release on
 GitHub.
 
+## 0.8.0
+
+- Linux: a screen share can carry its sound again, without the call in
+  it. Wisetalk mixes what every other app plays and shares that, so the
+  people watching no longer hear themselves. Works with PipeWire and
+  PulseAudio; what you hear yourself doesn't change.
+- macOS: the icon follows the theme, a dark tile in dark mode and a light
+  one in light mode. On macOS 26 everywhere; on earlier versions in the
+  Dock while Wisetalk runs.
+- Icons follow the system on other platforms too: a macOS-style tile on
+  Linux that icon themes can replace, and on Android a dark background in
+  the dark theme and a one-colour owl for themed icons.
+- Builds of the app take less time on GitHub, so releases come out
+  sooner.
+
 ## 0.7.0
 
 - Releases now come from [GitHub](https://github.com/WiselessGroup/Wisetalk/releases),
