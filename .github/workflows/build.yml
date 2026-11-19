@@ -59,9 +59,12 @@ jobs:
       - run: rustup component add rustfmt clippy
         working-directory: rust
       # The bindings generator, and cargo-expand, which it would otherwise
-      # install itself at whatever version is latest. Built once per version.
+      # install itself at whatever version is latest. Built once per version
+      # and saved on master only, like the Rust cache: a tag pushed with its
+      # commit saved them in the tag's own scope first, master couldn't save
+      # the same key, and the next tag built them again (v0.8.0, WLK-53).
       - id: tools
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/bin/flutter_rust_bridge_codegen
@@ -71,6 +74,13 @@ jobs:
         run: |
           cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
           cargo install cargo-expand --version 1.0.127 --locked
+      - if: steps.tools.outputs.cache-hit != 'true' && !startsWith(github.ref, 'refs/tags/')
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/bin/flutter_rust_bridge_codegen
+            ~/.cargo/bin/cargo-expand
+          key: ${{ steps.tools.outputs.cache-primary-key }}
       # The notification tests talk to a session bus.
       - run: dbus-run-session -- scripts/check.sh
 
