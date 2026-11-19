@@ -1088,6 +1088,12 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get videoFullScreen => '全画面表示';
+
+  @override
+  String get videoExitFullScreen => '全画面表示を終了';
+
+  @override
   String get connectionExcellent => '非常に良好';
 
   @override

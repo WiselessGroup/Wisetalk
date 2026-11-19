@@ -1,11 +1,16 @@
 package net.wiseless.wisetalk
 
+import android.app.PictureInPictureParams
 import android.content.Context
+import android.content.res.Configuration
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
+import android.os.Build
+import android.util.Log
+import android.util.Rational
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -19,6 +24,14 @@ class MainActivity : FlutterActivity() {
     // the window; without it they end with it, as before.
     override fun shouldDestroyEngineWithHost(): Boolean = !StayConnectedService.running
 
+    /**
+     * Someone shares a screen in the call: leaving Wisetalk shrinks it to a
+     * small window over the other apps, with the share alone in it
+     * (lib/data/picture_in_picture.dart, WLK-63).
+     */
+    private var pipWanted = false
+    private var pipChannel: MethodChannel? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // lib/data/call_service.dart
@@ -29,7 +42,7 @@ class MainActivity : FlutterActivity() {
                         val title = call.argument<String>("title")
                         if (title == null) {
                             CallService.stop(this)
-                            result.success(false)
+                            result.success(0)
                         } else {
                             val sharing = call.argument<Boolean>("sharing") ?: false
                             // In the app's language, which may not be the system's.
@@ -41,6 +54,24 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     else -> result.notImplemented()
+                }
+            }
+        // lib/data/picture_in_picture.dart
+        pipChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "net.wiseless.wisetalk/pip")
+            .also {
+                it.setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "want" -> {
+                            pipWanted = call.argument<Boolean>("on") ?: false
+                            try {
+                                setPictureInPictureParams(pipParams())
+                            } catch (e: Exception) {
+                                Log.w("PictureInPicture", "cannot set it up: $e")
+                            }
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
                 }
             }
         // lib/data/input_filters.dart: WebRTC uses the phone's own echo
@@ -124,6 +155,30 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             android.util.Log.w("Sounds", "a sound cue did not play: $e")
         }
+    }
+
+    private fun pipParams(): PictureInPictureParams {
+        val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
+        // Android 12 and later go into it by themselves, smoothly.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) params.setAutoEnterEnabled(pipWanted)
+        return params.build()
+    }
+
+    // Android 11 has no going in by itself: going home is the cue.
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (pipWanted && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            try {
+                enterPictureInPictureMode(pipParams())
+            } catch (e: Exception) {
+                Log.w("PictureInPicture", "cannot go into it: $e")
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(inPip: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(inPip, newConfig)
+        pipChannel?.invokeMethod("changed", inPip)
     }
 
     override fun onDestroy() {

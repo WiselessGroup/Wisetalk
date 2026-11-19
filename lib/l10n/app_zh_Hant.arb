@@ -311,6 +311,8 @@
   "callWaitingForKey": "正在等待通話金鑰…",
   "callEncrypted": "端對端加密",
   "videoScreen": "{name} · 螢幕",
+  "videoFullScreen": "全螢幕",
+  "videoExitFullScreen": "結束全螢幕",
   "connectionExcellent": "極佳",
   "connectionGood": "良好",
   "connectionPoor": "不佳",

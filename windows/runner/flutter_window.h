@@ -2,7 +2,9 @@
 #define RUNNER_FLUTTER_WINDOW_H_
 
 #include <flutter/dart_project.h>
+#include <flutter/encodable_value.h>
 #include <flutter/flutter_view_controller.h>
+#include <flutter/method_channel.h>
 
 #include <memory>
 
@@ -28,6 +30,20 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // net.wiseless.wisetalk/window: "fullScreen" on or off for a video
+  // (lib/data/app_window.dart, WLK-63).
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      window_channel_;
+
+  // Covers the whole monitor without a frame, or puts the window back as
+  // it was.
+  void SetFullScreen(bool on);
+
+  // How the window was before going full screen.
+  bool full_screen_ = false;
+  LONG_PTR saved_style_ = 0;
+  WINDOWPLACEMENT saved_placement_{sizeof(WINDOWPLACEMENT)};
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

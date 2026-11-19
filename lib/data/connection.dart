@@ -10,6 +10,7 @@ import 'chat.dart';
 import 'device.dart';
 import 'gateway.dart';
 import 'global_shortcuts.dart';
+import 'picture_in_picture.dart';
 import 'preferences.dart';
 import 'servers.dart';
 import 'session.dart';
@@ -17,11 +18,12 @@ import 'trust.dart';
 import 'voice.dart';
 
 class Connection {
-  const Connection(this.gateway, this.voice, this.chats);
+  const Connection(this.gateway, this.voice, this.chats, this.pip);
 
   final Gateway gateway;
   final Voice voice;
   final Chats chats;
+  final PictureInPicture pip;
 }
 
 final connectionProvider = FutureProvider<Connection?>((ref) async {
@@ -41,7 +43,9 @@ final connectionProvider = FutureProvider<Connection?>((ref) async {
   final voice = Voice(gateway, ref.read(preferencesProvider), trust: trust);
   final shortcuts = GlobalShortcuts(voice, ref.read(preferencesProvider));
   final chats = Chats(gateway, device, account: session.me.id, trust: trust);
+  final pip = PictureInPicture(voice);
   ref.onDispose(() {
+    pip.dispose();
     chats.dispose();
     shortcuts.dispose();
     voice.dispose();
@@ -49,5 +53,5 @@ final connectionProvider = FutureProvider<Connection?>((ref) async {
     gateway.dispose();
   });
   unawaited(gateway.connect());
-  return Connection(gateway, voice, chats);
+  return Connection(gateway, voice, chats, pip);
 });

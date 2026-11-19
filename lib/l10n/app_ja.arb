@@ -311,6 +311,8 @@
   "callWaitingForKey": "通話の鍵を待っています…",
   "callEncrypted": "エンドツーエンド暗号化",
   "videoScreen": "{name} · 画面",
+  "videoFullScreen": "全画面表示",
+  "videoExitFullScreen": "全画面表示を終了",
   "connectionExcellent": "非常に良好",
   "connectionGood": "良好",
   "connectionPoor": "不安定",

@@ -311,6 +311,8 @@
   "callWaitingForKey": "Ждём ключ звонка…",
   "callEncrypted": "Сквозное шифрование",
   "videoScreen": "{name} · экран",
+  "videoFullScreen": "На весь экран",
+  "videoExitFullScreen": "Выйти из полноэкранного режима",
   "connectionExcellent": "отличное",
   "connectionGood": "хорошее",
   "connectionPoor": "плохое",

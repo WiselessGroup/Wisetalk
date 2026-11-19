@@ -311,6 +311,8 @@
   "callWaitingForKey": "Warte auf den Anrufschlüssel…",
   "callEncrypted": "Ende-zu-Ende-verschlüsselt",
   "videoScreen": "{name} · Bildschirm",
+  "videoFullScreen": "Vollbild",
+  "videoExitFullScreen": "Vollbild beenden",
   "connectionExcellent": "ausgezeichnet",
   "connectionGood": "gut",
   "connectionPoor": "schwach",

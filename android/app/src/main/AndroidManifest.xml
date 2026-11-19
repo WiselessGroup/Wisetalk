@@ -11,8 +11,12 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <!-- CallService: the microphone in the background, and screen capture. -->
+    <!-- CallService: the call in the background, the microphone in it, and
+         screen capture. A call service needs MANAGE_OWN_CALLS, which asks
+         nothing of the person. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
     <!-- Stay Connected: the gateway connection while Wisetalk is closed
@@ -40,6 +44,7 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
+            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize">
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
@@ -65,7 +70,7 @@
         <service
             android:name=".CallService"
             android:exported="false"
-            android:foregroundServiceType="microphone|mediaProjection"/>
+            android:foregroundServiceType="phoneCall|microphone|mediaProjection"/>
         <service
             android:name=".StayConnectedService"
             android:exported="false"

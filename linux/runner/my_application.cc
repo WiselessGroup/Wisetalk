@@ -41,18 +41,28 @@ static void present_window(GtkWindow* window, const gchar* token) {
   gtk_window_present(window);
 }
 
-// net.wiseless.wisetalk/window: "present" with a token or null.
+// net.wiseless.wisetalk/window: "present" with a token or null, and
+// "fullScreen" on or off for a video (lib/data/app_window.dart, WLK-63).
 static void window_method_cb(FlMethodChannel* channel, FlMethodCall* call,
                              gpointer user_data) {
   GtkWindow* window = GTK_WINDOW(user_data);
-  if (g_strcmp0(fl_method_call_get_name(call), "present") != 0) {
+  const gchar* method = fl_method_call_get_name(call);
+  FlValue* args = fl_method_call_get_args(call);
+  if (g_strcmp0(method, "present") == 0) {
+    present_window(window, fl_value_get_type(args) == FL_VALUE_TYPE_STRING
+                               ? fl_value_get_string(args)
+                               : nullptr);
+  } else if (g_strcmp0(method, "fullScreen") == 0) {
+    if (fl_value_get_type(args) == FL_VALUE_TYPE_BOOL &&
+        fl_value_get_bool(args)) {
+      gtk_window_fullscreen(window);
+    } else {
+      gtk_window_unfullscreen(window);
+    }
+  } else {
     fl_method_call_respond_not_implemented(call, nullptr);
     return;
   }
-  FlValue* args = fl_method_call_get_args(call);
-  present_window(window, fl_value_get_type(args) == FL_VALUE_TYPE_STRING
-                             ? fl_value_get_string(args)
-                             : nullptr);
   fl_method_call_respond_success(call, nullptr, nullptr);
 }
 

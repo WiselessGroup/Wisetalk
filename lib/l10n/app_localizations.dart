@@ -1977,6 +1977,18 @@ abstract class AppLocalizations {
   /// **'{name} · screen'**
   String videoScreen(String name);
 
+  /// Tooltip on a video's button that shows it over the whole screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Screen'**
+  String get videoFullScreen;
+
+  /// Tooltip on the button that leaves a full-screen video.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Full Screen'**
+  String get videoExitFullScreen;
+
   /// Connection quality, alone in the details and inside connectionStatus.
   ///
   /// In en, this message translates to:

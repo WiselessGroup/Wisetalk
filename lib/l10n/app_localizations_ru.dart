@@ -1128,6 +1128,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get videoFullScreen => 'На весь экран';
+
+  @override
+  String get videoExitFullScreen => 'Выйти из полноэкранного режима';
+
+  @override
   String get connectionExcellent => 'отличное';
 
   @override

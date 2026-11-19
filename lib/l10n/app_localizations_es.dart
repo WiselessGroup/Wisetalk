@@ -1136,6 +1136,12 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get videoFullScreen => 'Pantalla completa';
+
+  @override
+  String get videoExitFullScreen => 'Salir de pantalla completa';
+
+  @override
   String get connectionExcellent => 'excelente';
 
   @override

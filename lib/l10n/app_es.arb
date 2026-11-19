@@ -311,6 +311,8 @@
   "callWaitingForKey": "Esperando la clave de la llamada…",
   "callEncrypted": "Cifrado de extremo a extremo",
   "videoScreen": "{name} · pantalla",
+  "videoFullScreen": "Pantalla completa",
+  "videoExitFullScreen": "Salir de pantalla completa",
   "connectionExcellent": "excelente",
   "connectionGood": "buena",
   "connectionPoor": "débil",

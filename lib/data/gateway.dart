@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../src/rust/api/text.dart';
@@ -70,6 +71,13 @@ class Gateway extends ChangeNotifier {
   /// The phone has no network (Stay Connected says so): nothing to retry.
   bool _networkGone = false;
 
+  /// Network changes as the system reports them: a VPN going up or down,
+  /// Wi-Fi to cable (WLK-62).
+  StreamSubscription<List<ConnectivityResult>>? _connectivity;
+
+  /// Ends a quick check of the connection after a network change.
+  Timer? _probing;
+
   /// The server is older than background mode (before 1.9) and can't read
   /// `set_background`: the connection stays as it is.
   bool _backgroundUnsupported = false;
@@ -88,6 +96,7 @@ class Gateway extends ChangeNotifier {
   void setBackground(bool on) {
     if (_background == on) return;
     _background = on;
+    _socket?.pingInterval = _pingInterval;
     if (_backgroundUnsupported || _socket == null) return;
     _sentBackground = true;
     send('set_background', {'background': on});
@@ -118,7 +127,54 @@ class Gateway extends ChangeNotifier {
       // the foreground: a call rides on this connection, and a working
       // one is better left alone.
       unawaited(socket.close());
+    } else {
+      _probe();
     }
+  }
+
+  /// How often a connection in the foreground pings the server. A route
+  /// that died quietly (a VPN switched on or off) delivers neither the
+  /// server's pings nor its close, and nothing we send fails for minutes:
+  /// without a pong in this time dart:io closes the socket, and [_dropped]
+  /// reconnects. In the background the server's own pings and Stay
+  /// Connected's network watch do (ADR-0035), and the phone sleeps.
+  static const _pingEvery = Duration(seconds: 20);
+
+  Duration? get _pingInterval => _background ? null : _pingEvery;
+
+  /// The network changed under a connection that looks fine: ping it now
+  /// rather than wait out the interval. A connection that answers stays,
+  /// and a call on it goes on.
+  void _probe() {
+    final socket = _socket;
+    if (socket == null || _background) return;
+    socket.pingInterval = const Duration(seconds: 3);
+    _probing?.cancel();
+    _probing = Timer(const Duration(seconds: 8), () {
+      if (identical(_socket, socket)) socket.pingInterval = _pingInterval;
+    });
+  }
+
+  /// The system's word that the network changed, on every platform. Stay
+  /// Connected on Android tells [networkChanged] the same in the background.
+  void _watchNetwork() {
+    _connectivity ??= Connectivity().onConnectivityChanged.listen(
+      (results) {
+        if (_closed || _background) return;
+        if (results.contains(ConnectivityResult.none)) return;
+        if (_socket != null) {
+          _probe();
+        } else if (_reconnect != null) {
+          // Waiting out the backoff: the new network may well work now.
+          _reconnect!.cancel();
+          _reconnect = null;
+          _retry = 0;
+          unawaited(connect());
+        }
+      },
+      // No NetworkManager on this Linux, say: the pings still work.
+      onError: (_) {},
+    );
   }
 
   /// Every event, after the channel list took it in.
@@ -147,6 +203,7 @@ class Gateway extends ChangeNotifier {
 
   Future<void> connect() async {
     _closed = false;
+    _watchNetwork();
     status = GatewayStatus.connecting;
     notifyListeners();
     final origin = session.server.origin;
@@ -165,6 +222,7 @@ class Gateway extends ChangeNotifier {
       }
       _socket = socket;
       _retry = 0;
+      socket.pingInterval = _pingInterval;
       // Before hello: then the ready that answers it is small.
       if (_background && !_backgroundUnsupported) {
         _sentBackground = true;
@@ -198,6 +256,8 @@ class Gateway extends ChangeNotifier {
     _disposed = true;
     _reconnect?.cancel();
     _awaitingReady?.cancel();
+    _probing?.cancel();
+    unawaited(_connectivity?.cancel());
     _socket?.close();
     _events.close();
     super.dispose();
@@ -214,6 +274,7 @@ class Gateway extends ChangeNotifier {
     _socket = null;
     sessionId = null;
     _awaitingReady?.cancel();
+    _probing?.cancel();
     if (_closed) return;
     status = GatewayStatus.offline;
     notifyListeners();

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/android_logs.dart';
+import 'data/connection.dart';
 import 'data/crash_reports.dart';
 import 'data/desktop_entry.dart';
 import 'data/input_filters.dart';
@@ -21,6 +22,7 @@ import 'router.dart';
 import 'src/rust/api/update.dart';
 import 'src/rust/frb_generated.dart';
 import 'theme.dart';
+import 'ui/call_stage.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,6 +70,15 @@ class WisetalkApp extends ConsumerWidget {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         localeListResolutionCallback: (wanted, _) => negotiateLocale(wanted),
         routerConfig: router,
+        // Android's small window over other apps shows a screen share alone.
+        builder: Platform.isAndroid
+            ? (context, child) => Consumer(
+                builder: (context, ref, _) => PictureInPictureFrame(
+                  pip: ref.watch(connectionProvider).value?.pip,
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              )
+            : null,
       ),
     );
   }

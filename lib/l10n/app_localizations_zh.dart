@@ -1119,6 +1119,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get videoFullScreen => 'Full Screen';
+
+  @override
+  String get videoExitFullScreen => 'Exit Full Screen';
+
+  @override
   String get connectionExcellent => 'Excellent';
 
   @override
@@ -2694,6 +2700,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String videoScreen(String name) {
     return '$name · 螢幕';
   }
+
+  @override
+  String get videoFullScreen => '全螢幕';
+
+  @override
+  String get videoExitFullScreen => '結束全螢幕';
 
   @override
   String get connectionExcellent => '極佳';

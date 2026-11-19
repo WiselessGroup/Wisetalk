@@ -1030,6 +1030,14 @@
       }
     }
   },
+  "videoFullScreen": "Full Screen",
+  "@videoFullScreen": {
+    "description": "Tooltip on a video's button that shows it over the whole screen."
+  },
+  "videoExitFullScreen": "Exit Full Screen",
+  "@videoExitFullScreen": {
+    "description": "Tooltip on the button that leaves a full-screen video."
+  },
   "connectionExcellent": "Excellent",
   "@connectionExcellent": {
     "description": "Connection quality, alone in the details and inside connectionStatus."

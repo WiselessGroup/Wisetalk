@@ -1,13 +1,17 @@
 // The middle of the window while in a channel: who's there, their cameras
 // and screens, and the call controls.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
+import '../data/app_window.dart';
 import '../data/gateway.dart';
+import '../data/picture_in_picture.dart';
 import '../data/protocol.dart';
 import '../data/voice.dart';
 import '../l10n/app_localizations.dart';
@@ -152,6 +156,8 @@ class _CallAreaState extends State<CallArea> {
                   onTap: (tile) => setState(
                     () => _focused = _focused == tile.id ? null : tile.id,
                   ),
+                  onFullScreen: (tile) =>
+                      FullScreenVideo.open(context, _voice, tile),
                 ),
         ),
         CallControls(gateway: widget.gateway, voice: _voice),
@@ -339,12 +345,14 @@ class _VideoGrid extends StatelessWidget {
     required this.voice,
     required this.focused,
     required this.onTap,
+    required this.onFullScreen,
   });
 
   final ChannelView view;
   final Voice voice;
   final String? focused;
   final void Function(VideoTile) onTap;
+  final void Function(VideoTile) onFullScreen;
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +399,7 @@ class _VideoGrid extends StatelessWidget {
                           : voice.qualities.of(tile.session),
                       focused: tile.id == focused,
                       onTap: () => onTap(tile),
+                      onFullScreen: () => onFullScreen(tile),
                     ),
                   ),
                 for (final p in cameraless)
@@ -424,6 +433,7 @@ class _VideoTileView extends StatelessWidget {
     required this.quality,
     required this.focused,
     required this.onTap,
+    required this.onFullScreen,
   });
 
   final VideoTile tile;
@@ -433,12 +443,11 @@ class _VideoTileView extends StatelessWidget {
   final ValueListenable<lk.ConnectionQuality>? quality;
   final bool focused;
   final VoidCallback onTap;
+  final VoidCallback onFullScreen;
 
   @override
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
-    // Our own tiles read You, in the interface's language.
-    final name = tile.local ? texts.videoYou : tile.name;
     // Video repaints on its own every frame; keep that from the rest.
     return RepaintBoundary(
       child: MouseRegion(
@@ -447,6 +456,7 @@ class _VideoTileView extends StatelessWidget {
             : SystemMouseCursors.zoomIn,
         child: GestureDetector(
           onTap: onTap,
+          onDoubleTap: onFullScreen,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: ColoredBox(
@@ -454,20 +464,14 @@ class _VideoTileView extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  lk.VideoTrackRenderer(
-                    tile.track,
-                    fit: lk.VideoViewFit.contain,
-                    mirrorMode: tile.local && !tile.screen
-                        ? lk.VideoViewMirrorMode.mirror
-                        : lk.VideoViewMirrorMode.off,
-                  ),
+                  _Video(tile: tile, away: away, quality: quality),
                   Positioned(
-                    left: 8,
-                    bottom: 6,
-                    child: _Label(
-                      tile.screen ? texts.videoScreen(name) : name,
-                      away: away,
-                      quality: quality,
+                    top: 6,
+                    right: 6,
+                    child: _VideoButton(
+                      icon: Icons.fullscreen,
+                      label: texts.videoFullScreen,
+                      onPressed: onFullScreen,
                     ),
                   ),
                 ],
@@ -476,6 +480,212 @@ class _VideoTileView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A camera or a screen with its name on it, filling what it's given.
+class _Video extends StatelessWidget {
+  const _Video({
+    super.key,
+    required this.tile,
+    this.away = false,
+    this.quality,
+  });
+
+  final VideoTile tile;
+  final bool away;
+  final ValueListenable<lk.ConnectionQuality>? quality;
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
+    // Our own tiles read You, in the interface's language.
+    final name = tile.local ? texts.videoYou : tile.name;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        lk.VideoTrackRenderer(
+          tile.track,
+          fit: lk.VideoViewFit.contain,
+          mirrorMode: tile.local && !tile.screen
+              ? lk.VideoViewMirrorMode.mirror
+              : lk.VideoViewMirrorMode.off,
+        ),
+        Positioned(
+          left: 8,
+          bottom: 6,
+          child: _Label(
+            tile.screen ? texts.videoScreen(name) : name,
+            away: away,
+            quality: quality,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A small dark button over a video, readable on any picture.
+class _VideoButton extends StatelessWidget {
+  const _VideoButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: label,
+    child: Material(
+      color: Colors.black.withValues(alpha: 0.55),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(
+            icon,
+            size: 20,
+            color: Colors.white,
+            semanticLabel: label,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// One video over the whole screen (WLK-63): the window goes full screen
+/// on the desktop, a phone hides its bars and turns a screen share
+/// sideways. Esc, a double click or the button come back; so does the
+/// video going away. The tiles left behind aren't drawn meanwhile, and
+/// LiveKit stops receiving what nobody sees (adaptive stream).
+class FullScreenVideo extends StatefulWidget {
+  const FullScreenVideo({super.key, required this.voice, required this.tile});
+
+  final Voice voice;
+  final VideoTile tile;
+
+  static Future<void> open(BuildContext context, Voice voice, VideoTile tile) =>
+      Navigator.of(context, rootNavigator: true).push(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) => FullScreenVideo(voice: voice, tile: tile),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        ),
+      );
+
+  @override
+  State<FullScreenVideo> createState() => _FullScreenVideoState();
+}
+
+class _FullScreenVideoState extends State<FullScreenVideo> {
+  bool _closed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.voice.addListener(_changed);
+    unawaited(setFullScreen(true, landscape: widget.tile.screen));
+  }
+
+  @override
+  void dispose() {
+    widget.voice.removeListener(_changed);
+    unawaited(setFullScreen(false));
+    super.dispose();
+  }
+
+  void _changed() {
+    if (!widget.voice.tiles.any((t) => t.id == widget.tile.id)) _close();
+  }
+
+  void _close() {
+    if (_closed) return;
+    _closed = true;
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
+    final tile = widget.tile;
+    return CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): _close},
+      child: Focus(
+        autofocus: true,
+        child: GestureDetector(
+          onDoubleTap: _close,
+          child: ColoredBox(
+            color: Colors.black,
+            child: SafeArea(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _Video(
+                    tile: tile,
+                    quality: tile.local
+                        ? null
+                        : widget.voice.qualities.of(tile.session),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: _VideoButton(
+                      icon: Icons.fullscreen_exit,
+                      label: texts.videoExitFullScreen,
+                      onPressed: _close,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The whole app, or in Android's picture-in-picture only the screen share
+/// it shows (WLK-63). The app stays underneath, kept but not drawn.
+class PictureInPictureFrame extends StatelessWidget {
+  const PictureInPictureFrame({
+    super.key,
+    required this.pip,
+    required this.child,
+  });
+
+  final PictureInPicture? pip;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final pip = this.pip;
+    if (pip == null) return child;
+    return ListenableBuilder(
+      listenable: pip,
+      builder: (context, child) {
+        final tile = pip.active ? pip.tile : null;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Offstage(offstage: tile != null, child: child),
+            if (tile != null)
+              ColoredBox(
+                color: Colors.black,
+                child: _Video(key: ValueKey(tile.id), tile: tile),
+              ),
+          ],
+        );
+      },
+      child: child,
     );
   }
 }

@@ -17,6 +17,8 @@ import android.util.Log
  * Keeps a call going while Wisetalk is in the background, with an ongoing
  * notification. Android stops the microphone of an app that goes to the
  * background without one, and screen capture needs one of its own type.
+ * Someone who only listens has no microphone permission and still needs
+ * the call kept: the phone call type covers that (WLK-64).
  */
 class CallService : Service() {
     companion object {
@@ -29,10 +31,10 @@ class CallService : Service() {
         private const val SHARING = "sharing"
 
         /** Answers the latest [update] once the service is in the foreground. */
-        private var pending: ((Boolean) -> Unit)? = null
+        private var pending: ((Int) -> Unit)? = null
 
         private fun types(context: Context, sharing: Boolean): Int {
-            var types = 0
+            var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
             if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
             ) {
@@ -47,6 +49,7 @@ class CallService : Service() {
          * [title], with [text] under it and its notification channel called
          * [channelName]; [done] gets whether it runs. Screen capture may start
          * only after the system's consent and once this ran with [sharing].
+         * [done] gets the types it runs with, 0 when it doesn't run.
          */
         fun update(
             context: Context,
@@ -54,14 +57,9 @@ class CallService : Service() {
             text: String,
             channelName: String,
             sharing: Boolean,
-            done: (Boolean) -> Unit,
+            done: (Int) -> Unit,
         ) {
-            // Without the microphone and not sharing there is nothing to keep.
-            if (types(context, sharing) == 0) {
-                stop(context)
-                return done(false)
-            }
-            pending?.invoke(false)
+            pending?.invoke(0)
             pending = done
             try {
                 context.startForegroundService(
@@ -74,7 +72,7 @@ class CallService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "cannot start: $e")
                 pending = null
-                done(false)
+                done(0)
             }
         }
 
@@ -90,17 +88,14 @@ class CallService : Service() {
         val text = intent?.getStringExtra(TEXT) ?: ""
         val channelName = intent?.getStringExtra(CHANNEL_NAME) ?: "Calls"
         val sharing = intent?.getBooleanExtra(SHARING, false) ?: false
+        val types = types(this, sharing)
         val ok = try {
-            startForeground(
-                NOTIFICATION,
-                notification(title, text, channelName),
-                types(this, sharing),
-            )
-            true
+            startForeground(NOTIFICATION, notification(title, text, channelName), types)
+            types
         } catch (e: Exception) {
             Log.w(TAG, "cannot go to the foreground: $e")
             stopSelf()
-            false
+            0
         }
         pending?.invoke(ok)
         pending = null

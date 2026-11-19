@@ -3,6 +3,22 @@
 The native app. Each release section becomes the notes of its release on
 GitHub.
 
+## 0.9.0
+
+- A VPN switched on or off, or a new network, no longer leaves Wisetalk
+  stuck: it notices a dead connection in under a minute, or at once
+  when the system reports the change, and reconnects by itself. A call
+  cut off this way picks up again in the same channel, with the
+  microphone as it was.
+- Full screen for a camera or a screen share: the button on the video, or
+  a double click. Esc, a double click or the button come back. On phones
+  a screen share turns sideways.
+- Android: leaving Wisetalk while someone shares a screen in the call
+  keeps that screen in a small window over other apps.
+- Android: a call goes on in the background for those who only listen,
+  without the microphone permission. A camera turns off while Wisetalk is
+  out of sight and back on when you return.
+
 ## 0.8.0
 
 - Linux: a screen share can carry its sound again, without the call in

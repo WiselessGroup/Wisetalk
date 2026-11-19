@@ -19,6 +19,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart'
+    show AppLifecycleListener, AppLifecycleState;
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart' as lk;
 
@@ -37,6 +39,7 @@ import 'protocol.dart';
 import 'screen_sound.dart';
 import 'shortcuts.dart';
 import 'sounds.dart';
+import 'stay_connected.dart' show awayFrom;
 import 'stereo_audio.dart';
 import 'trust.dart';
 
@@ -176,7 +179,11 @@ Cue? awayCue(Set<String> away, Participant participant, {required String? me}) {
 class Voice extends ChangeNotifier {
   Voice(this.gateway, this.preferences, {this.trust}) {
     _subscription = gateway.events.listen(_onEvent);
+    gateway.addListener(_gatewayChanged);
     preferences.addListener(_preferencesChanged);
+    if (Platform.isAndroid) {
+      _lifecycle = AppLifecycleListener(onStateChange: _sightChanged);
+    }
     unawaited(_applyOutput());
   }
 
@@ -264,9 +271,47 @@ class Voice extends ChangeNotifier {
   int _attempt = 0;
   bool _disposed = false;
 
+  /// On the way back into [channel] after the connection dropped mid-call
+  /// (WLK-62). The server takes a dropped connection out of its channel,
+  /// and the others stop sending it keys, so the seat is asked for again
+  /// once the gateway is back. Shown as joining.
+  bool _returning = false;
+
+  /// `join_voice` for the way back is sent and not answered yet.
+  bool _asked = false;
+
+  /// The microphone was off before the drop: it stays off after.
+  bool _stayMuted = false;
+
+  /// Android takes the camera from an app out of sight: the call service
+  /// has no camera type, and a camera on behind a dark screen shows nobody
+  /// anything (WLK-64). It goes off on the way out and back on on the way
+  /// in, as in Telegram.
+  AppLifecycleListener? _lifecycle;
+  bool _cameraWhenBack = false;
+
+  void _sightChanged(AppLifecycleState sight) {
+    if (awayFrom(sight)) {
+      if (!camera) return;
+      _cameraWhenBack = true;
+      unawaited(toggleCamera());
+    } else if (_cameraWhenBack) {
+      _cameraWhenBack = false;
+      if (!camera && state == VoiceState.connected) unawaited(toggleCamera());
+    }
+  }
+
+  /// Times in a row the room was lost while the gateway held: a few tries
+  /// back, then the call ends as it did before.
+  int _retries = 0;
+  static const _maxRetries = 3;
+  DateTime? _connectedAt;
+  Timer? _retry;
+
   void join(String id, {bool takeOver = false}) {
     if (channel == id) return;
     leave();
+    _retries = 0;
     channel = id;
     state = VoiceState.joining;
     error = null;
@@ -287,6 +332,58 @@ class Voice extends ChangeNotifier {
     if (channel == null) return;
     gateway.send('leave_voice');
     _reset();
+  }
+
+  void _gatewayChanged() {
+    if (channel == null) return;
+    if (gateway.ended != null) {
+      _reset();
+    } else if (gateway.status != GatewayStatus.ready &&
+        !(_returning && _room == null)) {
+      _suspend();
+    }
+  }
+
+  /// Drops the room but keeps the channel, to come back to it with
+  /// [_comeBackIn]. Android's call service keeps running meanwhile: it
+  /// could not start again from the background.
+  void _suspend() {
+    final id = channel;
+    if (id == null) return;
+    final wasMuted = muted;
+    _reset(keepService: true);
+    channel = id;
+    state = VoiceState.joining;
+    _returning = true;
+    _stayMuted = wasMuted;
+    notifyListeners();
+  }
+
+  /// Asks for the seat again, once the gateway can carry the request.
+  void _comeBackIn() {
+    final id = channel;
+    if (!_returning || _asked || id == null) return;
+    if (gateway.status != GatewayStatus.ready || _room != null) return;
+    _asked = true;
+    gateway.send('join_voice', {'channel': id});
+  }
+
+  /// The room fell apart while the gateway held, or never came together
+  /// on the way back: try again a little later, a few times.
+  void _roomLost() {
+    final since = _connectedAt;
+    if (since != null &&
+        DateTime.now().difference(since) > const Duration(minutes: 1)) {
+      _retries = 0;
+    }
+    if (_retries >= _maxRetries) {
+      error = _texts.voiceCannotConnect;
+      leave();
+      return;
+    }
+    _retries++;
+    _suspend();
+    _retry = Timer(Duration(seconds: 1 << _retries), _comeBackIn);
   }
 
   /// Others in the call who are away, for [awayCue].
@@ -774,6 +871,8 @@ class Voice extends ChangeNotifier {
 
   @override
   void dispose() {
+    gateway.removeListener(_gatewayChanged);
+    _lifecycle?.dispose();
     preferences.removeListener(_preferencesChanged);
     leave();
     _disposed = true;
@@ -794,8 +893,15 @@ class Voice extends ChangeNotifier {
       ? const []
       : (gateway.channel(channel!)?.participants ?? const []);
 
-  void _reset() {
+  void _reset({bool keepService = false}) {
     _attempt++;
+    _returning = false;
+    _asked = false;
+    _stayMuted = false;
+    _connectedAt = null;
+    _retry?.cancel();
+    _retry = null;
+    _cameraWhenBack = false;
     if (_phoneSoundOn) {
       _phoneSoundOn = false;
       unawaited(_phoneSound.stop());
@@ -823,7 +929,9 @@ class Voice extends ChangeNotifier {
     qualities.clear();
     trust?.clear();
     link.reset();
-    unawaited(_service.update(channel: null, texts: _texts));
+    if (!keepService) {
+      unawaited(_service.update(channel: null, texts: _texts));
+    }
     notifyListeners();
   }
 
@@ -831,10 +939,12 @@ class Voice extends ChangeNotifier {
   Future<bool> _syncService() {
     final id = channel;
     return _service.update(
-      channel: id == null || state != VoiceState.connected
+      // On the way back the call goes on as far as Android is concerned.
+      channel: id == null || (state != VoiceState.connected && !_returning)
           ? null
           : gateway.channel(id)?.channel.name ?? 'Wisetalk',
       sharing: screen,
+      talking: !muted,
       texts: _texts,
     );
   }
@@ -884,6 +994,7 @@ class Voice extends ChangeNotifier {
       case 'voice_granted':
         final granted = data as Map<String, dynamic>;
         if (granted['channel'] != channel) return;
+        _asked = false;
         _reviewKeys(_participants);
         _awayPeople
           ..clear()
@@ -923,6 +1034,8 @@ class Voice extends ChangeNotifier {
         final left = data as Map<String, dynamic>;
         if (left['channel'] != channel) return;
         if (left['session'] == gateway.sessionId) {
+          // Asking for the same seat again takes us out of it first.
+          if (_returning) return;
           _reset();
         } else {
           _awayPeople.remove(left['session']);
@@ -966,6 +1079,12 @@ class Voice extends ChangeNotifier {
       case 'voice_elsewhere':
         final asked = data as Map<String, dynamic>;
         if (state == VoiceState.joining && asked['channel'] == channel) {
+          if (_returning && asked['elsewhere'] == channel) {
+            // Our own seat from before the drop, most likely, which the
+            // server hasn't noticed is gone yet.
+            gateway.send('join_voice', {'channel': channel, 'take_over': true});
+            return;
+          }
           final here = asked['channel'] as String;
           _reset();
           elsewhere = (here, asked['elsewhere'] as String);
@@ -982,6 +1101,7 @@ class Voice extends ChangeNotifier {
       case 'ready':
         // Maybe a newer server after a reconnect: ask again.
         _awayUnsupported = false;
+        _comeBackIn();
       case 'error':
         final failure = data as Map<String, dynamic>;
         if (failure['code'] == 'chat_key') return;
@@ -1122,8 +1242,19 @@ class Voice extends ChangeNotifier {
         ..on<lk.ParticipantConnectionQualityUpdatedEvent>(
           (e) => qualities.set(e.participant.identity, e.connectionQuality),
         )
-        ..on<lk.RoomDisconnectedEvent>((_) {
-          if (_room == room) leave();
+        ..on<lk.RoomDisconnectedEvent>((e) {
+          if (_room != room) return;
+          switch (e.reason) {
+            // Kicked, taken over, closed: over for good.
+            case lk.DisconnectReason.clientInitiated ||
+                lk.DisconnectReason.duplicateIdentity ||
+                lk.DisconnectReason.participantRemoved ||
+                lk.DisconnectReason.roomDeleted:
+              leave();
+            // The network, or LiveKit restarting: worth coming back.
+            default:
+              _roomLost();
+          }
         });
 
       if (first) await _useKey(CallKey.generate());
@@ -1134,6 +1265,7 @@ class Voice extends ChangeNotifier {
         await room.disconnect();
         return;
       }
+      _connectedAt = DateTime.now();
       if (_key != null) {
         await _publishMicrophone();
       } else {
@@ -1144,6 +1276,10 @@ class Voice extends ChangeNotifier {
       // Left while connecting: the room closed under us, nothing went wrong.
       if (attempt != _attempt) return;
       debugPrint('cannot join voice: $e');
+      if (_returning || _retries > 0) {
+        _roomLost();
+        return;
+      }
       error = _texts.voiceCannotConnect;
       leave();
     }
@@ -1163,7 +1299,9 @@ class Voice extends ChangeNotifier {
     final room = _room;
     if (room == null || channel == null) return;
     state = VoiceState.connected;
-    if (serverMuted) {
+    _returning = false;
+    if (serverMuted || _stayMuted) {
+      _stayMuted = false;
       muted = true;
       unawaited(_syncService());
       await _phoneSoundFollows();

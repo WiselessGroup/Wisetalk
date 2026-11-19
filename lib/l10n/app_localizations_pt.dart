@@ -1134,6 +1134,12 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get videoFullScreen => 'Tela cheia';
+
+  @override
+  String get videoExitFullScreen => 'Sair da tela cheia';
+
+  @override
   String get connectionExcellent => 'excelente';
 
   @override
