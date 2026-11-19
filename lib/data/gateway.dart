@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../src/rust/api/text.dart';
 import 'api.dart';
@@ -158,7 +159,14 @@ class Gateway extends ChangeNotifier {
   /// The system's word that the network changed, on every platform. Stay
   /// Connected on Android tells [networkChanged] the same in the background.
   void _watchNetwork() {
-    _connectivity ??= Connectivity().onConnectivityChanged.listen(
+    if (_connectivity != null) return;
+    try {
+      // Plain Dart tests have no Flutter binding to hear the system with.
+      ServicesBinding.instance;
+    } catch (_) {
+      return;
+    }
+    _connectivity = Connectivity().onConnectivityChanged.listen(
       (results) {
         if (_closed || _background) return;
         if (results.contains(ConnectivityResult.none)) return;
